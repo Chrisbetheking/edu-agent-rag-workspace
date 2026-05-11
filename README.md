@@ -10,7 +10,7 @@ EduAgent 是一个面向留学咨询业务的 AI Agent + RAG 工作台，目标�
 
 ## 一句话项目介绍
 
-基于 React + TypeScript + NestJS 构建的 AI 留学咨询工作台，支持上传院校资料后进行 RAG 检索问答，并通过 Agent 工具完成 CGPA 换算、院校推荐、申请材料清单和销售话术生成。
+基于 React + TypeScript + NestJS 构建的 AI 留学咨询工作台，支持上传院校资料后进行 RAG 检索问答，并通过 Agent 工具完成 CGPA 换算、院校推荐、申请材料清单和销售话术生成。本项目当前支持本地运行：前端运行于 localhost:5173，后端运行于 localhost:3000，已完成登录、Dashboard、知识库、Agent 工具、Prompt 管理、RAG 评测等模块的 Demo 版本。
 
 ---
 
@@ -296,7 +296,7 @@ GET  /eval/results
 
 ---
 
-## 简历项目描述参考
+## 简历项目描述
 
 **EduAgent：AI Agent + RAG 留学咨询工作台｜React + TypeScript + NestJS**
 
