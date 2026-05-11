@@ -7,17 +7,17 @@ export class ChatController {
   constructor(private readonly chat: ChatService) {}
 
   @Get('conversations')
-  conversations() {
+  async conversations(): Promise<any> {
     return this.chat.conversations();
   }
 
   @Post('conversations')
-  create(@Body() body: { title: string }) {
+  async create(@Body() body: { title: string }): Promise<any> {
     return this.chat.createConversation(body.title);
   }
 
   @Get('conversations/:id/messages')
-  messages(@Param('id') id: string) {
+  async messages(@Param('id') id: string): Promise<any> {
     return this.chat.messages(id);
   }
 

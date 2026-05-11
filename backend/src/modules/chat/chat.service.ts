@@ -53,15 +53,67 @@ export class ChatService {
     private readonly db: DatabaseService,
   ) {}
 
-  conversations() {
+  async conversations(): Promise<any[]> {
+    if (this.db.enabled) {
+      try {
+        const result = await this.db.query(
+          `
+          select id, user_id, title, created_at, updated_at
+          from conversations
+          order by updated_at desc
+          limit 50
+          `,
+        );
+
+        return result.rows.map((row: any) => ({
+          id: row.id,
+          userId: row.user_id,
+          title: row.title,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }));
+      } catch (error) {
+        console.error('从 Supabase 读取 conversations 失败：', error);
+      }
+    }
+
     return this.store.conversations;
   }
 
-  createConversation(title: string) {
-    return this.store.createConversation(title || '新的留学咨询会话');
+  async createConversation(title: string): Promise<any> {
+    const conv = this.store.createConversation(title || '新的留学咨询会话');
+    await this.persistConversation(conv.id, conv.title);
+    return conv;
   }
 
-  messages(conversationId: string) {
+  async messages(conversationId: string): Promise<any[]> {
+    if (this.db.enabled) {
+      try {
+        const result = await this.db.query(
+          `
+          select id, conversation_id, role, content, sources, tool_calls, created_at
+          from messages
+          where conversation_id = $1
+          order by created_at asc
+          limit 200
+          `,
+          [conversationId],
+        );
+
+        return result.rows.map((row: any) => ({
+          id: row.id,
+          conversationId: row.conversation_id,
+          role: row.role,
+          content: row.content,
+          sources: row.sources || [],
+          toolCalls: row.tool_calls || [],
+          createdAt: row.created_at,
+        }));
+      } catch (error) {
+        console.error('从 Supabase 读取 messages 失败：', error);
+      }
+    }
+
     return this.store.messages.filter((m) => m.conversationId === conversationId);
   }
 
@@ -446,7 +498,7 @@ ${toolText}
       ? this.store.conversations.find((c) => c.id === body.conversationId)
       : this.store.createConversation(question.slice(0, 20) || '新的咨询');
 
-    const conversationId = conv?.id || this.store.createConversation('新的咨询').id;
+    const conversationId = body.conversationId || conv?.id || this.store.createConversation('新的咨询').id;
     const conversationTitle = conv?.title || question.slice(0, 20) || '新的咨询';
 
     await this.persistConversation(conversationId, conversationTitle);
