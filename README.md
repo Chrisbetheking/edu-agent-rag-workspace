@@ -1,5 +1,10 @@
 # EduAgent - AI Agent + RAG 留学咨询工作台
 
+在线演示地址：https://edu-agent-rag-workspace.vercel.app
+
+后端健康检查：https://edu-agent-backend.onrender.com/health
+测试账号：admin / admin123
+
 EduAgent 是一个面向留学咨询业务的 AI Agent + RAG 工作台，目标是把早期纯前端规则 Demo 升级为完整的 AI 应用研发项目。
 
 项目覆盖：知识库管理、RAG 检索问答、CGPA 换算、院校推荐、销售话术生成、Prompt 模板管理、工具调用日志、RAG 评测面板、SSE 流式输出、限流与 Docker 部署骨架。
