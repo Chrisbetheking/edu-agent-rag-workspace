@@ -25,6 +25,11 @@ export class ToolsController {
     return this.tools.materialList(body);
   }
 
+  @Get('overview')
+  async overview(@Query('limit') limit?: string) {
+    return this.tools.overview(Number(limit || 80));
+  }
+
   @Get('logs')
   async logs(@Query('limit') limit?: string) {
     return this.tools.logs(Number(limit || 50));

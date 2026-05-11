@@ -355,7 +355,7 @@ export default function Chat() {
 
           <div>
             <strong>正在分析学生背景和院校档次</strong>
-            <p>通常需要 10-60 秒。系统会把回答拆成一个个卡片。</p>
+            <p>系统会把回答拆成一个个卡片，并附上来源引用和工具调用记录。</p>
           </div>
         </div>
       )}

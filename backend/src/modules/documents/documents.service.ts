@@ -140,6 +140,29 @@ export class DocumentsService {
     return this.store.documents;
   }
 
+
+  async stats() {
+    const documents = await this.list();
+    const totalDocuments = documents.length;
+    const totalChunks = documents.reduce((sum: number, doc: any) => sum + Number(doc.chunkCount || 0), 0);
+    const statusMap = new Map<string, number>();
+
+    for (const doc of documents as any[]) {
+      const status = doc.status || 'unknown';
+      statusMap.set(status, (statusMap.get(status) || 0) + 1);
+    }
+
+    return {
+      totalDocuments,
+      totalChunks,
+      parsedDocuments: statusMap.get('parsed') || 0,
+      pendingDocuments: statusMap.get('pending') || 0,
+      statusBreakdown: Array.from(statusMap.entries()).map(([status, count]) => ({ status, count })),
+      recentDocuments: documents.slice(0, 6),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async upload(file: Express.Multer.File, body: any) {
     const title = body?.title || file?.originalname || '未命名文档';
     const text =

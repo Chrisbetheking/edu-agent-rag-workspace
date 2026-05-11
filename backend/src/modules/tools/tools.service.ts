@@ -219,4 +219,44 @@ export class ToolsService {
       output: log.output,
     }));
   }
+
+  async overview(limit = 80) {
+    const logs = await this.logs(limit);
+    const totalCalls = logs.length;
+    const successCount = logs.filter((log: any) => log.success).length;
+    const totalDuration = logs.reduce((sum: number, log: any) => sum + Number(log.durationMs || 0), 0);
+    const totalRagHits = logs.reduce((sum: number, log: any) => sum + Number(log.ragHitCount || 0), 0);
+
+    const toolUsageMap = new Map<string, number>();
+    const modelUsageMap = new Map<string, number>();
+
+    for (const log of logs as any[]) {
+      const model = log.model || 'unknown';
+      modelUsageMap.set(model, (modelUsageMap.get(model) || 0) + 1);
+
+      const toolNames = Array.isArray(log.toolNames) && log.toolNames.length ? log.toolNames : ['无工具调用'];
+      for (const name of toolNames) {
+        toolUsageMap.set(name, (toolUsageMap.get(name) || 0) + 1);
+      }
+    }
+
+    const toSortedArray = (map: Map<string, number>) =>
+      Array.from(map.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+
+    return {
+      totalCalls,
+      successCount,
+      failedCount: totalCalls - successCount,
+      successRate: totalCalls ? Number((successCount / totalCalls).toFixed(2)) : 0,
+      avgDurationMs: totalCalls ? Math.round(totalDuration / totalCalls) : 0,
+      avgRagHitCount: totalCalls ? Number((totalRagHits / totalCalls).toFixed(1)) : 0,
+      toolUsage: toSortedArray(toolUsageMap),
+      modelUsage: toSortedArray(modelUsageMap),
+      latestLogs: logs.slice(0, 8),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
 }

@@ -11,6 +11,11 @@ export class DocumentsController {
     return this.documents.list();
   }
 
+  @Get('stats')
+  stats() {
+    return this.documents.stats();
+  }
+
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   upload(@UploadedFile() file: Express.Multer.File, @Body() body: any) {
