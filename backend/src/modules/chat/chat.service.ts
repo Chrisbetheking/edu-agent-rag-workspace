@@ -117,7 +117,40 @@ export class ChatService {
     return this.store.messages.filter((m) => m.conversationId === conversationId);
   }
 
-  retrieve(query: string, topK = 3) {
+  async retrieve(query: string, topK = 3): Promise<any[]> {
+    if (this.db.enabled) {
+      try {
+        const result = await this.db.query(
+          `
+          select id, document_id, document_title, content, chunk_index, keywords
+          from chunks
+          order by created_at desc
+          limit 1000
+          `,
+        );
+
+        const scored = result.rows
+          .map((row: any) => ({
+            id: row.id,
+            documentId: row.document_id,
+            documentTitle: row.document_title,
+            content: row.content,
+            chunkIndex: row.chunk_index,
+            keywords: row.keywords || [],
+            score: keywordScore(query, row.content || ''),
+          }))
+          .filter((chunk: any) => chunk.score > 0)
+          .sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
+          .slice(0, topK);
+
+        if (scored.length > 0) {
+          return scored;
+        }
+      } catch (error) {
+        console.error('从 Supabase 检索 chunks 失败，回退到 MemoryStore：', error);
+      }
+    }
+
     return this.store.chunks
       .map((chunk) => ({ ...chunk, score: keywordScore(query, chunk.content) }))
       .filter((chunk) => chunk.score > 0)
@@ -506,7 +539,7 @@ ${toolText}
     this.store.addMessage(conversationId, 'user', question);
     await this.persistMessage(conversationId, 'user', question);
 
-    const sources = this.retrieve(question, body.topK || 3);
+    const sources = await this.retrieve(question, body.topK || 3);
     const toolCalls = this.detectTools(question);
 
     let answer = '';
