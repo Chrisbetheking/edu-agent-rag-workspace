@@ -1,47 +1,48 @@
-const metrics = [
-  { label: '知识库文档', value: '12', hint: '阶段 3 接入真实上传' },
-  { label: '今日 AI 问答', value: '24', hint: '阶段 5 接入 SSE' },
-  { label: 'Agent 工具', value: '3', hint: 'CGPA / 院校推荐 / 文案' },
-  { label: 'Prompt 模板', value: '6', hint: '阶段 6 开启版本管理' },
+const stats = [
+  { label: 'Agent 工具', value: '3', desc: 'CGPA / 院校推荐 / 销售话术' },
+  { label: '当前阶段', value: 'Phase 2', desc: '真实规则工具 + 调用日志' },
+  { label: '下一阶段', value: 'Phase 3', desc: '知识库上传与文档切片' },
 ];
 
 const roadmap = [
-  '阶段 1：工程骨架、登录、路由、API 封装',
-  '阶段 2：迁移旧 Demo 的 CGPA、院校推荐、文案工具',
-  '阶段 3：知识库上传、解析、切片',
-  '阶段 4：Embedding、Top-K 检索、来源引用',
-  '阶段 5：多轮对话、SSE 流式输出',
+  'Phase 2：迁移 v1 业务规则，完成工具接口和调用日志。',
+  'Phase 3：接入文档上传、解析、chunk 切片和知识库管理。',
+  'Phase 4：加入 embedding、向量检索、RAG 问答和来源引用。',
 ];
 
 export function DashboardPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <span className="eyebrow">Overview</span>
-        <h1>研发工作台</h1>
-        <p>当前版本是工程化骨架，后续逐步接入 RAG、Agent 和评测能力。</p>
+        <span className="eyebrow">EduAgent Workspace</span>
+        <h1>AI 留学咨询工作台</h1>
+        <p>从纯前端 v1 原型升级为工程化 AI Agent + RAG 项目。当前已进入 Phase 2。</p>
       </div>
 
-      <div className="metric-grid">
-        {metrics.map((metric) => (
-          <article className="metric-card" key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.hint}</small>
+      <div className="stats-grid">
+        {stats.map((item) => (
+          <article className="stat-card" key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <p>{item.desc}</p>
           </article>
         ))}
       </div>
 
       <section className="panel">
-        <h2>阶段路线</h2>
-        <div className="timeline">
-          {roadmap.map((item, index) => (
-            <div className="timeline-item" key={item}>
-              <span>{index + 1}</span>
-              <p>{item}</p>
-            </div>
-          ))}
+        <h2>当前已完成</h2>
+        <div className="card-grid">
+          <article className="feature-card"><strong>后端工具接口</strong><p>CGPA 换算、院校推荐、销售话术生成已由后端统一提供。</p></article>
+          <article className="feature-card"><strong>前端工具表单</strong><p>支持输入学生背景并展示结构化输出。</p></article>
+          <article className="feature-card"><strong>调用日志</strong><p>每次工具调用记录输入、输出、耗时和时间。</p></article>
         </div>
+      </section>
+
+      <section className="panel">
+        <h2>后续路线</h2>
+        <ul className="check-list">
+          {roadmap.map((item) => <li key={item}>{item}</li>)}
+        </ul>
       </section>
     </div>
   );

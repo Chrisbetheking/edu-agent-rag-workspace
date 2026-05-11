@@ -1,31 +1,54 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
+import { ToolsService } from './tools.service';
 
 @Controller('tools')
 export class ToolsController {
+  constructor(private readonly toolsService: ToolsService) {}
+
   @Get()
   list() {
-    return [
-      { key: 'cgpa_convert', name: 'CGPA 换算工具', enabled: true },
-      { key: 'school_recommend', name: '院校推荐工具', enabled: true },
-      { key: 'copywriting', name: '销售话术生成工具', enabled: true },
-    ];
+    return this.toolsService.listTools();
+  }
+
+  @Get('logs')
+  logs() {
+    return this.toolsService.getLogs();
   }
 
   @Post('cgpa-convert')
-  cgpaConvert(@Body() body: { score: number; scale: string }) {
-    return {
-      input: body,
-      result: '阶段 2 将迁移旧项目 GPA 换算规则。',
-    };
+  cgpaConvert(@Body() body: { score?: number; scale?: '4.0' | '5.0' | '100'; targetCountry?: string }) {
+    return this.toolsService.convertCgpa(body);
   }
 
   @Post('school-recommend')
-  schoolRecommend(@Body() body: Record<string, unknown>) {
-    return { input: body, result: '阶段 2 将迁移旧项目院校推荐规则。' };
+  schoolRecommend(
+    @Body()
+    body: {
+      country?: string;
+      major?: string;
+      gpa?: number;
+      scale?: '4.0' | '5.0' | '100';
+      englishScore?: string;
+      budget?: string;
+      background?: string;
+    },
+  ) {
+    return this.toolsService.recommendSchools(body);
   }
 
   @Post('copywriting')
-  copywriting(@Body() body: Record<string, unknown>) {
-    return { input: body, result: '阶段 2 将迁移旧项目申请文案生成逻辑。' };
+  copywriting(
+    @Body()
+    body: {
+      studentName?: string;
+      targetCountry?: string;
+      major?: string;
+      gpa?: number;
+      concern?: string;
+      channel?: 'wechat' | 'phone' | 'short_video';
+      background?: string;
+    },
+  ) {
+    return this.toolsService.generateCopywriting(body);
   }
 }

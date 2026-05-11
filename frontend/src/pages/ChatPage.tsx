@@ -1,44 +1,79 @@
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
+import { sendChatMessage } from '../api/chat';
 
-const sampleAnswer = `根据当前阶段的 Mock 数据，系统会在后续通过 RAG 检索院校知识库，并结合 CGPA 换算、院校推荐等工具生成结构化建议。`;
+type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  toolHints?: string[];
+  sources?: Array<{ title: string; snippet: string }>;
+};
 
 export function ChatPage() {
-  const [question, setQuestion] = useState('APU CS 本科 CGPA 3.2，预算 30 万，想申请英国硕士，有什么建议？');
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: '你好，我是 EduAgent。当前为阶段 1 骨架版，后续会接入真实 RAG 和 Agent 工具调用。' },
+  const [input, setInput] = useState('APU CS 本科 CGPA 3.2，想申请英国硕士，有哪些学校推荐？');
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: '我是 EduAgent。当前 Phase 2 已接入规则工具，你可以先体验 CGPA、院校推荐和销售话术生成。Phase 4 将接入真实 RAG。',
+    },
   ]);
 
-  const handleSend = () => {
-    if (!question.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      { role: 'user', content: question },
-      { role: 'assistant', content: sampleAnswer },
-    ]);
-    setQuestion('');
-  };
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!input.trim()) return;
+    const userMessage: ChatMessage = { id: `user_${Date.now()}`, role: 'user', content: input };
+    setMessages((items) => [...items, userMessage]);
+    setLoading(true);
+    try {
+      const data = await sendChatMessage(input);
+      setMessages((items) => [...items, data]);
+      setInput('');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="page chat-layout">
+    <div className="page">
       <div className="page-header">
-        <span className="eyebrow">AI Chat</span>
-        <h1>AI 留学咨询对话</h1>
-        <p>阶段 1 为 Mock 对话，后续接入 SSE 流式输出、来源引用和工具调用轨迹。</p>
+        <span className="eyebrow">AI Workspace</span>
+        <h1>AI 对话工作台</h1>
+        <p>Phase 2 先做工具联动提示；后续会升级为 SSE 流式输出和 RAG 来源引用。</p>
       </div>
 
-      <div className="chat-window">
-        {messages.map((message, index) => (
-          <div className={`message ${message.role}`} key={index}>
-            <span>{message.role === 'user' ? '用户' : 'EduAgent'}</span>
-            <p>{message.content}</p>
-          </div>
-        ))}
-      </div>
+      <section className="chat-shell">
+        <div className="messages">
+          {messages.map((message) => (
+            <article className={`message ${message.role}`} key={message.id}>
+              <strong>{message.role === 'user' ? '你' : 'EduAgent'}</strong>
+              <p>{message.content}</p>
+              {message.toolHints && message.toolHints.length > 0 && (
+                <div className="hint-box">
+                  <span>工具建议</span>
+                  {message.toolHints.map((hint) => <em key={hint}>{hint}</em>)}
+                </div>
+              )}
+              {message.sources && (
+                <div className="source-list">
+                  {message.sources.map((source) => (
+                    <div className="source-card" key={source.title}>
+                      <strong>{source.title}</strong>
+                      <span>{source.snippet}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
 
-      <div className="composer">
-        <textarea value={question} onChange={(e) => setQuestion(e.target.value)} />
-        <button className="primary-button" onClick={handleSend}>发送</button>
-      </div>
+        <form className="chat-input" onSubmit={submit}>
+          <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入留学咨询问题..." />
+          <button className="primary-button" disabled={loading}>{loading ? '发送中...' : '发送'}</button>
+        </form>
+      </section>
     </div>
   );
 }
