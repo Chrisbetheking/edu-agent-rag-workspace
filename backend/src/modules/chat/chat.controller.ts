@@ -22,7 +22,7 @@ export class ChatController {
   }
 
   @Post()
-  ask(@Body() body: any) {
+  async ask(@Body() body: any): Promise<any> {
     return this.chat.ask(body);
   }
 
