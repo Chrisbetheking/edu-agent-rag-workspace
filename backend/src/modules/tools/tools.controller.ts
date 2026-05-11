@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ToolsService } from './tools.service';
 
 @Controller('tools')
@@ -26,7 +26,7 @@ export class ToolsController {
   }
 
   @Get('logs')
-  logs() {
-    return this.tools.logs();
+  async logs(@Query('limit') limit?: string) {
+    return this.tools.logs(Number(limit || 50));
   }
 }
