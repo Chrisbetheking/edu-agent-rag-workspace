@@ -63,6 +63,34 @@ function cleanText(text?: string) {
     .trim();
 }
 
+function stripCodeFence(text: string) {
+  return String(text || '')
+    .trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```$/i, '')
+    .trim();
+}
+
+function tryParseStructuredAnswer(text?: string): StructuredAdvice | null {
+  if (!text) return null;
+
+  const cleaned = stripCodeFence(text);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
 function DetailItem({ label, value }: { label: string; value?: string }) {
   return (
     <div className="profile-item">
@@ -77,7 +105,9 @@ function EmptyState() {
     <div className="empty-advice">
       <div className="empty-icon">AI</div>
       <h2>输入学生背景，生成结构化选校方案</h2>
-      <p>系统会自动拆成背景判断、冲刺 / 匹配 / 保底院校、推荐原因、风险提醒和时间规划。</p>
+      <p>
+        系统会自动拆成背景判断、冲刺 / 匹配 / 保底院校、推荐原因、风险提醒和时间规划。
+      </p>
     </div>
   );
 }
@@ -113,6 +143,7 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
                 <h3>{cleanText(tier.tier)}</h3>
               </div>
             </div>
+
             <p className="tier-strategy">{cleanText(tier.strategy)}</p>
 
             <div className="school-list">
@@ -120,21 +151,27 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
                 <div className="school-card" key={`${tier.tier}-${school.name}-${index}`}>
                   <div className="school-topline">
                     <strong>{cleanText(school.name)}</strong>
-                    <em>{tier.tier}</em>
+                    <em>{cleanText(tier.tier)}</em>
                   </div>
+
                   <div className="school-detail">
                     <span>推荐原因</span>
                     <p>{cleanText(school.reason)}</p>
                   </div>
+
                   <div className="school-detail">
                     <span>适配点</span>
                     <p>{cleanText(school.fit)}</p>
                   </div>
+
                   <div className="school-detail warn">
                     <span>风险点</span>
                     <p>{cleanText(school.risk)}</p>
                   </div>
-                  <div className="school-action">下一步：{cleanText(school.action)}</div>
+
+                  <div className="school-action">
+                    下一步：{cleanText(school.action)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -148,13 +185,16 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
             <span>Timeline</span>
             <h2>申请时间规划</h2>
           </div>
+
           <div className="timeline-cards">
             {(data.timeline || []).map((item, index) => (
               <div className="timeline-card" key={`${item.phase}-${index}`}>
                 <div className="timeline-index">{index + 1}</div>
+
                 <div>
                   <strong>{cleanText(item.phase)}</strong>
                   <span>{cleanText(item.time)}</span>
+
                   <ul>
                     {(item.tasks || []).map((task, i) => (
                       <li key={i}>{cleanText(task)}</li>
@@ -171,12 +211,14 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
             <span>Risks & Actions</span>
             <h2>风险和下一步</h2>
           </div>
+
           <h3>风险提醒</h3>
           <div className="tag-list danger">
             {(data.risks || []).map((risk, index) => (
               <span key={index}>{cleanText(risk)}</span>
             ))}
           </div>
+
           <h3>下一步动作</h3>
           <div className="action-list">
             {(data.nextActions || []).map((action, index) => (
@@ -186,7 +228,9 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
         </div>
       </div>
 
-      <div className="disclaimer-card">{cleanText(data.disclaimer)}</div>
+      <div className="disclaimer-card">
+        {cleanText(data.disclaimer)}
+      </div>
     </div>
   );
 }
@@ -205,7 +249,19 @@ export default function Chat() {
       .catch((err) => console.error('加载历史会话失败：', err));
   }, []);
 
-  const structured = useMemo(() => result?.structured || null, [result]);
+  const structured = useMemo(() => {
+    if (!result) return null;
+
+    if (result.structured) {
+      return result.structured;
+    }
+
+    return (
+      tryParseStructuredAnswer(result.rawAnswer) ||
+      tryParseStructuredAnswer(result.answer) ||
+      null
+    );
+  }, [result]);
 
   async function ask(e: FormEvent) {
     e.preventDefault();
@@ -220,18 +276,24 @@ export default function Chat() {
     setResult(null);
 
     try {
-      const { data } = await api.post('/chat', { question, topK: 3 });
+      const { data } = await api.post('/chat', {
+        question,
+        topK: 3,
+      });
+
       setResult(data);
 
       const conv = await api.get('/chat/conversations');
       setConversations(conv.data);
     } catch (err: any) {
       console.error('AI 对话请求失败：', err);
+
       const message =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         err?.message ||
         '请求失败，请稍后重试。';
+
       setError(`AI 对话请求失败：${message}`);
     } finally {
       setLoading(false);
@@ -246,20 +308,32 @@ export default function Chat() {
           <h1>AI 留学选校工作台</h1>
           <p>真实大模型 + 工具调用 + RAG 来源引用，输出卡片化申请方案。</p>
         </div>
+
         <div className="model-badge">DeepSeek Connected</div>
       </div>
 
       <div className="prompt-panel">
         <form onSubmit={ask} className="prompt-box">
           <label>学生背景 / 咨询问题</label>
-          <textarea value={question} onChange={(e) => setQuestion(e.target.value)} />
+
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="请输入学生背景、目标国家、专业方向、预算等信息..."
+          />
+
           <div className="example-row">
             {examples.map((item) => (
-              <button type="button" key={item} onClick={() => setQuestion(item)}>
+              <button
+                type="button"
+                key={item}
+                onClick={() => setQuestion(item)}
+              >
                 {item.slice(0, 18)}...
               </button>
             ))}
           </div>
+
           <button className="primary ask-button" disabled={loading}>
             {loading ? '正在生成结构化方案...' : '生成选校方案'}
           </button>
@@ -278,9 +352,10 @@ export default function Chat() {
       {loading && (
         <div className="loading-card">
           <div className="loader-dot" />
+
           <div>
             <strong>正在分析学生背景和院校档次</strong>
-            <p>通常需要 10-30 秒。系统会把回答拆成一个个卡片。</p>
+            <p>通常需要 10-60 秒。系统会把回答拆成一个个卡片。</p>
           </div>
         </div>
       )}
@@ -291,6 +366,14 @@ export default function Chat() {
         <div className="fallback-answer">
           <h2>AI 回答</h2>
           <p>{cleanText(result.answer)}</p>
+
+          <div className="error-card" style={{ marginTop: 16 }}>
+            <strong>提示</strong>
+            <p>
+              当前回答没有被成功解析成结构化卡片。通常是因为大模型返回的 JSON
+              被截断，或者不是合法 JSON。请把 Render 里的 LLM_MAX_TOKENS 调高，并限制后端提示词输出长度。
+            </p>
+          </div>
         </div>
       )}
 
@@ -298,6 +381,7 @@ export default function Chat() {
         <div className="meta-grid">
           <div className="meta-panel">
             <h2>来源引用</h2>
+
             {result.sources?.length ? (
               result.sources.map((s, i) => (
                 <div className="source-card" key={s.id || i}>
@@ -313,6 +397,7 @@ export default function Chat() {
 
           <div className="meta-panel">
             <h2>工具调用</h2>
+
             {result.toolCalls?.length ? (
               result.toolCalls.map((t, i) => (
                 <div className="tool-card" key={i}>
@@ -327,6 +412,7 @@ export default function Chat() {
 
           <div className="meta-panel history-panel">
             <h2>历史会话</h2>
+
             {conversations.length ? (
               conversations.slice(0, 6).map((c) => (
                 <div className="history-row" key={c.id}>
