@@ -1,15 +1,23 @@
 {
   "name": "edu-agent-rag-workspace",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "frontend",
-    "backend"
-  ],
+  "description": "面向留学咨询业务的 AI Agent + RAG 工作台",
   "scripts": {
-    "dev:frontend": "npm --workspace frontend run dev",
-    "dev:backend": "npm --workspace backend run start:dev",
-    "build:frontend": "npm --workspace frontend run build",
-    "build:backend": "npm --workspace backend run build"
-  }
+    "install:all": "npm install --prefix frontend && npm install --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run start:dev --prefix backend",
+    "build": "npm run build --prefix frontend && npm run build --prefix backend",
+    "lint": "npm run lint --prefix frontend && npm run lint --prefix backend"
+  },
+  "keywords": [
+    "AI Agent",
+    "RAG",
+    "React",
+    "TypeScript",
+    "NestJS",
+    "留学咨询"
+  ],
+  "author": "Chrisbetheking",
+  "license": "MIT"
 }

@@ -1,37 +1,20 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-
-const demoUser = {
-  id: 'demo-admin-001',
-  username: 'admin',
-  displayName: 'Demo Admin',
-  role: 'admin' as const,
-};
+import { MemoryStore } from '../../shared/memory-store';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(private readonly store: MemoryStore, private readonly jwt: JwtService) {}
 
   login(username: string, password: string) {
-    if (username !== 'admin' || password !== 'admin123') {
-      throw new UnauthorizedException('Invalid username or password');
-    }
-
-    const accessToken = this.jwtService.sign({
-      sub: demoUser.id,
-      username: demoUser.username,
-      role: demoUser.role,
-    });
-
-    return { accessToken, user: demoUser };
+    const allow = (username === 'admin' && password === 'admin123') || (username === 'demo' && password === 'demo123');
+    if (!allow) throw new UnauthorizedException('账号或密码错误');
+    const user = this.store.users.find((u) => u.username === username)!;
+    const token = this.jwt.sign({ sub: user.id, username: user.username, role: user.role });
+    return { token, user };
   }
 
-  profile(token: string) {
-    try {
-      this.jwtService.verify(token);
-      return demoUser;
-    } catch {
-      throw new UnauthorizedException('Invalid token');
-    }
+  profile() {
+    return this.store.users[0];
   }
 }

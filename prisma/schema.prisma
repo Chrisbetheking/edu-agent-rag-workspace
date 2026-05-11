@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum DocumentStatus {
+  PENDING
+  PARSED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Document {
+  id        String         @id @default(uuid())
+  title     String
+  fileName  String
+  status    DocumentStatus @default(PENDING)
+  source    String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  chunks    DocumentChunk[]
+}
+
+model DocumentChunk {
+  id         String   @id @default(uuid())
+  documentId String
+  content    String
+  chunkIndex Int
+  score      Float?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  Message[]
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  role           String
+  content        String
+  sources        Json?
+  toolCalls      Json?
+  createdAt      DateTime @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model PromptTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  scene       String
+  content     String
+  variables   Json?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ToolCallLog {
+  id        String   @id @default(uuid())
+  toolName  String
+  input     Json
+  output    Json
+  duration  Int
+  status    String
+  createdAt DateTime @default(now())
+}
+
+model EvalQuestion {
+  id             String   @id @default(uuid())
+  question       String
+  expectedSource String
+  expectedAnswer String?
+  createdAt      DateTime @default(now())
+}
+
+model EvalResult {
+  id             String   @id @default(uuid())
+  questionId     String
+  topK           Int
+  hit            Boolean
+  recallAtK      Float
+  latency        Int
+  retrieved      Json
+  createdAt      DateTime @default(now())
+}

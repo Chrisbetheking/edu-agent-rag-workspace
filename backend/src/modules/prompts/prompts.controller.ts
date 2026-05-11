@@ -1,27 +1,27 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { PromptsService } from './prompts.service';
 
 @Controller('prompts')
 export class PromptsController {
+  constructor(private readonly prompts: PromptsService) {}
+
   @Get()
   list() {
-    return [
-      { id: 'prompt_1', name: '院校推荐 Prompt', enabled: true, version: 1 },
-      { id: 'prompt_2', name: '销售话术 Prompt', enabled: true, version: 1 },
-    ];
+    return this.prompts.list();
   }
 
   @Post()
-  create(@Body() body: Record<string, unknown>) {
-    return { id: 'prompt_new', ...body };
+  create(@Body() body: any) {
+    return this.prompts.create(body);
   }
 
-  @Put(':id')
-  update(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return { id, ...body };
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.prompts.update(id, body);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return { deleted: true, id };
+    return this.prompts.remove(id);
   }
 }

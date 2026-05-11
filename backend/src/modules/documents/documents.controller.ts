@@ -1,27 +1,34 @@
-import { Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { DocumentsService } from './documents.service';
 
 @Controller('documents')
 export class DocumentsController {
+  constructor(private readonly documents: DocumentsService) {}
+
   @Get()
   list() {
-    return [
-      { id: 'doc_1', title: '英国计算机硕士申请要求.pdf', status: 'ready', chunks: 42 },
-      { id: 'doc_2', title: '澳洲八大申请 FAQ.md', status: 'pending', chunks: 0 },
-    ];
+    return this.documents.list();
   }
 
   @Post('upload')
-  uploadPlaceholder() {
-    return { message: 'Phase 3 will implement real file upload and parsing.' };
+  @UseInterceptors(FileInterceptor('file'))
+  upload(@UploadedFile() file: Express.Multer.File, @Body() body: any) {
+    return this.documents.upload(file, body);
   }
 
   @Get(':id/chunks')
   chunks(@Param('id') id: string) {
-    return { documentId: id, chunks: [] };
+    return this.documents.chunks(id);
+  }
+
+  @Post(':id/reprocess')
+  reprocess(@Param('id') id: string) {
+    return this.documents.reprocess(id);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return { deleted: true, id };
+    return this.documents.remove(id);
   }
 }

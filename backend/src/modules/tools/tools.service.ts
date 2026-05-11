@@ -1,201 +1,97 @@
 import { Injectable } from '@nestjs/common';
-
-type ToolKey = 'cgpa_convert' | 'school_recommend' | 'copywriting';
-
-type ToolLog = {
-  id: string;
-  toolKey: ToolKey;
-  toolName: string;
-  input: Record<string, unknown>;
-  output: Record<string, unknown>;
-  success: boolean;
-  latencyMs: number;
-  createdAt: string;
-};
-
-const toolMeta: Record<ToolKey, { name: string; description: string }> = {
-  cgpa_convert: {
-    name: 'CGPA 换算工具',
-    description: '将 4.0 / 5.0 / 百分制成绩换算成留学申请参考区间。',
-  },
-  school_recommend: {
-    name: '院校推荐工具',
-    description: '根据国家、专业、GPA、预算和语言成绩生成冲刺/匹配/保底推荐。',
-  },
-  copywriting: {
-    name: '销售话术生成工具',
-    description: '根据学生背景、目标国家和顾虑点生成微信沟通话术、电话提纲和短视频脚本。',
-  },
-};
+import { MemoryStore } from '../../shared/memory-store';
 
 @Injectable()
 export class ToolsService {
-  private logs: ToolLog[] = [];
+  constructor(private readonly store: MemoryStore) {}
 
-  listTools() {
-    return Object.entries(toolMeta).map(([key, value]) => ({
-      key,
-      name: value.name,
-      description: value.description,
-      enabled: true,
-      stage: 'phase2_real_rule_engine',
-    }));
-  }
-
-  getLogs() {
-    return this.logs.slice().reverse().slice(0, 30);
-  }
-
-  convertCgpa(input: { score?: number; scale?: '4.0' | '5.0' | '100'; targetCountry?: string }) {
-    const started = Date.now();
-    const score = Number(input.score ?? 0);
-    const scale = input.scale ?? '4.0';
-    const max = scale === '5.0' ? 5 : scale === '100' ? 100 : 4;
-    const normalized = Math.max(0, Math.min(score / max, 1));
-    const percentage = Math.round(normalized * 1000) / 10;
-
-    let level = '需要补充背景';
-    let ukEstimate = '需结合学校算法';
-    let advice = '建议补充课程成绩、项目经历和语言成绩后再判断。';
-
-    if (percentage >= 88) {
-      level = '强竞争力';
-      ukEstimate = '约等于一等/高 2:1 区间';
-      advice = '可以准备冲刺院校，同时用科研、实习或项目强化申请亮点。';
-    } else if (percentage >= 80) {
-      level = '较强竞争力';
-      ukEstimate = '约等于 2:1 区间';
-      advice = '建议主申匹配院校，并选择 1-2 所冲刺院校。';
-    } else if (percentage >= 70) {
-      level = '中等竞争力';
-      ukEstimate = '约等于 2:2 到 2:1 边缘';
-      advice = '建议搭配语言成绩、项目经历和保底院校，降低申请风险。';
-    } else {
-      level = '风险较高';
-      ukEstimate = '低于常见直接录取要求';
-      advice = '建议考虑预科、桥梁课程、补充实习项目或扩大国家范围。';
+  private track<T>(toolName: string, input: any, fn: () => T) {
+    const start = Date.now();
+    try {
+      const output = fn();
+      this.store.addToolLog({ toolName, input, output, duration: Date.now() - start, status: 'success' });
+      return output;
+    } catch (error) {
+      const output = { message: error?.message || '工具调用失败' };
+      this.store.addToolLog({ toolName, input, output, duration: Date.now() - start, status: 'failed' });
+      throw error;
     }
-
-    const output = {
-      percentageEquivalent: percentage,
-      level,
-      ukEstimate,
-      advice,
-      disclaimer: '换算结果为演示规则，不代表任何学校官方换算标准。',
-    };
-
-    return this.record('cgpa_convert', input as Record<string, unknown>, output, started);
   }
 
-  recommendSchools(input: {
-    country?: string;
-    major?: string;
-    gpa?: number;
-    scale?: '4.0' | '5.0' | '100';
-    englishScore?: string;
-    budget?: string;
-    background?: string;
-  }) {
-    const started = Date.now();
-    const country = input.country || '英国';
-    const major = input.major || 'Computer Science';
-    const normalized = this.normalizeScore(Number(input.gpa ?? 3.2), input.scale ?? '4.0');
-
-    const pool = this.schoolPool(country, major);
-    const reach = pool.reach.slice(0, normalized >= 82 ? 3 : 2);
-    const match = pool.match.slice(0, 3);
-    const safe = pool.safe.slice(0, normalized >= 70 ? 2 : 3);
-
-    const output = {
-      profileSummary: `${country} / ${major} / 成绩约 ${normalized}% / 预算 ${input.budget || '未填写'} / 语言 ${input.englishScore || '未填写'}`,
-      buckets: [
-        { type: '冲刺', schools: reach, reason: '对成绩、背景和语言要求更高，适合少量尝试。' },
-        { type: '匹配', schools: match, reason: '与当前背景较匹配，建议作为主申组合。' },
-        { type: '保底', schools: safe, reason: '录取风险相对低，用于保证申请安全边界。' },
-      ],
-      nextActions: [
-        '补充完整成绩单、语言成绩、项目/实习经历。',
-        '核对目标专业官网 entry requirements。',
-        '准备 PS/CV，并把 AI 推荐结果作为初筛参考，不替代官方要求。',
-      ],
-      disclaimer: '院校推荐为演示规则，真实申请必须以学校官网和当年录取要求为准。',
-    };
-
-    return this.record('school_recommend', input as Record<string, unknown>, output, started);
-  }
-
-  generateCopywriting(input: {
-    studentName?: string;
-    targetCountry?: string;
-    major?: string;
-    gpa?: number;
-    concern?: string;
-    channel?: 'wechat' | 'phone' | 'short_video';
-    background?: string;
-  }) {
-    const started = Date.now();
-    const name = input.studentName || '同学';
-    const country = input.targetCountry || '英国/澳洲';
-    const major = input.major || '计算机相关专业';
-    const concern = input.concern || '担心成绩和预算是否够';
-
-    const output = {
-      wechatMessage: `${name}你好，我根据你的${major}方向和${country}目标，先帮你做了一个初步方案。你目前最关键的不是盲目选学校，而是先确认成绩换算、语言要求和预算区间。我可以先给你分成冲刺/匹配/保底三档，再逐个核对学校官网要求。`,
-      phoneOutline: [
-        '先确认学生背景：学校、专业、CGPA、语言、预算。',
-        `重点回应顾虑：${concern}。`,
-        '用 3 档院校方案降低决策压力。',
-        '下一步引导补充材料：成绩单、语言成绩、目标国家、预算。',
-      ],
-      shortVideoScript: `开头：很多同学想申${country}的${major}，但第一步不是看排名，而是看你的成绩能匹配哪一档学校。\n中段：我们会先做 CGPA 换算，再结合预算、语言和专业方向分成冲刺、匹配、保底。\n结尾：如果你也不确定自己能申哪些学校，可以先整理成绩单和目标国家，我们帮你做初筛。`,
-      riskReminder: '话术用于销售沟通草稿，不能承诺录取结果。',
-    };
-
-    return this.record('copywriting', input as Record<string, unknown>, output, started);
-  }
-
-  private normalizeScore(score: number, scale: '4.0' | '5.0' | '100') {
-    const max = scale === '5.0' ? 5 : scale === '100' ? 100 : 4;
-    return Math.round(Math.max(0, Math.min(score / max, 1)) * 1000) / 10;
-  }
-
-  private schoolPool(country: string, major: string) {
-    const uk = country.includes('英');
-    const au = country.includes('澳');
-    const asia = country.includes('马') || country.includes('新');
-    if (au) {
+  convertCgpa(input: { cgpa: number; scale?: number; targetCountry?: string }) {
+    return this.track('CGPA 换算工具', input, () => {
+      const scale = Number(input.scale || 4);
+      const cgpa = Number(input.cgpa || 0);
+      const percent = Math.max(0, Math.min(100, (cgpa / scale) * 100));
+      let level = '需要强化背景';
+      if (percent >= 85) level = '优秀，可冲刺排名较高院校';
+      else if (percent >= 75) level = '良好，适合匹配中上院校';
+      else if (percent >= 65) level = '中等，建议合理选校并补充项目/实习';
       return {
-        reach: [`University of Melbourne - ${major}`, `University of Sydney - ${major}`, `UNSW - ${major}`],
-        match: [`Monash University - ${major}`, `University of Queensland - ${major}`, `University of Adelaide - ${major}`],
-        safe: [`RMIT University - ${major}`, `Deakin University - ${major}`, `UTS - ${major}`],
+        cgpa,
+        scale,
+        percentage: Number(percent.toFixed(2)),
+        targetCountry: input.targetCountry || '未指定',
+        level,
+        advice: [
+          '换算结果仅用于初筛，不等于学校官方评估。',
+          '建议同时准备课程描述、项目经历、实习证明和推荐信。',
+          '最终要求需要以目标学校官网和当年招生政策为准。',
+        ],
       };
-    }
-    if (asia) {
-      return {
-        reach: [`NUS/NTU 相关项目 - ${major}`, `University of Malaya - ${major}`, `Monash Malaysia - ${major}`],
-        match: [`APU - ${major}`, `Taylor's University - ${major}`, `UCSI University - ${major}`],
-        safe: [`INTI International University - ${major}`, `SEGi University - ${major}`, `HELP University - ${major}`],
-      };
-    }
-    return {
-      reach: [`University of Manchester - ${major}`, `University of Bristol - ${major}`, `University of Warwick - ${major}`],
-      match: [`University of Birmingham - ${major}`, `University of Leeds - ${major}`, `University of Southampton - ${major}`],
-      safe: [`University of Leicester - ${major}`, `University of Essex - ${major}`, `Coventry University - ${major}`],
-    };
+    });
   }
 
-  private record(toolKey: ToolKey, input: Record<string, unknown>, output: Record<string, unknown>, started: number) {
-    const log: ToolLog = {
-      id: `${toolKey}_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      toolKey,
-      toolName: toolMeta[toolKey].name,
-      input,
-      output,
-      success: true,
-      latencyMs: Date.now() - started,
-      createdAt: new Date().toISOString(),
-    };
-    this.logs.push(log);
-    return { ...output, logId: log.id, latencyMs: log.latencyMs };
+  recommendSchools(input: any) {
+    return this.track('院校推荐工具', input, () => {
+      const gpa = Number(input.gpa || input.cgpa || 0);
+      const country = input.country || '英国/澳洲';
+      const major = input.major || '计算机相关专业';
+      const budget = input.budget || '未指定';
+      const language = input.language || '暂未提供';
+      const bands = gpa >= 3.4
+        ? { reach: ['Manchester', 'Bristol', 'Warwick'], match: ['Sheffield', 'Nottingham', 'Leeds'], safe: ['Cardiff', 'Liverpool', 'Queen Mary'] }
+        : gpa >= 3.0
+          ? { reach: ['Sheffield', 'Nottingham', 'Leeds'], match: ['Cardiff', 'Liverpool', 'Queen Mary'], safe: ['Sussex', 'Essex', 'Swansea'] }
+          : { reach: ['Cardiff', 'Liverpool'], match: ['Sussex', 'Essex', 'Swansea'], safe: ['部分预科/语言班/合作项目'] };
+      return {
+        profile: { country, major, gpa, budget, language },
+        reach: bands.reach.map((name) => ({ name, reason: '可作为冲刺选择，需要突出项目、实习和课程匹配度。' })),
+        match: bands.match.map((name) => ({ name, reason: '与当前背景相对匹配，建议重点准备申请材料。' })),
+        safe: bands.safe.map((name) => ({ name, reason: '作为保底选择，适合提升申请成功率。' })),
+        risk: ['GPA、语言成绩、专业匹配度和申请时间都会影响结果。', '推荐结果为 Demo 模拟，真实申请需核对学校官网。'],
+      };
+    });
+  }
+
+  generateCopywriting(input: any) {
+    return this.track('销售话术生成工具', input, () => {
+      const name = input.name || '同学';
+      const country = input.country || '目标国家';
+      const concern = input.concern || '选校和申请成功率';
+      return {
+        wechat: `你好${name}，根据你目前的背景，如果目标是${country}，我们可以先从 GPA、专业匹配度、预算和语言成绩四个维度做初筛。你现在最需要解决的是${concern}，我建议先整理成绩单和目标专业方向，我可以帮你做一版冲刺/匹配/保底方案。`,
+        callOutline: ['确认学生背景和目标国家', '解释当前背景的优势与风险', '给出三档选校策略', '引导提供成绩单和语言成绩', '安排下一步方案沟通'],
+        shortVideoScript: `如果你也是马来西亚本科背景，想申请${country}硕士，千万不要只看排名。GPA、专业匹配、预算和材料完整度都会影响结果。建议先做三档选校，再针对每所学校准备材料。`,
+      };
+    });
+  }
+
+  materialList(input: any) {
+    return this.track('申请材料清单工具', input, () => {
+      const country = input.country || '目标国家';
+      const degree = input.degree || '硕士';
+      return {
+        country,
+        degree,
+        required: ['成绩单', '在读证明/毕业证', '个人陈述 PS', '简历 CV', '推荐信', '护照', '语言成绩'],
+        optional: ['课程描述', '作品集', '实习证明', '项目证明', '获奖证明'],
+        reminders: ['不同学校材料要求可能不同。', '语言成绩未达标时可查询语言班或后补政策。', '所有材料建议统一命名并备份。'],
+      };
+    });
+  }
+
+  logs() {
+    return this.store.toolLogs.slice(0, 50);
   }
 }

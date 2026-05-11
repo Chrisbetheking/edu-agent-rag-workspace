@@ -1,26 +1,25 @@
+version: "3.9"
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: edu-agent-postgres
+    container_name: eduagent-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: edu_agent
-      POSTGRES_PASSWORD: edu_agent_password
-      POSTGRES_DB: edu_agent_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: eduagent
     ports:
       - "5432:5432"
     volumes:
-      - edu_agent_postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
-    container_name: edu-agent-redis
+    container_name: eduagent-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
-    volumes:
-      - edu_agent_redis:/data
 
 volumes:
-  edu_agent_postgres:
-  edu_agent_redis:
+  postgres_data:
