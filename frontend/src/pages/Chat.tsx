@@ -1,17 +1,198 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+
+interface SchoolAdvice {
+  name: string;
+  reason: string;
+  fit: string;
+  risk: string;
+  action: string;
+}
+
+interface SchoolTier {
+  tier: string;
+  level: string;
+  strategy: string;
+  schools: SchoolAdvice[];
+}
+
+interface TimelineItem {
+  phase: string;
+  time: string;
+  tasks: string[];
+}
+
+interface StructuredAdvice {
+  summary: string;
+  profile: {
+    education: string;
+    gpa: string;
+    targetCountry: string;
+    targetMajor: string;
+    budget: string;
+    competitiveness: string;
+  };
+  schoolTiers: SchoolTier[];
+  timeline: TimelineItem[];
+  risks: string[];
+  nextActions: string[];
+  disclaimer: string;
+}
 
 interface ChatResult {
   answer: string;
+  rawAnswer?: string;
+  structured?: StructuredAdvice | null;
   sources: any[];
   toolCalls: any[];
   conversationId: string;
 }
 
-export default function Chat() {
-  const [question, setQuestion] = useState(
-    'APU 计算机本科 CGPA 3.2，想申请英国硕士，应该怎么选校？预算30万',
+const examples = [
+  'APU 计算机本科 CGPA 3.2，想申请英国硕士，预算30万，请给我冲刺、匹配、保底三档选校。',
+  '马来西亚本科软件工程，GPA 3.5，想申请澳洲数据科学硕士，怎么规划？',
+  '双非本科均分82，想申请英国人工智能硕士，预算35万，有哪些学校适合？',
+];
+
+function cleanText(text?: string) {
+  return String(text || '')
+    .replace(/\*\*/g, '')
+    .replace(/###/g, '')
+    .replace(/```json/g, '')
+    .replace(/```/g, '')
+    .trim();
+}
+
+function DetailItem({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="profile-item">
+      <span>{label}</span>
+      <strong>{cleanText(value) || '待补充'}</strong>
+    </div>
   );
+}
+
+function EmptyState() {
+  return (
+    <div className="empty-advice">
+      <div className="empty-icon">AI</div>
+      <h2>输入学生背景，生成结构化选校方案</h2>
+      <p>系统会自动拆成背景判断、冲刺 / 匹配 / 保底院校、推荐原因、风险提醒和时间规划。</p>
+    </div>
+  );
+}
+
+function StructuredResult({ data }: { data: StructuredAdvice }) {
+  return (
+    <div className="advice-result">
+      <div className="summary-card">
+        <span className="section-kicker">总体判断</span>
+        <h2>{cleanText(data.summary)}</h2>
+      </div>
+
+      <div className="profile-grid">
+        <DetailItem label="学生背景" value={data.profile?.education} />
+        <DetailItem label="成绩判断" value={data.profile?.gpa} />
+        <DetailItem label="目标国家" value={data.profile?.targetCountry} />
+        <DetailItem label="专业方向" value={data.profile?.targetMajor} />
+        <DetailItem label="预算判断" value={data.profile?.budget} />
+        <DetailItem label="竞争力" value={data.profile?.competitiveness} />
+      </div>
+
+      <div className="section-heading">
+        <span>School Shortlist</span>
+        <h2>三档选校方案</h2>
+      </div>
+
+      <div className="tier-grid">
+        {(data.schoolTiers || []).map((tier) => (
+          <div className="tier-card" key={tier.tier}>
+            <div className="tier-header">
+              <div>
+                <span>{cleanText(tier.level)}</span>
+                <h3>{cleanText(tier.tier)}</h3>
+              </div>
+            </div>
+            <p className="tier-strategy">{cleanText(tier.strategy)}</p>
+
+            <div className="school-list">
+              {(tier.schools || []).map((school, index) => (
+                <div className="school-card" key={`${tier.tier}-${school.name}-${index}`}>
+                  <div className="school-topline">
+                    <strong>{cleanText(school.name)}</strong>
+                    <em>{tier.tier}</em>
+                  </div>
+                  <div className="school-detail">
+                    <span>推荐原因</span>
+                    <p>{cleanText(school.reason)}</p>
+                  </div>
+                  <div className="school-detail">
+                    <span>适配点</span>
+                    <p>{cleanText(school.fit)}</p>
+                  </div>
+                  <div className="school-detail warn">
+                    <span>风险点</span>
+                    <p>{cleanText(school.risk)}</p>
+                  </div>
+                  <div className="school-action">下一步：{cleanText(school.action)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="advice-two-col">
+        <div className="insight-panel">
+          <div className="section-heading compact">
+            <span>Timeline</span>
+            <h2>申请时间规划</h2>
+          </div>
+          <div className="timeline-cards">
+            {(data.timeline || []).map((item, index) => (
+              <div className="timeline-card" key={`${item.phase}-${index}`}>
+                <div className="timeline-index">{index + 1}</div>
+                <div>
+                  <strong>{cleanText(item.phase)}</strong>
+                  <span>{cleanText(item.time)}</span>
+                  <ul>
+                    {(item.tasks || []).map((task, i) => (
+                      <li key={i}>{cleanText(task)}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="insight-panel">
+          <div className="section-heading compact">
+            <span>Risks & Actions</span>
+            <h2>风险和下一步</h2>
+          </div>
+          <h3>风险提醒</h3>
+          <div className="tag-list danger">
+            {(data.risks || []).map((risk, index) => (
+              <span key={index}>{cleanText(risk)}</span>
+            ))}
+          </div>
+          <h3>下一步动作</h3>
+          <div className="action-list">
+            {(data.nextActions || []).map((action, index) => (
+              <div key={index}>{cleanText(action)}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="disclaimer-card">{cleanText(data.disclaimer)}</div>
+    </div>
+  );
+}
+
+export default function Chat() {
+  const [question, setQuestion] = useState(examples[0]);
   const [result, setResult] = useState<ChatResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [conversations, setConversations] = useState<any[]>([]);
@@ -21,10 +202,10 @@ export default function Chat() {
     api
       .get('/chat/conversations')
       .then((res) => setConversations(res.data))
-      .catch((err) => {
-        console.error('加载历史会话失败：', err);
-      });
+      .catch((err) => console.error('加载历史会话失败：', err));
   }, []);
+
+  const structured = useMemo(() => result?.structured || null, [result]);
 
   async function ask(e: FormEvent) {
     e.preventDefault();
@@ -39,24 +220,18 @@ export default function Chat() {
     setResult(null);
 
     try {
-      const { data } = await api.post('/chat', {
-        question,
-        topK: 3,
-      });
-
+      const { data } = await api.post('/chat', { question, topK: 3 });
       setResult(data);
 
       const conv = await api.get('/chat/conversations');
       setConversations(conv.data);
     } catch (err: any) {
       console.error('AI 对话请求失败：', err);
-
       const message =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         err?.message ||
         '请求失败，请稍后重试。';
-
       setError(`AI 对话请求失败：${message}`);
     } finally {
       setLoading(false);
@@ -64,82 +239,107 @@ export default function Chat() {
   }
 
   return (
-    <section>
-      <div className="page-title">
+    <section className="chat-page-v2">
+      <div className="hero-panel">
         <div>
-          <h1>AI 对话工作台</h1>
-          <p>支持 RAG 来源引用和 Agent 工具调用。当前已接入真实大模型。</p>
+          <span className="section-kicker">EduAgent RAG Workspace</span>
+          <h1>AI 留学选校工作台</h1>
+          <p>真实大模型 + 工具调用 + RAG 来源引用，输出卡片化申请方案。</p>
         </div>
+        <div className="model-badge">DeepSeek Connected</div>
       </div>
 
-      <div className="chat-layout">
-        <div className="panel chat-panel">
-          <form onSubmit={ask} className="chat-input">
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="请输入留学咨询问题..."
-            />
-
-            <button className="primary" disabled={loading}>
-              {loading ? '生成中...' : '发送问题'}
-            </button>
-          </form>
-
-          {error && (
-            <div className="answer-card">
-              <h2>请求失败</h2>
-              <p className="preline">{error}</p>
-            </div>
-          )}
-
-          {result && (
-            <div className="answer-card">
-              <h2>AI 回答</h2>
-              <p className="preline">{result.answer}</p>
-
-              <h3>来源引用</h3>
-              <div className="source-list">
-                {result.sources.length ? (
-                  result.sources.map((s, i) => (
-                    <div className="source-card" key={s.id || i}>
-                      <strong>{s.documentTitle || '未命名资料'}</strong>
-                      <span>相似度：{s.score}</span>
-                      <p>{s.content}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p>暂无来源引用。</p>
-                )}
-              </div>
-
-              <h3>工具调用</h3>
-              {result.toolCalls.length ? (
-                result.toolCalls.map((t, i) => (
-                  <pre key={i}>{JSON.stringify(t, null, 2)}</pre>
-                ))
-              ) : (
-                <p>本次未触发工具。</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="panel side-panel">
-          <h2>历史会话</h2>
-
-          {conversations.length ? (
-            conversations.map((c) => (
-              <div className="list-row" key={c.id}>
-                <strong>{c.title}</strong>
-                <span>{new Date(c.updatedAt).toLocaleString()}</span>
-              </div>
-            ))
-          ) : (
-            <p>暂无历史会话。</p>
-          )}
-        </div>
+      <div className="prompt-panel">
+        <form onSubmit={ask} className="prompt-box">
+          <label>学生背景 / 咨询问题</label>
+          <textarea value={question} onChange={(e) => setQuestion(e.target.value)} />
+          <div className="example-row">
+            {examples.map((item) => (
+              <button type="button" key={item} onClick={() => setQuestion(item)}>
+                {item.slice(0, 18)}...
+              </button>
+            ))}
+          </div>
+          <button className="primary ask-button" disabled={loading}>
+            {loading ? '正在生成结构化方案...' : '生成选校方案'}
+          </button>
+        </form>
       </div>
+
+      {error && (
+        <div className="error-card">
+          <strong>请求失败</strong>
+          <p>{error}</p>
+        </div>
+      )}
+
+      {!result && !loading && !error && <EmptyState />}
+
+      {loading && (
+        <div className="loading-card">
+          <div className="loader-dot" />
+          <div>
+            <strong>正在分析学生背景和院校档次</strong>
+            <p>通常需要 10-30 秒。系统会把回答拆成一个个卡片。</p>
+          </div>
+        </div>
+      )}
+
+      {structured && <StructuredResult data={structured} />}
+
+      {result && !structured && (
+        <div className="fallback-answer">
+          <h2>AI 回答</h2>
+          <p>{cleanText(result.answer)}</p>
+        </div>
+      )}
+
+      {result && (
+        <div className="meta-grid">
+          <div className="meta-panel">
+            <h2>来源引用</h2>
+            {result.sources?.length ? (
+              result.sources.map((s, i) => (
+                <div className="source-card" key={s.id || i}>
+                  <strong>{s.documentTitle || '未命名资料'}</strong>
+                  <span>相似度：{s.score}</span>
+                  <p>{s.content}</p>
+                </div>
+              ))
+            ) : (
+              <p className="muted-text">暂无来源引用。</p>
+            )}
+          </div>
+
+          <div className="meta-panel">
+            <h2>工具调用</h2>
+            {result.toolCalls?.length ? (
+              result.toolCalls.map((t, i) => (
+                <div className="tool-card" key={i}>
+                  <strong>{t.name}</strong>
+                  <pre>{JSON.stringify(t.result, null, 2)}</pre>
+                </div>
+              ))
+            ) : (
+              <p className="muted-text">本次未触发工具。</p>
+            )}
+          </div>
+
+          <div className="meta-panel history-panel">
+            <h2>历史会话</h2>
+            {conversations.length ? (
+              conversations.slice(0, 6).map((c) => (
+                <div className="history-row" key={c.id}>
+                  <strong>{c.title}</strong>
+                  <span>{new Date(c.updatedAt).toLocaleString()}</span>
+                </div>
+              ))
+            ) : (
+              <p className="muted-text">暂无历史会话。</p>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
