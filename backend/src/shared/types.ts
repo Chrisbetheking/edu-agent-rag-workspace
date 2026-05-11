@@ -1,10 +1,21 @@
-export type Role = 'admin' | 'user';
+export type Role = 'admin' | 'consultant' | 'viewer' | 'guest' | 'user';
 
 export interface User {
   id: string;
   username: string;
   displayName: string;
   role: Role;
+  quotaLimit?: number;
+  quotaRemaining?: number;
+}
+
+export interface RequestUser {
+  id: string;
+  username: string;
+  displayName: string;
+  role: Role;
+  quotaLimit?: number;
+  quotaRemaining?: number;
 }
 
 export interface DocumentRecord {
@@ -14,7 +25,11 @@ export interface DocumentRecord {
   source: string;
   status: 'pending' | 'parsed' | 'failed';
   createdAt: string;
+  updatedAt?: string;
   chunkCount: number;
+  ownerId?: string;
+  visibility?: 'public' | 'private' | 'guest';
+  tags?: string[];
 }
 
 export interface DocumentChunk {
@@ -25,6 +40,7 @@ export interface DocumentChunk {
   chunkIndex: number;
   score?: number;
   keywords: string[];
+  ownerId?: string;
 }
 
 export interface Conversation {
@@ -32,6 +48,7 @@ export interface Conversation {
   title: string;
   createdAt: string;
   updatedAt: string;
+  userId?: string;
 }
 
 export interface Message {

@@ -20,9 +20,24 @@ export class ToolsController {
     return this.tools.generateCopywriting(body);
   }
 
+  @Post('growth-campaign')
+  growthCampaign(@Body() body: any) {
+    return this.tools.growthCampaign(body);
+  }
+
   @Post('material-list')
   materialList(@Body() body: any) {
     return this.tools.materialList(body);
+  }
+
+  @Post('application-plan')
+  applicationPlan(@Body() body: any) {
+    return this.tools.applicationPlan(body);
+  }
+
+  @Post('advisor-suite')
+  advisorSuite(@Body() body: any) {
+    return this.tools.advisorSuite(body);
   }
 
   @Get('overview')

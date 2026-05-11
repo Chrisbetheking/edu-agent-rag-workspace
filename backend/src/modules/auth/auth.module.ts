@@ -7,5 +7,6 @@ import { AuthService } from './auth.service';
   imports: [JwtModule.register({ secret: process.env.JWT_SECRET || 'eduagent-demo-secret' })],
   controllers: [AuthController],
   providers: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

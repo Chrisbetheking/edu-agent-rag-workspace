@@ -1,13 +1,15 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { api } from '../api/client';
 
-type ToolKey = 'cgpa' | 'school' | 'copywriting' | 'material';
+type ToolKey = 'advisor' | 'cgpa' | 'school' | 'copywriting' | 'material' | 'application';
 
 const toolTabs: Array<{ key: ToolKey; name: string; desc: string; tag: string }> = [
+  { key: 'advisor', name: 'AI 综合方案', desc: '把成绩、选校、材料、文书和转化动作一键编排。', tag: 'Agent' },
   { key: 'cgpa', name: 'CGPA 换算', desc: '把 4.0 / 5.0 / 百分制换成申请判断。', tag: 'Academic' },
   { key: 'school', name: '院校推荐', desc: '输出冲刺、匹配、保底三档院校。', tag: 'Planning' },
   { key: 'copywriting', name: '销售话术', desc: '生成微信沟通、电话提纲和短视频脚本。', tag: 'Growth' },
   { key: 'material', name: '材料清单', desc: '按国家和学位整理申请材料 checklist。', tag: 'Ops' },
+  { key: 'application', name: '申请后台', desc: '生成文书重点、材料清单和递交流程。', tag: 'CRM' },
 ];
 
 function JsonBlock({ data }: { data: unknown }) {
@@ -15,7 +17,7 @@ function JsonBlock({ data }: { data: unknown }) {
 }
 
 export default function Tools() {
-  const [active, setActive] = useState<ToolKey>('school');
+  const [active, setActive] = useState<ToolKey>('advisor');
   const [cgpa, setCgpa] = useState('3.2');
   const [scale, setScale] = useState('4');
   const [country, setCountry] = useState('英国');
@@ -59,8 +61,12 @@ export default function Tools() {
       : type === 'school'
         ? '/tools/school-recommend'
         : type === 'copywriting'
-          ? '/tools/copywriting'
-          : '/tools/material-list';
+          ? '/tools/growth-campaign'
+          : type === 'application'
+            ? '/tools/application-plan'
+            : type === 'advisor'
+              ? '/tools/advisor-suite'
+              : '/tools/material-list';
 
     try {
       const { data } = await api.post(endpoint, payload);
@@ -80,7 +86,7 @@ export default function Tools() {
           <h1>Agent 工具中心</h1>
           <p>把留学咨询中的重复判断封装成可调用工具，并把输入、输出和耗时写入日志。</p>
         </div>
-        <span className="status-dot">4 tools online</span>
+        <span className="status-dot">6 tools online</span>
       </div>
 
       <div className="tool-tabs pro-tabs">
@@ -132,7 +138,7 @@ export default function Tools() {
             <div className="empty-advice compact-empty">
               <div className="empty-icon">⌘</div>
               <h2>选择工具并运行</h2>
-              <p>工具结果会以 JSON 呈现，方便解释 Agent 如何调用业务能力。</p>
+              <p>工具结果会以 JSON 呈现，展示 Agent 如何把多个业务能力综合编排。</p>
             </div>
           )}
         </section>

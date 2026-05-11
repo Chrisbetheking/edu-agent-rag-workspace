@@ -6,8 +6,7 @@ import { makeChunk, splitIntoChunks } from './text-utils';
 @Injectable()
 export class MemoryStore {
   users: User[] = [
-    { id: 'u_admin', username: 'admin', displayName: '管理员', role: 'admin' },
-    { id: 'u_demo', username: 'demo', displayName: '演示用户', role: 'user' },
+    { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' },
   ];
 
   documents: DocumentRecord[] = [];
@@ -42,17 +41,20 @@ export class MemoryStore {
   }
 
   addDocumentFromText(title: string, fileName: string, text: string, source = 'local') {
-    const doc: DocumentRecord = { id: uuid(), title, fileName, source, status: 'parsed', createdAt: new Date().toISOString(), chunkCount: 0 };
-    const chunks = splitIntoChunks(text).map((chunk, index) => makeChunk(doc.id, doc.title, chunk, index));
+    const now = new Date().toISOString();
+    const ownerId = source === 'guest' ? 'guest_public' : 'u_chris';
+    const visibility = source === 'guest' ? 'guest' : 'public';
+    const doc: DocumentRecord = { id: uuid(), title, fileName, source, status: 'parsed', createdAt: now, updatedAt: now, chunkCount: 0, ownerId, visibility };
+    const chunks = splitIntoChunks(text).map((chunk, index) => ({ ...makeChunk(doc.id, doc.title, chunk, index), ownerId }));
     doc.chunkCount = chunks.length;
     this.documents.unshift(doc);
     this.chunks.push(...chunks);
     return doc;
   }
 
-  createConversation(title: string) {
+  createConversation(title: string, userId = 'u_chris') {
     const now = new Date().toISOString();
-    const c: Conversation = { id: uuid(), title, createdAt: now, updatedAt: now };
+    const c: Conversation = { id: uuid(), title, createdAt: now, updatedAt: now, userId };
     this.conversations.unshift(c);
     return c;
   }

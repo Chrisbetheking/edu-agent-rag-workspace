@@ -3,6 +3,8 @@ import { Response } from 'express';
 import { MemoryStore } from '../../shared/memory-store';
 import { keywordScore } from '../../shared/text-utils';
 import { DatabaseService } from '../../shared/database.service';
+import { AuthContextService } from '../../shared/auth-context.service';
+import { RequestUser } from '../../shared/types';
 import { ToolsService } from '../tools/tools.service';
 import { LlmService } from '../llm/llm.service';
 
@@ -51,18 +53,21 @@ export class ChatService {
     private readonly tools: ToolsService,
     private readonly llmService: LlmService,
     private readonly db: DatabaseService,
+    private readonly authContext: AuthContextService,
   ) {}
 
-  async conversations(): Promise<any[]> {
+  async conversations(user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
     if (this.db.enabled) {
       try {
         const result = await this.db.query(
           `
           select id, user_id, title, created_at, updated_at
           from conversations
+          where ($1 = 'admin') or user_id = $2
           order by updated_at desc
           limit 50
           `,
+          [user.role, user.id],
         );
 
         return result.rows.map((row: any) => ({
@@ -77,16 +82,16 @@ export class ChatService {
       }
     }
 
-    return this.store.conversations;
+    return user.role === 'admin' ? this.store.conversations : this.store.conversations.filter((c) => c.userId === user.id);
   }
 
-  async createConversation(title: string): Promise<any> {
-    const conv = this.store.createConversation(title || '新的留学咨询会话');
-    await this.persistConversation(conv.id, conv.title);
+  async createConversation(title: string, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any> {
+    const conv = this.store.createConversation(title || '新的留学咨询会话', user.id);
+    await this.persistConversation(conv.id, conv.title, user);
     return conv;
   }
 
-  async messages(conversationId: string): Promise<any[]> {
+  async messages(conversationId: string, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
     if (this.db.enabled) {
       try {
         const result = await this.db.query(
@@ -94,10 +99,14 @@ export class ChatService {
           select id, conversation_id, role, content, sources, tool_calls, created_at
           from messages
           where conversation_id = $1
+            and (
+              $2 = 'admin'
+              or exists (select 1 from conversations c where c.id = messages.conversation_id and c.user_id = $3)
+            )
           order by created_at asc
           limit 200
           `,
-          [conversationId],
+          [conversationId, user.role, user.id],
         );
 
         return result.rows.map((row: any) => ({
@@ -114,19 +123,23 @@ export class ChatService {
       }
     }
 
-    return this.store.messages.filter((m) => m.conversationId === conversationId);
+    const allowed = user.role === 'admin' || this.store.conversations.some((c) => c.id === conversationId && c.userId === user.id);
+    return allowed ? this.store.messages.filter((m) => m.conversationId === conversationId) : [];
   }
 
-  async retrieve(query: string, topK = 3): Promise<any[]> {
+  async retrieve(query: string, topK = 3, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
     if (this.db.enabled) {
       try {
         const result = await this.db.query(
           `
-          select id, document_id, document_title, content, chunk_index, keywords
-          from chunks
-          order by created_at desc
+          select c.id, c.document_id, c.document_title, c.content, c.chunk_index, c.keywords, coalesce(c.owner_id, d.owner_id, 'u_chris') as owner_id
+          from chunks c
+          left join documents d on d.id = c.document_id
+          where ($1 = 'admin') or coalesce(d.visibility, 'public') = 'public' or coalesce(c.owner_id, d.owner_id, 'u_chris') = $2
+          order by c.created_at desc
           limit 1000
           `,
+          [user.role, user.id],
         );
 
         const scored = result.rows
@@ -151,14 +164,16 @@ export class ChatService {
       }
     }
 
+    const visibleDocIds = new Set(this.store.documents.filter((doc) => user.role === 'admin' || doc.visibility === 'public' || doc.ownerId === user.id).map((doc) => doc.id));
     return this.store.chunks
+      .filter((chunk) => visibleDocIds.has(chunk.documentId))
       .map((chunk) => ({ ...chunk, score: keywordScore(query, chunk.content) }))
       .filter((chunk) => chunk.score > 0)
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, topK);
   }
 
-  private async persistConversation(conversationId: string, title: string) {
+  private async persistConversation(conversationId: string, title: string, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }) {
     if (!this.db.enabled) return;
 
     try {
@@ -169,7 +184,7 @@ export class ChatService {
         on conflict (id)
         do update set title = excluded.title, updated_at = now()
         `,
-        [conversationId, 'u_admin', title || '新的咨询'],
+        [conversationId, user.id, title || '新的咨询'],
       );
     } catch (error) {
       console.error('保存 conversation 到 Supabase 失败：', error);
@@ -519,7 +534,7 @@ ${toolText}
     };
   }
 
-  async ask(body: { conversationId?: string; question: string; topK?: number }): Promise<any> {
+  async ask(body: { conversationId?: string; question: string; topK?: number }, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any> {
     const startedAt = Date.now();
 
     const question = (body.question || '').slice(
@@ -527,19 +542,21 @@ ${toolText}
       Number(process.env.MAX_INPUT_LENGTH || 2000),
     );
 
-    const conv = body.conversationId
-      ? this.store.conversations.find((c) => c.id === body.conversationId)
-      : this.store.createConversation(question.slice(0, 20) || '新的咨询');
+    const quota = this.authContext.consumeGuestQuota(user);
 
-    const conversationId = body.conversationId || conv?.id || this.store.createConversation('新的咨询').id;
+    const conv = body.conversationId
+      ? this.store.conversations.find((c) => c.id === body.conversationId && (user.role === 'admin' || c.userId === user.id))
+      : this.store.createConversation(question.slice(0, 20) || '新的咨询', user.id);
+
+    const conversationId = conv?.id || this.store.createConversation('新的咨询', user.id).id;
     const conversationTitle = conv?.title || question.slice(0, 20) || '新的咨询';
 
-    await this.persistConversation(conversationId, conversationTitle);
+    await this.persistConversation(conversationId, conversationTitle, user);
 
     this.store.addMessage(conversationId, 'user', question);
     await this.persistMessage(conversationId, 'user', question);
 
-    const sources = await this.retrieve(question, body.topK || 3);
+    const sources = await this.retrieve(question, body.topK || 3, user);
     const toolCalls = this.detectTools(question);
 
     let answer = '';
@@ -587,15 +604,16 @@ ${toolText}
       rawAnswer,
       sources,
       toolCalls,
+      quota,
     };
   }
 
-  async stream(question: string, res: Response) {
+  async stream(question: string, res: Response, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    const result = await this.ask({ question });
+    const result = await this.ask({ question }, user);
     const pieces = result.answer.split('');
 
     for (const ch of pieces) {

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { useAuthStore } from '../store/auth';
 
 interface SchoolAdvice {
   name: string;
@@ -46,6 +47,7 @@ interface ChatResult {
   sources: any[];
   toolCalls: any[];
   conversationId: string;
+  quota?: { limit: number | null; used: number | null; remaining: number | null };
 }
 
 const examples = [
@@ -236,6 +238,9 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
 }
 
 export default function Chat() {
+  const user = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
+  const isGuest = user?.role === 'guest';
   const [question, setQuestion] = useState(examples[0]);
   const [result, setResult] = useState<ChatResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -282,6 +287,9 @@ export default function Chat() {
       });
 
       setResult(data);
+      if (data.quota && isGuest && user) {
+        setUser({ ...user, quotaLimit: data.quota.limit, quotaRemaining: data.quota.remaining });
+      }
 
       const conv = await api.get('/chat/conversations');
       setConversations(conv.data);
@@ -306,10 +314,10 @@ export default function Chat() {
         <div>
           <span className="section-kicker">EduAgent RAG Workspace</span>
           <h1>AI 留学选校工作台</h1>
-          <p>真实大模型 + 工具调用 + RAG 来源引用，输出卡片化申请方案。</p>
+          <p>真实大模型 + 工具调用 + RAG 来源引用，输出卡片化申请方案；右侧展示 RAG 来源、工具调用和历史会话。</p>
         </div>
 
-        <div className="model-badge">DeepSeek Connected</div>
+        <div className="model-badge">{isGuest ? `Guest quota ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : 'DeepSeek Connected'}</div>
       </div>
 
       <div className="prompt-panel">

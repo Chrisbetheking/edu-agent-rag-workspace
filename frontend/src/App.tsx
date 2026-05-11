@@ -6,6 +6,9 @@ import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import Knowledge from './pages/Knowledge';
 import Tools from './pages/Tools';
+import FrontDesk from './pages/FrontDesk';
+import Applications from './pages/Applications';
+import Architecture from './pages/Architecture';
 import Prompts from './pages/Prompts';
 import Evaluation from './pages/Evaluation';
 import Logs from './pages/Logs';
@@ -22,12 +25,15 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Protected><Layout /></Protected>}>
         <Route index element={<Dashboard />} />
+        <Route path="frontdesk" element={<FrontDesk />} />
         <Route path="chat" element={<Chat />} />
+        <Route path="applications" element={<Applications />} />
         <Route path="knowledge" element={<Knowledge />} />
         <Route path="tools" element={<Tools />} />
         <Route path="prompts" element={<Prompts />} />
         <Route path="evaluation" element={<Evaluation />} />
         <Route path="logs" element={<Logs />} />
+        <Route path="architecture" element={<Architecture />} />
       </Route>
     </Routes>
   );

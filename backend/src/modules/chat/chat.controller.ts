@@ -1,33 +1,41 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { ChatService } from './chat.service';
+import { AuthContextService } from '../../shared/auth-context.service';
 
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chat: ChatService) {}
+  constructor(
+    private readonly chat: ChatService,
+    private readonly authContext: AuthContextService,
+  ) {}
+
+  private user(authorization?: string) {
+    return this.authContext.getUserFromAuthorization(authorization);
+  }
 
   @Get('conversations')
-  async conversations(): Promise<any> {
-    return this.chat.conversations();
+  async conversations(@Headers('authorization') authorization?: string): Promise<any> {
+    return this.chat.conversations(this.user(authorization));
   }
 
   @Post('conversations')
-  async create(@Body() body: { title: string }): Promise<any> {
-    return this.chat.createConversation(body.title);
+  async create(@Body() body: { title: string }, @Headers('authorization') authorization?: string): Promise<any> {
+    return this.chat.createConversation(body.title, this.user(authorization));
   }
 
   @Get('conversations/:id/messages')
-  async messages(@Param('id') id: string): Promise<any> {
-    return this.chat.messages(id);
+  async messages(@Param('id') id: string, @Headers('authorization') authorization?: string): Promise<any> {
+    return this.chat.messages(id, this.user(authorization));
   }
 
   @Post()
-  async ask(@Body() body: any): Promise<any> {
-    return this.chat.ask(body);
+  async ask(@Body() body: any, @Headers('authorization') authorization?: string): Promise<any> {
+    return this.chat.ask(body, this.user(authorization));
   }
 
   @Get('stream')
-  stream(@Query('question') question: string, @Res() res: Response) {
-    return this.chat.stream(question || '请介绍英国硕士申请材料', res);
+  stream(@Query('question') question: string, @Res() res: Response, @Headers('authorization') authorization?: string) {
+    return this.chat.stream(question || '请介绍英国硕士申请材料', res, this.user(authorization));
   }
 }
