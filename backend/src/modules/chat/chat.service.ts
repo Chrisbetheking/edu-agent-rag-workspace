@@ -5,7 +5,7 @@ import { keywordScore } from '../../shared/text-utils';
 import { ToolsService } from '../tools/tools.service';
 import { LlmService } from '../llm/llm.service';
 
-interface SchoolAdvice {
+export interface SchoolAdvice {
   name: string;
   reason: string;
   fit: string;
@@ -13,20 +13,20 @@ interface SchoolAdvice {
   action: string;
 }
 
-interface SchoolTier {
+export interface SchoolTier {
   tier: string;
   level: string;
   strategy: string;
   schools: SchoolAdvice[];
 }
 
-interface TimelineItem {
+export interface TimelineItem {
   phase: string;
   time: string;
   tasks: string[];
 }
 
-interface StructuredAdvice {
+export interface StructuredAdvice {
   summary: string;
   profile: {
     education: string;
@@ -204,12 +204,32 @@ export class ChatService {
         },
       ],
       timeline: [
-        { phase: '准备阶段', time: '现在起 2-4 周', tasks: ['确定目标专业', '整理成绩单和课程描述', '准备项目/实习素材'] },
-        { phase: '申请阶段', time: '开放申请后 1-2 个月内', tasks: ['优先提交匹配院校', '同步准备冲刺和保底', '检查语言成绩要求'] },
-        { phase: '补强阶段', time: '等待 offer 期间', tasks: ['补充作品集或 GitHub 项目', '继续刷语言成绩', '准备面试和奖学金材料'] },
+        {
+          phase: '准备阶段',
+          time: '现在起 2-4 周',
+          tasks: ['确定目标专业', '整理成绩单和课程描述', '准备项目/实习素材'],
+        },
+        {
+          phase: '申请阶段',
+          time: '开放申请后 1-2 个月内',
+          tasks: ['优先提交匹配院校', '同步准备冲刺和保底', '检查语言成绩要求'],
+        },
+        {
+          phase: '补强阶段',
+          time: '等待 offer 期间',
+          tasks: ['补充作品集或 GitHub 项目', '继续刷语言成绩', '准备面试和奖学金材料'],
+        },
       ],
-      risks: ['30 万预算在伦敦可能偏紧。', '仅有 GPA 不足以判断全部录取概率。', '最终要求必须以学校官网当年页面为准。'],
-      nextActions: ['补充雅思/托福情况。', '确认是否接受非伦敦城市。', '整理 1-2 个计算机相关项目经历。'],
+      risks: [
+        '30 万预算在伦敦可能偏紧。',
+        '仅有 GPA 不足以判断全部录取概率。',
+        '最终要求必须以学校官网当年页面为准。',
+      ],
+      nextActions: [
+        '补充雅思/托福情况。',
+        '确认是否接受非伦敦城市。',
+        '整理 1-2 个计算机相关项目经历。',
+      ],
       disclaimer: '以上建议用于初筛和申请规划，真实申请请以学校官网和当年招生要求为准。',
     };
   }
@@ -229,6 +249,7 @@ export class ChatService {
     } catch {
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) return null;
+
       try {
         return JSON.parse(match[0]);
       } catch {
@@ -243,6 +264,7 @@ export class ChatService {
         const schools = (tier.schools || [])
           .map((school) => `${school.name}：${school.reason}`)
           .join('\n');
+
         return `${tier.tier}：${tier.strategy}\n${schools}`;
       })
       .join('\n\n');
@@ -251,7 +273,17 @@ export class ChatService {
       .map((item) => `${item.time}｜${item.phase}：${(item.tasks || []).join('；')}`)
       .join('\n');
 
-    return `${structured.summary}\n\n${tierText}\n\n时间规划：\n${timelineText}\n\n下一步：\n${(structured.nextActions || []).join('\n')}\n\n${structured.disclaimer}`;
+    return `${structured.summary}
+
+${tierText}
+
+时间规划：
+${timelineText}
+
+下一步：
+${(structured.nextActions || []).join('\n')}
+
+${structured.disclaimer}`;
   }
 
   private async buildRealAnswer(question: string, sources: any[], toolCalls: any[]) {
@@ -335,6 +367,7 @@ ${toolText}
     ]);
 
     const structured = this.parseStructuredAnswer(raw);
+
     return {
       raw,
       structured,
@@ -342,7 +375,7 @@ ${toolText}
     };
   }
 
-  async ask(body: { conversationId?: string; question: string; topK?: number }) {
+  async ask(body: { conversationId?: string; question: string; topK?: number }): Promise<any> {
     const question = (body.question || '').slice(
       0,
       Number(process.env.MAX_INPUT_LENGTH || 2000),
