@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 import { MemoryStore } from '../../shared/memory-store';
 import { keywordScore } from '../../shared/text-utils';
+import { DatabaseService } from '../../shared/database.service';
 import { ToolsService } from '../tools/tools.service';
 import { LlmService } from '../llm/llm.service';
 
@@ -49,6 +50,7 @@ export class ChatService {
     private readonly store: MemoryStore,
     private readonly tools: ToolsService,
     private readonly llmService: LlmService,
+    private readonly db: DatabaseService,
   ) {}
 
   conversations() {
@@ -69,6 +71,95 @@ export class ChatService {
       .filter((chunk) => chunk.score > 0)
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, topK);
+  }
+
+  private async persistConversation(conversationId: string, title: string) {
+    if (!this.db.enabled) return;
+
+    try {
+      await this.db.query(
+        `
+        insert into conversations (id, user_id, title)
+        values ($1, $2, $3)
+        on conflict (id)
+        do update set title = excluded.title, updated_at = now()
+        `,
+        [conversationId, 'u_admin', title || '新的咨询'],
+      );
+    } catch (error) {
+      console.error('保存 conversation 到 Supabase 失败：', error);
+    }
+  }
+
+  private async persistMessage(
+    conversationId: string,
+    role: 'user' | 'assistant' | 'system',
+    content: string,
+    sources: any[] = [],
+    toolCalls: any[] = [],
+  ) {
+    if (!this.db.enabled) return;
+
+    try {
+      await this.db.query(
+        `
+        insert into messages (conversation_id, role, content, sources, tool_calls)
+        values ($1, $2, $3, $4::jsonb, $5::jsonb)
+        `,
+        [
+          conversationId,
+          role,
+          content,
+          JSON.stringify(sources || []),
+          JSON.stringify(toolCalls || []),
+        ],
+      );
+    } catch (error) {
+      console.error('保存 message 到 Supabase 失败：', error);
+    }
+  }
+
+  private async persistCallLog(payload: {
+    conversationId: string;
+    question: string;
+    model: string;
+    success: boolean;
+    durationMs: number;
+    ragHitCount: number;
+    toolNames: string[];
+    error?: string;
+  }) {
+    if (!this.db.enabled) return;
+
+    try {
+      await this.db.query(
+        `
+        insert into call_logs (
+          conversation_id,
+          question,
+          model,
+          success,
+          duration_ms,
+          rag_hit_count,
+          tool_names,
+          error
+        )
+        values ($1, $2, $3, $4, $5, $6, $7, $8)
+        `,
+        [
+          payload.conversationId,
+          payload.question,
+          payload.model,
+          payload.success,
+          payload.durationMs,
+          payload.ragHitCount,
+          payload.toolNames,
+          payload.error || null,
+        ],
+      );
+    } catch (error) {
+      console.error('保存 call_log 到 Supabase 失败：', error);
+    }
   }
 
   private isDemoMode() {
@@ -204,32 +295,12 @@ export class ChatService {
         },
       ],
       timeline: [
-        {
-          phase: '准备阶段',
-          time: '现在起 2-4 周',
-          tasks: ['确定目标专业', '整理成绩单和课程描述', '准备项目/实习素材'],
-        },
-        {
-          phase: '申请阶段',
-          time: '开放申请后 1-2 个月内',
-          tasks: ['优先提交匹配院校', '同步准备冲刺和保底', '检查语言成绩要求'],
-        },
-        {
-          phase: '补强阶段',
-          time: '等待 offer 期间',
-          tasks: ['补充作品集或 GitHub 项目', '继续刷语言成绩', '准备面试和奖学金材料'],
-        },
+        { phase: '准备阶段', time: '现在起 2-4 周', tasks: ['确定目标专业', '整理成绩单和课程描述', '准备项目/实习素材'] },
+        { phase: '申请阶段', time: '开放申请后 1-2 个月内', tasks: ['优先提交匹配院校', '同步准备冲刺和保底', '检查语言成绩要求'] },
+        { phase: '补强阶段', time: '等待 offer 期间', tasks: ['补充作品集或 GitHub 项目', '继续刷语言成绩', '准备面试和奖学金材料'] },
       ],
-      risks: [
-        '30 万预算在伦敦可能偏紧。',
-        '仅有 GPA 不足以判断全部录取概率。',
-        '最终要求必须以学校官网当年页面为准。',
-      ],
-      nextActions: [
-        '补充雅思/托福情况。',
-        '确认是否接受非伦敦城市。',
-        '整理 1-2 个计算机相关项目经历。',
-      ],
+      risks: ['30 万预算在伦敦可能偏紧。', '仅有 GPA 不足以判断全部录取概率。', '最终要求必须以学校官网当年页面为准。'],
+      nextActions: ['补充雅思/托福情况。', '确认是否接受非伦敦城市。', '整理 1-2 个计算机相关项目经历。'],
       disclaimer: '以上建议用于初筛和申请规划，真实申请请以学校官网和当年招生要求为准。',
     };
   }
@@ -249,7 +320,6 @@ export class ChatService {
     } catch {
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) return null;
-
       try {
         return JSON.parse(match[0]);
       } catch {
@@ -264,7 +334,6 @@ export class ChatService {
         const schools = (tier.schools || [])
           .map((school) => `${school.name}：${school.reason}`)
           .join('\n');
-
         return `${tier.tier}：${tier.strategy}\n${schools}`;
       })
       .join('\n\n');
@@ -273,17 +342,7 @@ export class ChatService {
       .map((item) => `${item.time}｜${item.phase}：${(item.tasks || []).join('；')}`)
       .join('\n');
 
-    return `${structured.summary}
-
-${tierText}
-
-时间规划：
-${timelineText}
-
-下一步：
-${(structured.nextActions || []).join('\n')}
-
-${structured.disclaimer}`;
+    return `${structured.summary}\n\n${tierText}\n\n时间规划：\n${timelineText}\n\n下一步：\n${(structured.nextActions || []).join('\n')}\n\n${structured.disclaimer}`;
   }
 
   private async buildRealAnswer(question: string, sources: any[], toolCalls: any[]) {
@@ -299,7 +358,7 @@ ${structured.disclaimer}`;
 
 JSON 格式必须严格如下：
 {
-  "summary": "80到140字的总体判断",
+  "summary": "80到120字的总体判断",
   "profile": {
     "education": "学生背景",
     "gpa": "GPA/CGPA/均分判断",
@@ -316,10 +375,10 @@ JSON 格式必须严格如下：
       "schools": [
         {
           "name": "学校名称",
-          "reason": "推荐原因，至少35字",
-          "fit": "适配点，至少25字",
-          "risk": "风险点，至少25字",
-          "action": "下一步动作，至少20字"
+          "reason": "推荐原因，25到45字",
+          "fit": "适配点，25到45字",
+          "risk": "风险点，25到45字",
+          "action": "下一步动作，20到35字"
         }
       ]
     },
@@ -337,7 +396,7 @@ JSON 格式必须严格如下：
     }
   ],
   "timeline": [
-    { "phase": "阶段名称", "time": "时间", "tasks": ["任务1", "任务2", "任务3"] }
+    { "phase": "阶段名称", "time": "时间", "tasks": ["任务1", "任务2"] }
   ],
   "risks": ["风险1", "风险2", "风险3"],
   "nextActions": ["下一步1", "下一步2", "下一步3"],
@@ -345,9 +404,8 @@ JSON 格式必须严格如下：
 }
 
 内容要求：
-内容要求：
 1. 三档选校都必须给出，冲刺、匹配、保底每档各给 2 所学校。
-2. 每所学校的 reason、fit、risk、action 每项控制在 25 到 45 字。
+2. 每所学校的 reason、fit、risk、action 每项控制在 25 到 45 字，避免输出过长。
 3. 时间规划给 3 个阶段，每个阶段 2 个任务。
 4. 语气专业、具体、适合展示在研发项目 Demo 中。
 5. 不要编造精确录取率；不确定时用“需要核对官网要求”。
@@ -369,7 +427,6 @@ ${toolText}
     ]);
 
     const structured = this.parseStructuredAnswer(raw);
-
     return {
       raw,
       structured,
@@ -378,6 +435,8 @@ ${toolText}
   }
 
   async ask(body: { conversationId?: string; question: string; topK?: number }): Promise<any> {
+    const startedAt = Date.now();
+
     const question = (body.question || '').slice(
       0,
       Number(process.env.MAX_INPUT_LENGTH || 2000),
@@ -388,8 +447,12 @@ ${toolText}
       : this.store.createConversation(question.slice(0, 20) || '新的咨询');
 
     const conversationId = conv?.id || this.store.createConversation('新的咨询').id;
+    const conversationTitle = conv?.title || question.slice(0, 20) || '新的咨询';
+
+    await this.persistConversation(conversationId, conversationTitle);
 
     this.store.addMessage(conversationId, 'user', question);
+    await this.persistMessage(conversationId, 'user', question);
 
     const sources = this.retrieve(question, body.topK || 3);
     const toolCalls = this.detectTools(question);
@@ -397,6 +460,8 @@ ${toolText}
     let answer = '';
     let structured: StructuredAdvice | null = null;
     let rawAnswer = '';
+    let success = true;
+    let errorMessage = '';
 
     if (this.isDemoMode()) {
       structured = this.fallbackStructured(question, sources, toolCalls);
@@ -409,12 +474,26 @@ ${toolText}
         structured = result.structured;
         rawAnswer = result.raw;
       } catch (error: any) {
-        answer = `真实大模型调用失败。错误信息：${error?.message || String(error)}`;
+        success = false;
+        errorMessage = error?.message || String(error);
+        answer = `真实大模型调用失败。错误信息：${errorMessage}`;
         rawAnswer = answer;
       }
     }
 
     this.store.addMessage(conversationId, 'assistant', answer, sources, toolCalls);
+    await this.persistMessage(conversationId, 'assistant', answer, sources, toolCalls);
+
+    await this.persistCallLog({
+      conversationId,
+      question,
+      model: process.env.LLM_MODEL || 'deepseek-chat',
+      success,
+      durationMs: Date.now() - startedAt,
+      ragHitCount: sources.length,
+      toolNames: toolCalls.map((tool) => tool.name),
+      error: errorMessage,
+    });
 
     return {
       conversationId,
