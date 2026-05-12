@@ -108,6 +108,50 @@ function tryParseStructuredAnswer(text?: string): StructuredAdvice | null {
 }
 
 
+
+function parseLooseJson(value: unknown): any {
+  if (typeof value !== 'string') return value;
+  const text = value.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+  if (!text || !/^[\[{]/.test(text)) return value;
+  try { return JSON.parse(text); } catch { return value; }
+}
+
+function DisplayValue({ value }: { value: unknown }) {
+  const parsed = parseLooseJson(value);
+  if (Array.isArray(parsed)) {
+    return <ul className="clean-list compact-clean-list">{parsed.slice(0, 8).map((item, index) => <li key={index}>{toDisplayText(parseLooseJson(item))}</li>)}</ul>;
+  }
+  if (parsed && typeof parsed === 'object') {
+    return (
+      <div className="smart-object-grid">
+        {Object.entries(parsed as Record<string, unknown>).slice(0, 12).map(([key, val]) => (
+          <div key={key} className="smart-object-cell">
+            <span>{key}</span>
+            <strong>{toDisplayText(parseLooseJson(val)) || '-'}</strong>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return <p className="pre-line compact-text-block">{cleanText(parsed) || '暂无内容'}</p>;
+}
+
+function SourceCard({ source, index }: { source: any; index: number }) {
+  return (
+    <FoldSection title={cleanText(source.documentTitle || source.title || `来源 ${index + 1}`)} subtitle={`相似度：${cleanText(source.score) || '-'}`} defaultOpen={index < 2} className="inner-fold-card source-card-v13">
+      <DisplayValue value={source.content || source.chunk || source.text} />
+    </FoldSection>
+  );
+}
+
+function ToolCallCard({ call, index }: { call: any; index: number }) {
+  return (
+    <FoldSection title={cleanText(call.name || call.toolName || `工具 ${index + 1}`)} subtitle={cleanText(call.status || call.type || 'tool')} defaultOpen={index === 0} className="inner-fold-card tool-call-card-v13">
+      <DisplayValue value={call.result || call.output || call} />
+    </FoldSection>
+  );
+}
+
 function profileFromChat(question: string, data: ChatResult) {
   const structured = data.structured || tryParseStructuredAnswer(data.rawAnswer) || tryParseStructuredAnswer(data.answer);
   const profile = structured?.profile;
@@ -355,24 +399,17 @@ export default function Chat() {
       )}
 
       {result && (
-        <div className="meta-grid">
-          <SectionGroup title="来源引用" defaultOpen>
-            {result.sources?.length ? result.sources.map((s, i) => (
-              <div className="source-card" key={s.id || i}>
-                <strong>{cleanText(s.documentTitle || '未命名资料')}</strong>
-                <span>相似度：{cleanText(s.score)}</span>
-                <p>{cleanText(s.content)}</p>
-              </div>
-            )) : <p className="muted-text">暂无来源引用。</p>}
+        <div className="meta-grid meta-grid-v13">
+          <SectionGroup title="来源引用" subtitle="RAG 命中文档" defaultOpen>
+            <div className="meta-card-grid-v13">
+              {result.sources?.length ? result.sources.map((s, i) => <SourceCard source={s} index={i} key={s.id || i} />) : <p className="muted-text">暂无来源引用。</p>}
+            </div>
           </SectionGroup>
 
-          <SectionGroup title="工具调用" defaultOpen>
-            {result.toolCalls?.length ? result.toolCalls.map((t, i) => (
-              <div className="tool-card" key={i}>
-                <strong>{cleanText(t.name)}</strong>
-                <pre>{JSON.stringify(t.result, null, 2)}</pre>
-              </div>
-            )) : <p className="muted-text">本次未触发工具。</p>}
+          <SectionGroup title="工具调用" subtitle="结构化输出" defaultOpen>
+            <div className="meta-card-grid-v13">
+              {result.toolCalls?.length ? result.toolCalls.map((t, i) => <ToolCallCard call={t} index={i} key={i} />) : <p className="muted-text">本次未触发工具。</p>}
+            </div>
           </SectionGroup>
 
           <SectionGroup title="历史会话" defaultOpen>

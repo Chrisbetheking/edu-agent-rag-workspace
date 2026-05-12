@@ -3,34 +3,81 @@ import { api } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
 import { angleOptions, countryOptions, degreeOptions, majorOptions, platformOptions } from '../constants/options';
 import { readSessionState, writeSessionState } from '../utils/sessionState';
-import { FoldSection, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 
-const STORAGE_KEY = 'eduagent.frontdesk.v12';
+const STORAGE_KEY = 'eduagent.frontdesk.v9';
 
-function CopyButton({ text }: { text: unknown }) {
-  return <button className="mini-copy" type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard?.writeText(toDisplayText(text)); }}>复制</button>;
+function parseLooseJson(value: unknown): any {
+  if (typeof value !== 'string') return value;
+  const text = value.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+  if (!text || !/^[\[{]/.test(text)) return value;
+  try { return JSON.parse(text); } catch { return value; }
 }
 
-function CopyCard({ title, content, className = '' }: { title: string; content: unknown; className?: string }) {
-  const items = asArray(content).filter(Boolean);
-  const text = items.length > 1 ? items.map(stringifySafe).join('\n') : stringifySafe(content);
+function compactText(value: unknown) {
+  const parsed = parseLooseJson(value);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const obj = parsed as Record<string, unknown>;
+    return String(obj.content || obj.topic || obj.title || obj.text || Object.values(obj).filter(Boolean).join(' / '));
+  }
+  return stringifySafe(parsed);
+}
+
+function normalizeCalendarItem(item: any, index: number) {
+  const parsed = parseLooseJson(item);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return {
+      day: parsed.day || parsed.date || `第 ${index + 1} 天`,
+      platform: parsed.platform || parsed.channel || '内容渠道',
+      type: parsed.type || parsed.format || parsed.scene || '内容',
+      topic: parsed.topic || parsed.title || parsed.theme || `第 ${index + 1} 天内容`,
+      content: parsed.content || parsed.copy || parsed.text || parsed.script || '',
+    };
+  }
+  return { day: `第 ${index + 1} 天`, platform: '内容渠道', type: '内容', topic: `第 ${index + 1} 天内容`, content: compactText(parsed) };
+}
+
+
+function CopyCard({ title, content }: { title: string; content: unknown }) {
+  const parsed = parseLooseJson(content);
+  const items = asArray(parsed).filter(Boolean);
+  const text = items.length > 1 ? items.map(compactText).join('\n') : compactText(parsed);
   return (
-    <FoldSection title={title} defaultOpen className={`inner-fold-card lead-result-card ${className}`.trim()} badge={<CopyButton text={text} />}>
-      {items.length > 1 ? <ul>{items.map((item, index) => <li key={`${title}-${index}`}>{stringifySafe(item)}</li>)}</ul> : <TextBlock value={text} />}
-    </FoldSection>
+    <article className="copy-card enhanced-card">
+      <div className="row-between top-align">
+        <h3>{title}</h3>
+        <button className="ghost-button" type="button" onClick={() => navigator.clipboard?.writeText(text)}>复制</button>
+      </div>
+      {items.length > 1 ? <ul>{items.map((item, index) => <li key={`${title}-${index}`}>{compactText(item)}</li>)}</ul> : <p>{text || '暂无内容'}</p>}
+    </article>
   );
 }
 
 function CalendarCard({ items }: { items: any[] }) {
-  const text = items.map((x) => `${x.day || ''}｜${x.topic || ''}｜${x.format || ''}`).join('\n');
+  const normalized = items.map(normalizeCalendarItem);
+  const copyText = normalized.map((x) => `${x.day}｜${x.platform}｜${x.type}｜${x.topic}\n${x.content}`).join('\n\n');
   return (
-    <FoldSection id="lead-calendar" title="发布计划" subtitle="按天拆分" defaultOpen className="inner-fold-card lead-result-card lead-span" badge={<CopyButton text={text} />}>
-      <div className="mini-table lead-calendar-table">
-        {items.map((item, index) => (
-          <div key={index}><strong>{item.day || `第 ${index + 1} 天`}</strong><span>{item.topic || stringifySafe(item)}</span><em>{item.format || '内容'}</em></div>
+    <article className="copy-card enhanced-card full-span-card calendar-panel-v13">
+      <div className="row-between top-align">
+        <div>
+          <h3>发布计划</h3>
+          <p className="muted compact-note">按时间、渠道和内容类型拆分，避免展示原始 JSON。</p>
+        </div>
+        <button className="ghost-button" type="button" onClick={() => navigator.clipboard?.writeText(copyText)}>复制</button>
+      </div>
+      <div className="calendar-board-v13">
+        {normalized.map((item, index) => (
+          <div className="calendar-card-v13" key={index}>
+            <div className="calendar-card-head">
+              <strong>{item.day}</strong>
+              <span>{item.platform}</span>
+            </div>
+            <em>{item.type}</em>
+            <h4>{item.topic}</h4>
+            <p>{item.content || '待补充内容'}</p>
+          </div>
         ))}
       </div>
-    </FoldSection>
+    </article>
   );
 }
 
@@ -48,6 +95,7 @@ export default function FrontDesk() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
 
   useEffect(() => {
     const saved = readSessionState<any>(STORAGE_KEY, {});
@@ -86,7 +134,6 @@ export default function FrontDesk() {
       const { data } = await api.post('/tools/growth-campaign', { name, student, background: student, country, major, degree, angle, concern: angle, platform, gaokaoTaken, gaokaoScore });
       setResult(data || {});
       writeSessionState(STORAGE_KEY, { form: { name, student, country, major, degree, angle, platform, gaokaoTaken, gaokaoScore }, result: data || {} });
-      window.setTimeout(() => document.getElementById('lead-summary')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || '生成失败');
     } finally {
@@ -95,7 +142,7 @@ export default function FrontDesk() {
   }
 
   return (
-    <section className="page-stack compact-page frontdesk-page-v12">
+    <section className="page-stack compact-page">
       <div className="page-title elevated clean-title">
         <div>
           <span className="eyebrow">客户线索</span>
@@ -111,50 +158,39 @@ export default function FrontDesk() {
       {error && <div className="error-card"><strong>生成失败</strong><p>{error}</p></div>}
       {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{result.llmFallbackReason}</div>}
 
-      <div className={result ? 'lead-workbench lead-workbench-generated' : 'two-col wide-right lead-workbench'}>
-        <section className="panel form-panel lead-input-panel">
+      <div className={`two-col wide-right frontdesk-workbench-v13 ${result ? 'with-result' : ''}`}>
+        <section className="panel form-panel sticky-panel">
           <div className="panel-title compact"><span className="eyebrow">录入</span><h2>学生信息</h2></div>
-          <form className="form-stack lead-form-grid" onSubmit={generate}>
-            <div className="form-grid two lead-inline-grid">
+          <form className="form-stack" onSubmit={generate}>
+            <div className="form-grid two">
               <label>学生称呼<input value={name} onChange={(e) => setName(e.target.value)} /></label>
               <label>申请学位<select value={degree} onChange={(e) => setDegree(e.target.value)}>{degreeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               {degree === '本科' && <label>是否有高考成绩<select value={gaokaoTaken} onChange={(e) => setGaokaoTaken(e.target.value)}><option value="否">否</option><option value="是">是</option></select></label>}
               {degree === '本科' && gaokaoTaken === '是' && <label>高考分数<input value={gaokaoScore} onChange={(e) => setGaokaoScore(e.target.value)} placeholder="例如 580/750" /></label>}
+            </div>
+            <label>学生背景<textarea value={student} onChange={(e) => setStudent(e.target.value)} /></label>
+            <div className="form-grid two">
               <label>目标国家<select value={country} onChange={(e) => setCountry(e.target.value)}>{countryOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               <label>目标专业<select value={major} onChange={(e) => setMajor(e.target.value)}>{majorOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-              <label>沟通切入点<select value={angle} onChange={(e) => setAngle(e.target.value)}>{angleOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-              <label>投放渠道<select value={platform} onChange={(e) => setPlatform(e.target.value)}>{platformOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
             </div>
-            <label className="lead-textarea">学生背景<textarea value={student} onChange={(e) => setStudent(e.target.value)} /></label>
+            <label>沟通切入点<select value={angle} onChange={(e) => setAngle(e.target.value)}>{angleOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label>投放渠道<select value={platform} onChange={(e) => setPlatform(e.target.value)}>{platformOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
             <button className="primary" disabled={loading}>{loading ? '生成中...' : '生成内容'}</button>
           </form>
         </section>
 
-        <section className="panel result-panel lead-result-panel">
+        <section className="panel result-panel frontdesk-result-panel-v13">
           <div className="panel-title compact"><span className="eyebrow">结果</span><h2>内容包</h2></div>
           {!result ? (
-            <div className="empty-advice compact-empty"><div className="empty-icon">✍</div><h2>等待生成</h2><p>填写学生信息后生成内容。</p></div>
+            <div className="empty-advice compact-empty"><div className="empty-icon">✍</div><h2>等待生成</h2><p>填写左侧信息后生成内容。</p></div>
           ) : (
-            <div className="lead-output-stack generated-output">
-              <SectionNav items={[
-                { id: 'lead-summary', label: '摘要' },
-                { id: 'lead-xhs', label: '小红书' },
-                { id: 'lead-video', label: '短视频' },
-                { id: 'lead-follow', label: '跟进' },
-                { id: 'lead-calendar', label: '计划' },
-              ]} />
-              <FoldSection id="lead-summary" title="线索摘要" subtitle="用于销售和内容选题" defaultOpen className="section-group-card">
-                <TextBlock value={result.brief} />
-              </FoldSection>
-              <div id="lead-xhs" className="lead-output-grid two">
-                <CopyCard title="小红书标题" content={result.xiaohongshu?.title} />
-                <CopyCard title="Hashtags" content={asArray(result.xiaohongshu?.hashtags).join(' ')} />
-                <CopyCard title="小红书正文" className="lead-span" content={[result.xiaohongshu?.hook, ...asArray(result.xiaohongshu?.body), result.xiaohongshu?.cta].filter(Boolean)} />
-              </div>
-              <div id="lead-video" className="lead-output-grid two">
-                <CopyCard title="短视频脚本" content={[result.videoScript?.opening, ...asArray(result.videoScript?.shots), result.videoScript?.ending].filter(Boolean)} />
-                <div id="lead-follow"><CopyCard title="微信跟进" content={result.wechatFollowup} /></div>
-              </div>
+            <div className="copy-grid two-output-grid">
+              <CopyCard title="线索摘要" content={result.brief} />
+              <CopyCard title="标题" content={result.xiaohongshu?.title} />
+              <CopyCard title="正文" content={[result.xiaohongshu?.hook, ...asArray(result.xiaohongshu?.body), result.xiaohongshu?.cta].filter(Boolean)} />
+              <CopyCard title="话题" content={asArray(result.xiaohongshu?.hashtags).join(' ')} />
+              <CopyCard title="短视频脚本" content={[result.videoScript?.opening, ...asArray(result.videoScript?.shots), result.videoScript?.ending].filter(Boolean)} />
+              <CopyCard title="微信跟进" content={result.wechatFollowup} />
               <CalendarCard items={asArray(result.contentCalendar)} />
               <details className="raw-json-details full-span-card"><summary>查看结构化数据</summary><pre className="json-block compact-json">{JSON.stringify(result, null, 2)}</pre></details>
             </div>

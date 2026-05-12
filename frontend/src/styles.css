@@ -1783,252 +1783,252 @@ th { color: var(--muted); font-weight: 800; }
   .application-workbench-v9 { grid-template-columns: 1fr !important; }
 }
 
-/* V12: fixed directory, full-width result workbench, two-column long-result boards, logs filters */
-.section-nav-v12 {
-  position: fixed !important;
-  top: 142px !important;
-  left: calc(292px + 32px) !important;
-  right: 40px !important;
-  z-index: 300 !important;
-  width: auto !important;
-  max-width: none !important;
-  margin: 0 !important;
-  padding: 9px 12px !important;
-  border-radius: 20px !important;
-  border: 1px solid rgba(49, 80, 200, .18) !important;
-  background: rgba(255,255,255,.94) !important;
-  backdrop-filter: blur(18px) saturate(130%);
-  box-shadow: 0 18px 48px rgba(15,23,42,.14) !important;
-  display: flex !important;
-  align-items: center;
-  gap: 8px;
-  overflow-x: auto;
+/* V13: no fixed directory, full-width generated workspaces, horizontal long content */
+.section-nav,
+.section-nav-v11,
+.section-nav-inline,
+.application-result-panel-v10 .section-nav {
+  position: static !important;
+  top: auto !important;
+  z-index: 1 !important;
+  margin: 0 0 16px !important;
+  box-shadow: none !important;
+  background: #f8fbff !important;
+  border: 1px solid #e5edff !important;
+  border-radius: 18px !important;
+  padding: 9px 10px !important;
 }
-.app-shell.sidebar-collapsed .section-nav-v12 { left: calc(86px + 32px) !important; }
-.section-nav-v12 span { color: #64748b; font-size: 12px; font-weight: 950; white-space: nowrap; }
-.section-nav-v12 button:not(.section-nav-top) {
-  flex: 0 0 auto;
-  border: 0;
-  background: #eef4ff;
-  color: #3150c8;
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 950;
-  cursor: pointer;
-  transition: transform .16s ease, background .16s ease;
-}
-.section-nav-v12 button:not(.section-nav-top):hover { transform: translateY(-1px); background: #dbeafe; }
-.section-nav-v12 + * { margin-top: 58px; }
-.section-nav-top { cursor: pointer; }
-.section-fold, .section-group-card, .advisor-module, .app-grid-item { scroll-margin-top: 210px !important; }
+.section-nav-inline a,
+.section-nav a { padding: 7px 12px; }
+.section-nav-top { margin-left: auto; box-shadow: none; }
+.section-fold, .section-group-card, .advisor-module, .app-grid-item { scroll-margin-top: 28px !important; }
 
-/* Use top input + full result workspace after generation to remove the large empty left rail. */
-.tools-workbench-v9:has(.agent-output-stack),
-.application-workbench-v9:has(.application-output-grid-v11),
-.lead-workbench-generated {
-  display: grid !important;
+/* Once a result exists, stop wasting half the page on the form. */
+.tools-workbench-v13.with-result,
+.application-workbench-v13.with-result,
+.frontdesk-workbench-v13.with-result {
   grid-template-columns: 1fr !important;
-  gap: 22px !important;
+  gap: 18px !important;
 }
-.tools-workbench-v9:has(.agent-output-stack) > .form-panel,
-.application-workbench-v9:has(.application-output-grid-v11) > .form-panel,
-.lead-workbench-generated > .lead-input-panel {
+.tools-workbench-v13.with-result .form-panel-inline,
+.application-workbench-v13.with-result .form-panel-inline,
+.frontdesk-workbench-v13.with-result .form-panel {
   position: static !important;
   max-height: none !important;
   overflow: visible !important;
+  padding: 18px 20px !important;
 }
-.tools-workbench-v9:has(.agent-output-stack) .form-stack,
-.application-workbench-v9:has(.application-output-grid-v11) .form-stack,
-.lead-workbench-generated .lead-form-grid {
+.tools-workbench-v13.with-result .form-stack,
+.application-workbench-v13.with-result .form-stack,
+.frontdesk-workbench-v13.with-result .form-stack {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, .32fr);
-  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
   align-items: end;
 }
-.tools-workbench-v9:has(.agent-output-stack) .form-grid.two,
-.application-workbench-v9:has(.application-output-grid-v11) .form-grid.two,
-.lead-workbench-generated .lead-inline-grid {
-  grid-template-columns: repeat(4, minmax(150px, 1fr)) !important;
+.tools-workbench-v13.with-result .form-stack > .form-grid,
+.application-workbench-v13.with-result .form-stack > .form-grid,
+.frontdesk-workbench-v13.with-result .form-stack > .form-grid {
+  display: contents;
 }
-.tools-workbench-v9:has(.agent-output-stack) textarea,
-.application-workbench-v9:has(.application-output-grid-v11) textarea,
-.lead-workbench-generated textarea {
+.tools-workbench-v13.with-result .form-stack > label,
+.application-workbench-v13.with-result .form-stack > label,
+.frontdesk-workbench-v13.with-result .form-stack > label { margin: 0; }
+.tools-workbench-v13.with-result .form-stack textarea,
+.application-workbench-v13.with-result .form-stack textarea,
+.frontdesk-workbench-v13.with-result .form-stack textarea {
   min-height: 72px !important;
+  max-height: 96px;
 }
-.tools-workbench-v9:has(.agent-output-stack) .button-grid,
-.application-workbench-v9:has(.application-output-grid-v11) .button-grid,
-.lead-workbench-generated .primary { align-self: stretch; }
-
-/* Result workspace becomes the primary canvas. */
-.generated-result-panel,
-.application-result-panel-v10,
-.lead-result-panel {
-  position: relative;
-  overflow: visible !important;
-  min-width: 0;
+.tools-workbench-v13.with-result .form-stack > label:has(textarea),
+.application-workbench-v13.with-result .form-stack > label:has(textarea),
+.frontdesk-workbench-v13.with-result .form-stack > label:has(textarea) {
+  grid-column: span 2;
 }
-.advisor-grid-v11,
-.application-output-grid-v11,
-.lead-output-stack {
-  padding-top: 4px;
+.tools-workbench-v13.with-result .button-grid,
+.application-workbench-v13.with-result .form-stack > button,
+.frontdesk-workbench-v13.with-result .form-stack > button {
+  grid-column: span 2;
+  align-self: stretch;
 }
-
-/* Advisor: strong left/right rhythm inside modules. */
-.advisor-grid-v11 {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-  gap: 20px !important;
-}
-.advisor-trace-module,
-.advisor-materials-module { grid-column: 1 / -1 !important; }
-.advisor-grid-v11 .advisor-module > .agent-output-stack,
-.advisor-grid-v11 .advisor-module > .generated-output,
-.advisor-grid-v11 .score-view-v10 {
-  display: grid;
-  gap: 16px;
-}
-.advisor-grid-v11 .advisor-score-module .score-view-v10 {
-  grid-template-columns: minmax(0, .58fr) minmax(0, .42fr);
-}
-.advisor-grid-v11 .advisor-score-module .score-view-v10 > .section-group-card:first-child { grid-column: 1 / -1; }
-.advisor-grid-v11 .advisor-score-module .score-view-v10 > .section-group-card:nth-child(2),
-.advisor-grid-v11 .advisor-score-module .score-view-v10 > .section-group-card:nth-child(3) { min-height: 100%; }
-.advisor-grid-v11 .advisor-application-module .result-cluster-grid.two,
-.advisor-grid-v11 .advisor-sales-module .nested-card-grid.two,
-.advisor-grid-v11 .advisor-materials-module .material-board-comfort {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-}
-.advisor-grid-v11 .advisor-application-module .draft-grid-comfort {
-  grid-template-columns: minmax(0, .58fr) minmax(0, .42fr) !important;
-}
-.advisor-grid-v11 .advisor-application-module .draft-main-card { grid-row: span 2; }
-.advisor-grid-v11 .workflow-board-v11 {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
-}
-.advisor-grid-v11 .comfort-tier-grid,
-.chat-page-v2 .tier-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  align-items: stretch;
-}
-
-/* Application page: two-column business board, no dead blank area. */
-.application-output-grid-v11 {
-  grid-template-columns: minmax(0, .52fr) minmax(0, .48fr) !important;
-  gap: 20px !important;
-}
-.application-output-grid-v11 > .section-nav { grid-column: 1 / -1; }
-.app-grid-score,
-.app-grid-drafts { grid-column: 1 / -1 !important; }
-.app-grid-brief,
-.app-grid-pipeline,
-.app-grid-materials { min-width: 0; }
-.app-grid-brief .app-brief-board-v10,
-.app-grid-pipeline .nested-card-grid.two,
-.app-grid-materials .compact-material-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-.app-grid-drafts .app-draft-grid-v10 {
-  grid-template-columns: minmax(0, .6fr) minmax(0, .4fr) !important;
-}
-.app-grid-drafts .draft-main-card { grid-row: span 2; }
-.app-grid-drafts .draft-main-card .pre-line { max-height: 520px; }
-.app-grid-drafts .app-draft-side-v10 .pre-line { max-height: 240px; }
-
-/* Lead/frontdesk: compact input, full-width output, grouped cards. */
-.lead-output-stack { display: grid; gap: 16px; }
-.lead-output-grid {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-.lead-output-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.lead-span { grid-column: 1 / -1; }
-.lead-result-card .pre-line,
-.lead-result-card ul {
-  max-height: 360px;
-  overflow: auto;
-  padding-right: 6px;
-}
-.lead-calendar-table { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
-
-/* Chat lower blocks stay balanced in columns. */
-.chat-page-v2 .advice-two-col,
-.chat-page-v2 .meta-grid {
-  display: grid !important;
-  grid-template-columns: minmax(0, .58fr) minmax(0, .42fr) !important;
-  gap: 20px !important;
-  align-items: start;
-}
-.chat-page-v2 .advice-two-col > .section-group-card,
-.chat-page-v2 .meta-grid > .section-group-card { min-width: 0; height: fit-content; }
-.chat-page-v2 .timeline-cards { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.chat-page-v2 .summary-card h2 { line-height: 1.45; }
-
-/* Logs: filters + observability dashboard. */
-.logs-filter-panel { padding: 20px; }
-.log-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
-  gap: 14px;
-  align-items: end;
-}
-.log-filter-grid label { display: grid; gap: 8px; color: #334155; font-weight: 850; }
-.log-filter-grid select,
-.log-filter-grid input {
+.tools-workbench-v13.with-result .result-panel-v13,
+.application-workbench-v13.with-result .application-result-panel-v13,
+.frontdesk-workbench-v13.with-result .frontdesk-result-panel-v13 {
   width: 100%;
-  min-height: 46px;
-  border: 1px solid #dbe5f1;
+}
+
+/* Advisor page: convert lower blocks to wide two-column business boards. */
+.advisor-grid-v13 {
+  display: grid !important;
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+}
+.advisor-grid-v13 .advisor-trace-module,
+.advisor-grid-v13 .advisor-materials-module { grid-column: 1 / -1; }
+.advisor-grid-v13 .advisor-score-module,
+.advisor-grid-v13 .advisor-sales-module { grid-column: span 5; }
+.advisor-grid-v13 .advisor-schools-module,
+.advisor-grid-v13 .advisor-application-module { grid-column: span 7; }
+.advisor-grid-v13 .workflow-board-v11 { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+.advisor-grid-v13 .comfort-tier-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.advisor-grid-v13 .decision-grid-v10,
+.advisor-grid-v13 .risk-board-v10,
+.advisor-grid-v13 .nested-card-grid.two,
+.advisor-grid-v13 .result-cluster-grid.two,
+.advisor-grid-v13 .app-brief-board-v10,
+.advisor-grid-v13 .app-draft-grid-v10,
+.advisor-grid-v13 .draft-grid-comfort { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.advisor-grid-v13 .score-factor-grid-v10,
+.advisor-grid-v13 .comfort-score-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.advisor-grid-v13 .material-board-comfort { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.advisor-grid-v13 .section-group-card { height: auto; }
+.advisor-grid-v13 .result-shell-grid { grid-template-columns: minmax(180px, .28fr) minmax(0, .72fr) !important; }
+.advisor-grid-v13 .advisor-application-module .result-shell-grid,
+.advisor-grid-v13 .advisor-sales-module .result-shell-grid,
+.advisor-grid-v13 .advisor-materials-module .result-shell-grid { grid-template-columns: 1fr !important; }
+.advisor-grid-v13 .pre-line { max-height: 360px; overflow: auto; }
+
+/* Application page: full-width generated dossier. */
+.application-output-grid-v13 {
+  display: grid !important;
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+}
+.application-output-grid-v13 > .section-nav { grid-column: 1 / -1; }
+.application-output-grid-v13 .app-grid-score { grid-column: span 5; }
+.application-output-grid-v13 .app-grid-brief { grid-column: span 7; }
+.application-output-grid-v13 .app-grid-drafts { grid-column: 1 / -1; }
+.application-output-grid-v13 .app-grid-pipeline { grid-column: span 7; }
+.application-output-grid-v13 .app-grid-materials { grid-column: span 5; }
+.application-output-grid-v13 .app-brief-board-v10 { grid-template-columns: minmax(0, .46fr) minmax(0, .54fr) !important; }
+.application-output-grid-v13 .app-brief-side-v10 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.application-output-grid-v13 .app-brief-side-v10 > .fold-card:first-child { grid-row: span 2; }
+.application-output-grid-v13 .app-draft-grid-v10 { grid-template-columns: minmax(0, .62fr) minmax(320px, .38fr) !important; }
+.application-output-grid-v13 .app-pipeline-grid-v10 { grid-template-columns: minmax(0, .58fr) minmax(320px, .42fr) !important; }
+.application-output-grid-v13 .compact-pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.application-output-grid-v13 .compact-material-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.application-output-grid-v13 .app-brief-main .pre-line { max-height: 260px; overflow: auto; }
+.application-output-grid-v13 .app-draft-side-v10 .pre-line { max-height: 320px; overflow: auto; }
+
+/* Front desk: parse calendar objects into horizontal campaign cards. */
+.frontdesk-result-panel-v13 .copy-grid.two-output-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.calendar-panel-v13 { grid-column: 1 / -1; }
+.calendar-board-v13 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.calendar-card-v13 {
+  border: 1px solid #e6edf7;
+  border-radius: 20px;
+  padding: 16px;
+  background: linear-gradient(180deg, #fff, #f8fbff);
+  display: grid;
+  gap: 10px;
+  min-height: 210px;
+}
+.calendar-card-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.calendar-card-head strong { color: #3150c8; }
+.calendar-card-head span, .calendar-card-v13 em {
+  font-style: normal;
+  color: #64748b;
+  font-weight: 900;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.calendar-card-v13 h4 { margin: 0; color: #0f172a; font-size: 16px; line-height: 1.4; }
+.calendar-card-v13 p { margin: 0; color: #334155; line-height: 1.65; overflow-wrap: anywhere; word-break: normal; }
+.compact-note { margin-top: 4px !important; }
+
+/* Chat meta panels: no raw JSON walls. */
+.meta-grid-v13 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; align-items: start; }
+.meta-card-grid-v13 { display: grid; gap: 12px; }
+.smart-object-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.smart-object-cell {
+  border: 1px solid #edf2f7;
   border-radius: 14px;
   padding: 10px 12px;
-  font: inherit;
-  font-weight: 800;
-  background: #fff;
+  background: #f8fbff;
+  display: grid;
+  gap: 4px;
 }
-.log-search { grid-column: span 2; }
-.logs-stats-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.trace-list-v12 { display: grid; gap: 14px; }
-.trace-card-error { border-color: #fecaca !important; background: linear-gradient(180deg, #fff, #fff7f7) !important; }
-.trace-metrics-v12 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.trace-card .error-card.slim { background: #fff1f2; }
+.smart-object-cell span { color: #64748b; font-size: 12px; font-weight: 900; }
+.smart-object-cell strong { color: #172033; line-height: 1.45; font-size: 13px; overflow-wrap: anywhere; }
+.compact-text-block { max-height: 220px; overflow: auto; }
+.compact-clean-list { margin: 0; }
+.source-card-v13 .fold-body,
+.tool-call-card-v13 .fold-body { max-height: 340px; overflow: auto; }
 
-/* General compactness and enterprise polish. */
-.result-shell-main > .section-group-card,
-.result-shell-main > .fold-card,
-.generated-output > .section-group-card,
-.lead-output-stack > .section-group-card { min-width: 0; }
-.fold-card > summary { gap: 16px; }
-.fold-card > summary b { white-space: nowrap; }
-.fold-body .pre-line { line-height: 1.72; }
-.mini-result-card, .inner-fold-card { overflow: hidden; }
-
-@media (max-width: 1320px) {
-  .tools-workbench-v9:has(.agent-output-stack) .form-stack,
-  .application-workbench-v9:has(.application-output-grid-v11) .form-stack,
-  .lead-workbench-generated .lead-form-grid { grid-template-columns: 1fr; }
-  .tools-workbench-v9:has(.agent-output-stack) .form-grid.two,
-  .application-workbench-v9:has(.application-output-grid-v11) .form-grid.two,
-  .lead-workbench-generated .lead-inline-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)) !important; }
-  .advisor-grid-v11,
-  .application-output-grid-v11,
-  .advisor-grid-v11 .advisor-score-module .score-view-v10,
-  .app-grid-drafts .app-draft-grid-v10,
-  .chat-page-v2 .advice-two-col,
-  .chat-page-v2 .meta-grid { grid-template-columns: 1fr !important; }
-  .app-grid-brief .app-brief-board-v10,
-  .app-grid-pipeline .nested-card-grid.two,
-  .app-grid-materials .compact-material-list,
-  .advisor-grid-v11 .advisor-sales-module .nested-card-grid.two,
-  .advisor-grid-v11 .advisor-materials-module .material-board-comfort { grid-template-columns: 1fr !important; }
-  .logs-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Logs observability filters. */
+.filter-grid-v13 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) minmax(260px, 1.4fr);
+  gap: 12px;
+  align-items: end;
 }
-@media (max-width: 920px) {
-  .section-nav-v12 { left: 14px !important; right: 14px !important; top: 14px !important; max-width: none !important; }
-  .section-nav-v12 span { display: none; }
-  .section-nav-v12 + * { margin-top: 54px; }
-  .section-fold, .section-group-card, .advisor-module, .app-grid-item { scroll-margin-top: 92px !important; }
-  .log-filter-grid,
-  .logs-stats-grid,
-  .lead-output-grid.two,
-  .advisor-grid-v11 .comfort-tier-grid,
-  .chat-page-v2 .tier-grid { grid-template-columns: 1fr !important; }
-  .log-search { grid-column: auto; }
-  .trace-metrics-v12 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.filter-grid-v13 label { margin: 0; }
+.filter-search { grid-column: auto; }
+.stats-grid.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.log-stats-v13 .stat-card strong { font-size: clamp(28px, 3vw, 44px); }
+.log-list-v13 { display: grid; gap: 14px; }
+.trace-card-failed { border-color: #fecaca; background: linear-gradient(180deg, #fff, #fff7f7); }
+.trace-metrics-v13 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.error-card.slim { margin-top: 12px; padding: 12px 14px; }
+
+@media (max-width: 1500px) {
+  .calendar-board-v13 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .advisor-grid-v13 .workflow-board-v11 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .advisor-grid-v13 .comfort-tier-grid,
+  .advisor-grid-v13 .material-board-comfort { grid-template-columns: 1fr !important; }
+  .application-output-grid-v13 .app-grid-score,
+  .application-output-grid-v13 .app-grid-brief,
+  .application-output-grid-v13 .app-grid-pipeline,
+  .application-output-grid-v13 .app-grid-materials { grid-column: 1 / -1; }
+  .stats-grid.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .filter-grid-v13 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filter-search { grid-column: 1 / -1; }
+}
+
+@media (max-width: 1100px) {
+  .tools-workbench-v13.with-result .form-stack,
+  .application-workbench-v13.with-result .form-stack,
+  .frontdesk-workbench-v13.with-result .form-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .advisor-grid-v13 { grid-template-columns: 1fr !important; }
+  .advisor-grid-v13 .advisor-score-module,
+  .advisor-grid-v13 .advisor-schools-module,
+  .advisor-grid-v13 .advisor-application-module,
+  .advisor-grid-v13 .advisor-sales-module { grid-column: 1 / -1; }
+  .advisor-grid-v13 .result-shell-grid,
+  .advisor-grid-v13 .decision-grid-v10,
+  .advisor-grid-v13 .risk-board-v10,
+  .advisor-grid-v13 .nested-card-grid.two,
+  .advisor-grid-v13 .result-cluster-grid.two,
+  .advisor-grid-v13 .app-brief-board-v10,
+  .advisor-grid-v13 .app-draft-grid-v10,
+  .advisor-grid-v13 .draft-grid-comfort,
+  .application-output-grid-v13 .app-brief-board-v10,
+  .application-output-grid-v13 .app-draft-grid-v10,
+  .application-output-grid-v13 .app-pipeline-grid-v10 { grid-template-columns: 1fr !important; }
+  .application-output-grid-v13 .app-brief-side-v10 { grid-template-columns: 1fr; }
+  .frontdesk-result-panel-v13 .copy-grid.two-output-grid,
+  .meta-grid-v13 { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 720px) {
+  .calendar-board-v13,
+  .filter-grid-v13,
+  .stats-grid.six,
+  .tools-workbench-v13.with-result .form-stack,
+  .application-workbench-v13.with-result .form-stack,
+  .frontdesk-workbench-v13.with-result .form-stack { grid-template-columns: 1fr !important; }
+  .tools-workbench-v13.with-result .form-stack > label:has(textarea),
+  .application-workbench-v13.with-result .form-stack > label:has(textarea),
+  .frontdesk-workbench-v13.with-result .form-stack > label:has(textarea),
+  .tools-workbench-v13.with-result .button-grid,
+  .application-workbench-v13.with-result .form-stack > button,
+  .frontdesk-workbench-v13.with-result .form-stack > button { grid-column: auto; }
 }

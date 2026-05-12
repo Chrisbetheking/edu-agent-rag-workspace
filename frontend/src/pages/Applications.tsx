@@ -196,8 +196,8 @@ export default function Applications() {
       {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(result.llmFallbackReason)}</div>}
 
 
-      <div className="two-col application-workbench-v9">
-        <section className="panel sticky-panel compact-form-card">
+      <div className={`two-col application-workbench-v9 application-workbench-v13 ${result ? 'with-result' : ''}`}>
+        <section className={`panel compact-form-card ${result ? 'form-panel-inline' : 'sticky-panel'}`}>
           <div className="panel-title compact"><span className="eyebrow">录入</span><h2>学生档案</h2></div>
           <form className="form-stack" onSubmit={run}>
             <div className="form-grid two">
@@ -219,13 +219,13 @@ export default function Applications() {
           </form>
         </section>
 
-        <section className="panel generated-result-panel application-result-panel-v9 application-result-panel-v10">
+        <section className="panel generated-result-panel application-result-panel-v9 application-result-panel-v10 application-result-panel-v13">
           <div className="panel-title compact">
             <div><span className="eyebrow">结果</span><h2>申请案卷</h2></div>
             {result && <span className="pill success">已生成</span>}
           </div>
           {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
-            <div className="application-output-stack-v10 application-output-grid-v11">
+            <div className="application-output-stack-v10 application-output-grid-v11 application-output-grid-v13">
               <SectionNav items={[
                 { id: 'app-score', label: '评分' },
                 { id: 'app-brief', label: '方向' },

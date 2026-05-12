@@ -259,7 +259,7 @@ function AdvisorView({ result }: { result: any }) {
         </div>
       </div>
 
-      <div className="advisor-grid-v11">
+      <div className="advisor-grid-v11 advisor-grid-v13">
         <div id="advisor-trace" className="advisor-module advisor-trace-module">
           <ResultShell title="执行链路" subtitle="一次录入，多节点复用">
             <div className="workflow-board workflow-board-v9 workflow-board-v11">
@@ -410,8 +410,8 @@ export default function Tools() {
       {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p><small>已尝试写入前端失败日志；如系统日志没有出现，请重新部署后端。</small></div>}
       {activeResult?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(activeResult.llmFallbackReason)}</div>}
 
-      <div className="two-col wide-right tools-workbench-grid tools-workbench-v9">
-        <section className="panel form-panel sticky-panel compact-form-card">
+      <div className={`two-col wide-right tools-workbench-grid tools-workbench-v9 tools-workbench-v13 ${activeResult ? 'with-result' : ''}`}>
+        <section className={`panel form-panel compact-form-card ${activeResult ? 'form-panel-inline' : 'sticky-panel'}`}>
           <div className="panel-title compact"><span className="eyebrow">录入</span><h2>{activeMeta.name}</h2></div>
           <form className="form-stack" onSubmit={(e) => callTool(active, e)}>
             <div className="form-grid two">
@@ -433,7 +433,7 @@ export default function Tools() {
           </form>
         </section>
 
-        <section className="panel result-panel generated-result-panel result-panel-v9">
+        <section className="panel result-panel generated-result-panel result-panel-v9 result-panel-v13">
           <div className="panel-title"><div><span className="eyebrow">结果</span><h2>{activeMeta.name}</h2></div>{activeResult && <span className="pill success">完成</span>}</div>
           {activeResult ? <><GenericResult result={activeResult} active={active} /><details className="raw-json-details"><summary>查看结构化数据</summary><pre className="json-block compact-json">{JSON.stringify(activeResult, null, 2)}</pre></details></> : <div className="empty-advice compact-empty"><div className="empty-icon">⌘</div><h2>{loadingTool ? '正在运行' : '等待运行'}</h2><p>建议先运行“完整流程”，再查看各节点结果。</p></div>}
         </section>
