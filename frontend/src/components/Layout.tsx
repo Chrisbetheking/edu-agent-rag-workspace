@@ -6,7 +6,7 @@ import { api } from '../api/client';
 const RESUME_URL = 'https://chrisbetheking.github.io/WANGHONG-s-Resume-Website/';
 
 const navs = [
-  { to: '/', label: '工作台', icon: '▦', desc: '业务总览' },
+  { to: '/workspace', label: '工作台', icon: '▦', desc: '业务总览' },
   { to: '/frontdesk', label: '前台增长', icon: '✍', desc: '小红书 / 视频脚本' },
   { to: '/chat', label: 'AI 对话', icon: '✦', desc: 'RAG 选校方案' },
   { to: '/applications', label: '申请后台', icon: '▣', desc: '文书与递交流程' },
@@ -19,7 +19,7 @@ const navs = [
 ];
 
 function pageLabel(pathname: string) {
-  const current = navs.find((item) => (item.to === '/' ? pathname === '/' : pathname.startsWith(item.to)));
+  const current = navs.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`));
   return current?.label || 'EduAgent';
 }
 
@@ -62,7 +62,7 @@ export default function Layout() {
               key={item.to}
               to={item.to}
               className={({ isActive }) => (isActive ? 'nav active' : 'nav')}
-              end={item.to === '/'}
+              end={item.to === '/workspace'}
             >
               <span className="nav-icon">{item.icon}</span>
               <span>

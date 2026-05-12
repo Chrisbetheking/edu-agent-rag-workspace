@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from './store/auth';
 import Layout from './components/Layout';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
@@ -22,9 +23,10 @@ function Protected({ children }: { children: JSX.Element }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<Protected><Layout /></Protected>}>
-        <Route index element={<Dashboard />} />
+      <Route element={<Protected><Layout /></Protected>}>
+        <Route path="/workspace" element={<Dashboard />} />
         <Route path="frontdesk" element={<FrontDesk />} />
         <Route path="chat" element={<Chat />} />
         <Route path="applications" element={<Applications />} />
@@ -35,6 +37,7 @@ export default function App() {
         <Route path="logs" element={<Logs />} />
         <Route path="architecture" element={<Architecture />} />
       </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

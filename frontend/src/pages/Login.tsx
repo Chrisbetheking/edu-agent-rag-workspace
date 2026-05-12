@@ -22,7 +22,7 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/login', { username, password });
       setAuth(data.token, data.user);
-      navigate('/');
+      navigate('/workspace');
     } catch (err: any) {
       setError(err?.response?.data?.message || '登录失败，请检查管理员账号和密码。');
     } finally {
@@ -36,7 +36,7 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/guest');
       setAuth(data.token, data.user);
-      navigate('/');
+      navigate('/workspace');
     } catch (err: any) {
       setError(err?.response?.data?.message || '访客登录失败，请稍后重试。');
     } finally {

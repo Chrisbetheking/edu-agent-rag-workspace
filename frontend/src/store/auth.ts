@@ -3,7 +3,7 @@ import { create } from 'zustand';
 const TOKEN_KEY = 'eduagent_token';
 const USER_KEY = 'eduagent_user';
 const VERSION_KEY = 'eduagent_auth_version';
-const AUTH_VERSION = 'v2-no-hardcoded-demo-password';
+const AUTH_VERSION = 'v3-public-landing-guest-quota';
 
 interface User {
   id: string;
