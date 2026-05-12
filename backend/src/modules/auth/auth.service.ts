@@ -24,16 +24,21 @@ export class AuthService {
   login(username: string, password: string) {
     const inputUsername = String(username || '').trim();
     const inputPassword = String(password || '').trim();
-    const adminUsername = process.env.ADMIN_USERNAME || 'CHRISWANG';
-    const adminPassword = process.env.ADMIN_PASSWORD || '060712';
+    const adminUsername = String(process.env.ADMIN_USERNAME || 'admin').trim();
+    const adminPassword = String(process.env.ADMIN_PASSWORD || '').trim();
 
-    const allow = inputUsername.toUpperCase() === adminUsername.toUpperCase() && inputPassword === adminPassword;
+    if (!adminPassword) {
+      throw new UnauthorizedException('管理员密码未在后端环境变量 ADMIN_PASSWORD 中配置。请先在部署平台添加 ADMIN_USERNAME / ADMIN_PASSWORD。');
+    }
+
+    const allow = inputUsername.toLowerCase() === adminUsername.toLowerCase() && inputPassword === adminPassword;
     if (!allow) throw new UnauthorizedException('账号或密码错误');
 
-    const user = this.store.users.find((u) => u.username.toUpperCase() === adminUsername.toUpperCase()) || {
-      id: 'u_chris',
+    const existing = this.store.users.find((u) => u.username.toLowerCase() === adminUsername.toLowerCase());
+    const user = existing || {
+      id: 'u_admin',
       username: adminUsername,
-      displayName: 'Chris Wang',
+      displayName: process.env.ADMIN_DISPLAY_NAME || 'Admin',
       role: 'admin',
     };
 

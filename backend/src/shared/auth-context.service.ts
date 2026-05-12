@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RequestUser } from './types';
 
@@ -51,7 +51,7 @@ export class AuthContextService {
 
       return user;
     } catch {
-      return this.safeGuest();
+      throw new UnauthorizedException('登录状态已失效，请重新进入。');
     }
   }
 

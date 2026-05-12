@@ -657,3 +657,62 @@ th { color: var(--muted); font-weight: 800; }
   .document-row-v2 { grid-template-columns: 1fr; }
   .doc-actions { justify-content: flex-start; max-width: none; }
 }
+
+/* Full-stack product polish v2 */
+.fatal-page { min-height: 100vh; display: grid; place-items: center; padding: 32px; background: radial-gradient(circle at 20% 20%, rgba(54,87,227,.14), transparent 30%), #f6f8fc; }
+.fatal-card { width: min(760px, 100%); padding: 30px; border-radius: 28px; background: #fff; border: 1px solid #e5ebf3; box-shadow: var(--shadow); }
+.fatal-card h1 { margin: 10px 0; font-size: clamp(28px, 4vw, 44px); letter-spacing: -.05em; }
+.fatal-card p { color: var(--muted); line-height: 1.7; }
+
+.sticky-panel { position: sticky; top: 24px; }
+.enhanced-card { position: relative; overflow: hidden; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.enhanced-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: linear-gradient(90deg, rgba(54,87,227,.8), rgba(6,182,212,.65)); opacity: .7; }
+.enhanced-card:hover { transform: translateY(-2px); border-color: rgba(54,87,227,.22); box-shadow: 0 18px 48px rgba(15,23,42,.08); }
+.full-span-card { grid-column: 1 / -1; }
+.two-output-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.compact-json { max-height: 360px; overflow: auto; }
+.json-block { white-space: pre-wrap; word-break: break-word; background: #0b1220; color: #e5eefb; border-radius: 18px; padding: 16px; line-height: 1.6; font-size: 12px; }
+
+.mini-table { display: grid; gap: 8px; margin-top: 10px; }
+.mini-table div { display: grid; grid-template-columns: 90px minmax(0, 1fr) 90px; gap: 10px; align-items: center; padding: 11px 12px; border-radius: 14px; background: #f8fafc; border: 1px solid #edf2f7; }
+.mini-table strong { color: #0f172a; }
+.mini-table span { color: #334155; line-height: 1.45; }
+.mini-table em { font-style: normal; color: #3150c8; font-weight: 800; text-align: right; }
+
+.document-draft-panel .ops-card p, .draft-grid .ops-card p { white-space: pre-line; }
+.draft-grid { display: grid; grid-template-columns: 1.4fr .8fr .8fr; gap: 12px; }
+.stage-number { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 999px; color: white; background: linear-gradient(135deg, var(--primary), var(--cyan)); font-weight: 950; }
+
+.agent-output-stack { display: grid; gap: 16px; }
+.agent-summary-card, .panel-lite { border: 1px solid #e8eef8; border-radius: 24px; background: linear-gradient(135deg, #ffffff, #f8fbff); padding: 20px; box-shadow: var(--shadow-soft); }
+.agent-summary-card h2 { margin: 8px 0 12px; font-size: 22px; line-height: 1.45; letter-spacing: -.03em; }
+.panel-lite h3 { margin: 0 0 12px; }
+.workflow-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.workflow-step { border: 1px solid #e8eef8; border-radius: 18px; background: #fff; padding: 14px; min-height: 150px; display: grid; gap: 6px; align-content: start; }
+.workflow-step em { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 999px; background: #eef2ff; color: #3150c8; font-style: normal; font-weight: 950; }
+.workflow-step strong { color: #0f172a; }
+.workflow-step span { color: #3150c8; font-size: 12px; font-weight: 900; }
+.workflow-step p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 13px; }
+.compact-tier-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.school-row { padding: 12px 0; border-top: 1px solid #edf2f7; }
+.school-row:first-of-type { border-top: 0; }
+.school-row strong { display: block; color: #0f172a; margin-bottom: 6px; }
+.school-row p { margin: 0; color: #334155; line-height: 1.65; }
+.school-row small { display: block; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.raw-json-details { margin-top: 16px; }
+.raw-json-details summary { cursor: pointer; color: #3150c8; font-weight: 900; margin-bottom: 10px; }
+
+.login-card input::placeholder { color: #94a3b8; }
+.login-card .primary:disabled { filter: grayscale(.15); }
+
+@media (max-width: 1280px) {
+  .workflow-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .draft-grid, .two-output-grid, .compact-tier-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .sticky-panel { position: static; }
+  .workflow-grid { grid-template-columns: 1fr; }
+  .mini-table div { grid-template-columns: 1fr; }
+  .mini-table em { text-align: left; }
+}

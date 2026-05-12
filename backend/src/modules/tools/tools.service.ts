@@ -3,6 +3,30 @@ import { MemoryStore } from '../../shared/memory-store';
 import { DatabaseService } from '../../shared/database.service';
 import { LlmService } from '../llm/llm.service';
 
+type ToolStatus = 'success' | 'failed';
+
+type StudentInput = {
+  name?: string;
+  studentName?: string;
+  student?: string;
+  background?: string;
+  country?: string;
+  targetCountry?: string;
+  major?: string;
+  degree?: string;
+  cgpa?: number | string;
+  gpa?: number | string;
+  scale?: number | string;
+  budget?: string;
+  language?: string;
+  englishScore?: string;
+  concern?: string;
+  angle?: string;
+  platform?: string;
+  experience?: string;
+  targetSchools?: string;
+};
+
 @Injectable()
 export class ToolsService {
   constructor(
@@ -11,74 +35,55 @@ export class ToolsService {
     private readonly llm: LlmService,
   ) {}
 
+  private hasRealLlm() {
+    return this.llm.isConfigured() && String(process.env.FORCE_MOCK_TOOLS || '').toLowerCase() !== 'true';
+  }
+
+  private normalizeStudent(input: StudentInput = {}) {
+    const name = input.name || input.studentName || 'Chris';
+    const country = input.country || input.targetCountry || '英国';
+    const major = input.major || '计算机科学';
+    const degree = input.degree || '硕士';
+    const cgpa = String(input.cgpa || input.gpa || '3.2');
+    const scale = Number(input.scale || 4);
+    const budget = input.budget || '30万人民币';
+    const language = input.language || input.englishScore || 'IELTS 6.5';
+    const concern = input.concern || input.angle || '担心 CGPA 不够，希望用项目、实习和文书提高竞争力';
+    const experience = input.experience || input.background || input.student || '马来西亚 APU 计算机本科，有软件项目、AI/数据项目和实习经历';
+    const platform = input.platform || '小红书 + 短视频 + 微信私域';
+    const targetSchools = input.targetSchools || '暂未确定';
+
+    return { name, country, major, degree, cgpa, scale, budget, language, concern, experience, platform, targetSchools };
+  }
+
   private track<T>(toolName: string, input: any, fn: () => T) {
     const start = Date.now();
-
     try {
       const output = fn();
-
-      this.store.addToolLog({
-        toolName,
-        input,
-        output,
-        duration: Date.now() - start,
-        status: 'success',
-      });
-
+      this.addToolLog(toolName, input, output, Date.now() - start, 'success');
       return output;
     } catch (error: any) {
-      const output = {
-        message: error?.message || '工具调用失败',
-      };
-
-      this.store.addToolLog({
-        toolName,
-        input,
-        output,
-        duration: Date.now() - start,
-        status: 'failed',
-      });
-
+      const output = { message: error?.message || '工具调用失败' };
+      this.addToolLog(toolName, input, output, Date.now() - start, 'failed');
       throw error;
     }
   }
-
-
 
   private async trackAsync<T>(toolName: string, input: any, fn: () => Promise<T>) {
     const start = Date.now();
-
     try {
       const output = await fn();
-
-      this.store.addToolLog({
-        toolName,
-        input,
-        output,
-        duration: Date.now() - start,
-        status: 'success',
-      });
-
+      this.addToolLog(toolName, input, output, Date.now() - start, 'success');
       return output;
     } catch (error: any) {
-      const output = {
-        message: error?.message || '工具调用失败',
-      };
-
-      this.store.addToolLog({
-        toolName,
-        input,
-        output,
-        duration: Date.now() - start,
-        status: 'failed',
-      });
-
+      const output = { message: error?.message || '工具调用失败' };
+      this.addToolLog(toolName, input, output, Date.now() - start, 'failed');
       throw error;
     }
   }
 
-  private demoMode() {
-    return String(process.env.DEMO_MODE || 'true').toLowerCase() === 'true';
+  private addToolLog(toolName: string, input: any, output: any, duration: number, status: ToolStatus) {
+    this.store.addToolLog({ toolName, input, output, duration, status });
   }
 
   private stripJson(text: string) {
@@ -90,7 +95,7 @@ export class ToolsService {
       .trim();
   }
 
-  private tryJson(text: string) {
+  private tryJson<T = any>(text: string): T | null {
     try {
       return JSON.parse(this.stripJson(text));
     } catch {
@@ -104,6 +109,37 @@ export class ToolsService {
     }
   }
 
+  private asArray(value: any): any[] {
+    if (Array.isArray(value)) return value;
+    if (value == null || value === '') return [];
+    return [value];
+  }
+
+  private async aiJson<T>(config: {
+    system: string;
+    user: string;
+    fallback: T;
+    normalize?: (value: any, raw?: string) => T;
+  }): Promise<T> {
+    if (!this.hasRealLlm()) return config.fallback;
+
+    try {
+      const raw = await this.llm.chat([
+        { role: 'system', content: `${config.system}\n\n你必须只返回合法 JSON，不要 Markdown，不要代码块，不要解释。` },
+        { role: 'user', content: config.user },
+      ]);
+      const parsed = this.tryJson(raw);
+      if (!parsed) return { ...(config.fallback as any), raw, llmFallbackReason: 'LLM 返回不是合法 JSON，已使用安全兜底结构。' } as T;
+      return config.normalize ? config.normalize(parsed, raw) : ({ ...(config.fallback as any), ...(parsed as any), poweredBy: 'deepseek' } as T);
+    } catch (error: any) {
+      return { ...(config.fallback as any), llmFallbackReason: error?.message || 'LLM unavailable' } as T;
+    }
+  }
+
+  private markdownList(items: any[] = []) {
+    return items.filter(Boolean).map((item) => `- ${typeof item === 'string' ? item : JSON.stringify(item)}`).join('\n');
+  }
+
   convertCgpa(input: { cgpa: number; scale?: number; targetCountry?: string }) {
     return this.track('CGPA 换算工具', input, () => {
       const scale = Number(input.scale || 4);
@@ -111,9 +147,10 @@ export class ToolsService {
       const percent = Math.max(0, Math.min(100, (cgpa / scale) * 100));
 
       let level = '需要强化背景';
-      if (percent >= 85) level = '优秀，可冲刺排名较高院校';
-      else if (percent >= 75) level = '良好，适合匹配中上院校';
-      else if (percent >= 65) level = '中等，建议合理选校并补充项目/实习';
+      let band = 'risk';
+      if (percent >= 85) { level = '优秀，可冲刺排名较高院校'; band = 'reach'; }
+      else if (percent >= 75) { level = '良好，适合匹配中上院校'; band = 'match'; }
+      else if (percent >= 65) { level = '中等，建议合理选校并补充项目/实习'; band = 'safe-match'; }
 
       return {
         cgpa,
@@ -121,8 +158,9 @@ export class ToolsService {
         percentage: Number(percent.toFixed(2)),
         targetCountry: input.targetCountry || '未指定',
         level,
+        band,
         advice: [
-          '换算结果仅用于初筛，不等于学校官方评估。',
+          '换算结果仅用于申请初筛，不等于学校官方评估。',
           '建议同时准备课程描述、项目经历、实习证明和推荐信。',
           '最终要求需要以目标学校官网和当年招生政策为准。',
         ],
@@ -130,168 +168,143 @@ export class ToolsService {
     });
   }
 
-  recommendSchools(input: any) {
-    return this.track('院校推荐工具', input, () => {
-      const gpa = Number(input.gpa || input.cgpa || 0);
-      const country = input.country || '英国/澳洲';
-      const major = input.major || '计算机相关专业';
-      const budget = input.budget || '未指定';
-      const language = input.language || '暂未提供';
-
-      const bands =
+  async recommendSchools(input: StudentInput) {
+    return this.trackAsync('AI 院校推荐工具', input, async () => {
+      const s = this.normalizeStudent(input);
+      const gpa = Number(s.cgpa) || 3.2;
+      const fallbackBands =
         gpa >= 3.4
-          ? {
-              reach: ['Manchester', 'Bristol', 'Warwick'],
-              match: ['Sheffield', 'Nottingham', 'Leeds'],
-              safe: ['Cardiff', 'Liverpool', 'Queen Mary'],
-            }
+          ? { reach: ['Manchester', 'Bristol'], match: ['Sheffield', 'Nottingham'], safe: ['Cardiff', 'Liverpool'] }
           : gpa >= 3.0
-            ? {
-                reach: ['Sheffield', 'Nottingham', 'Leeds'],
-                match: ['Cardiff', 'Liverpool', 'Queen Mary'],
-                safe: ['Sussex', 'Essex', 'Swansea'],
-              }
-            : {
-                reach: ['Cardiff', 'Liverpool'],
-                match: ['Sussex', 'Essex', 'Swansea'],
-                safe: ['部分预科/语言班/合作项目'],
-              };
-
-      return {
-        profile: {
-          country,
-          major,
-          gpa,
-          budget,
-          language,
-        },
-        reach: bands.reach.map((name) => ({
-          name,
-          reason: '可作为冲刺选择，需要突出项目、实习和课程匹配度。',
-        })),
-        match: bands.match.map((name) => ({
-          name,
-          reason: '与当前背景相对匹配，建议重点准备申请材料。',
-        })),
-        safe: bands.safe.map((name) => ({
-          name,
-          reason: '作为保底选择，适合提升申请成功率。',
-        })),
-        risk: [
-          'GPA、语言成绩、专业匹配度和申请时间都会影响结果。',
-          '推荐结果为 Demo 模拟，真实申请需核对学校官网。',
-        ],
-      };
-    });
-  }
-
-  generateCopywriting(input: any) {
-    return this.track('销售话术生成工具', input, () => {
-      const name = input.name || '同学';
-      const country = input.country || '目标国家';
-      const concern = input.concern || '选校和申请成功率';
-
-      return {
-        wechat: `你好${name}，根据你目前的背景，如果目标是${country}，我们可以先从 GPA、专业匹配度、预算和语言成绩四个维度做初筛。你现在最需要解决的是${concern}，我建议先整理成绩单和目标专业方向，我可以帮你做一版冲刺/匹配/保底方案。`,
-        callOutline: [
-          '确认学生背景和目标国家',
-          '解释当前背景的优势与风险',
-          '给出三档选校策略',
-          '引导提供成绩单和语言成绩',
-          '安排下一步方案沟通',
-        ],
-        shortVideoScript: `如果你也是马来西亚本科背景，想申请${country}硕士，千万不要只看排名。GPA、专业匹配、预算和材料完整度都会影响结果。建议先做三档选校，再针对每所学校准备材料。`,
-      };
-    });
-  }
-
-  materialList(input: any) {
-    return this.track('申请材料清单工具', input, () => {
-      const country = input.country || '目标国家';
-      const degree = input.degree || '硕士';
-
-      return {
-        country,
-        degree,
-        required: ['成绩单', '在读证明/毕业证', '个人陈述 PS', '简历 CV', '推荐信', '护照', '语言成绩'],
-        optional: ['课程描述', '作品集', '实习证明', '项目证明', '获奖证明'],
-        reminders: [
-          '不同学校材料要求可能不同。',
-          '语言成绩未达标时可查询语言班或后补政策。',
-          '所有材料建议统一命名并备份。',
-        ],
-      };
-    });
-  }
-
-
-  async growthCampaign(input: any) {
-    return this.trackAsync('AI 前台增长内容生成器', input, async () => {
-      const student = input.student || input.name || '马来西亚本科计算机学生';
-      const country = input.country || input.targetCountry || '英国';
-      const major = input.major || '计算机科学';
-      const angle = input.angle || input.concern || 'GPA 不高也想稳妥申请';
-      const platform = input.platform || '小红书 + 短视频 + 微信';
+            ? { reach: ['Sheffield', 'Nottingham'], match: ['Cardiff', 'Liverpool'], safe: ['Sussex', 'Essex'] }
+            : { reach: ['Cardiff', 'Liverpool'], match: ['Sussex', 'Essex'], safe: ['Swansea', '部分预科/语言班/合作项目'] };
 
       const fallback = {
-        brief: `${student}，目标${country}${major}，核心内容角度：${angle}。`,
+        profile: s,
+        reach: fallbackBands.reach.map((name) => ({ name, reason: '可作为冲刺选择，需要突出项目、实习和课程匹配度。', action: '核对官网课程要求、语言要求和申请截止时间。' })),
+        match: fallbackBands.match.map((name) => ({ name, reason: '与当前背景相对匹配，建议重点准备申请材料。', action: '围绕项目经历和专业匹配度准备 PS/CV。' })),
+        safe: fallbackBands.safe.map((name) => ({ name, reason: '作为保底选择，适合提升申请成功率。', action: '控制申请风险，避免只投高风险学校。' })),
+        risk: ['GPA、语言成绩、课程匹配度和申请时间都会影响结果。', '推荐结果为初筛，真实申请需核对学校官网。'],
+      };
+
+      return this.aiJson({
+        fallback,
+        system: '你是留学选校规划 Agent，擅长把学生背景拆成冲刺、匹配、保底三档。',
+        user: `请基于以下学生背景生成三档院校推荐 JSON。字段：profile, reach, match, safe, risk。每档 2-3 所学校，每所包含 name, reason, fit, risk, action。\n${JSON.stringify(s, null, 2)}`,
+        normalize: (value) => ({
+          ...fallback,
+          ...value,
+          profile: value.profile || fallback.profile,
+          reach: this.asArray(value.reach).length ? this.asArray(value.reach) : fallback.reach,
+          match: this.asArray(value.match).length ? this.asArray(value.match) : fallback.match,
+          safe: this.asArray(value.safe).length ? this.asArray(value.safe) : fallback.safe,
+          risk: this.asArray(value.risk).length ? this.asArray(value.risk) : fallback.risk,
+          poweredBy: 'deepseek',
+        }),
+      });
+    });
+  }
+
+  async generateCopywriting(input: StudentInput) {
+    return this.trackAsync('AI 销售话术生成工具', input, async () => {
+      const s = this.normalizeStudent(input);
+      const fallback = {
+        student: s,
+        wechat: `你好${s.name}，我看你目标是${s.country}${s.major}${s.degree}。我们可以先按 GPA、课程匹配、项目经历、语言成绩和预算做一次定位，再拆出冲刺/匹配/保底方案。`,
+        objectionHandling: [
+          { concern: '担心 GPA 不够', answer: 'GPA 是重要因素，但项目、实习、课程匹配和文书解释逻辑也会影响整体竞争力。' },
+          { concern: '担心预算超支', answer: '可以先区分伦敦与非伦敦城市，再把学校分成不同预算档。' },
+        ],
+        callOutline: ['确认学生背景和目标国家', '解释当前背景优势与风险', '给出三档选校策略', '引导提供成绩单和项目经历', '安排下一步方案沟通'],
+        shortVideoScript: `如果你是${s.experience}，想申请${s.country}${s.major}${s.degree}，不要只盯排名，要先看课程匹配、预算和材料完整度。`,
+        followUpTasks: ['索要成绩单', '确认语言成绩', '整理项目/实习素材', '预约方案讲解'],
+      };
+
+      return this.aiJson({
+        fallback,
+        system: '你是留学咨询公司的销售转化 Agent，输出专业、有边界、不过度承诺的销售话术。',
+        user: `请生成销售沟通包 JSON。字段：student, wechat, objectionHandling, callOutline, shortVideoScript, followUpTasks。\n${JSON.stringify(s, null, 2)}`,
+        normalize: (value) => ({
+          ...fallback,
+          ...value,
+          objectionHandling: this.asArray(value.objectionHandling).length ? this.asArray(value.objectionHandling) : fallback.objectionHandling,
+          callOutline: this.asArray(value.callOutline).length ? this.asArray(value.callOutline) : fallback.callOutline,
+          followUpTasks: this.asArray(value.followUpTasks).length ? this.asArray(value.followUpTasks) : fallback.followUpTasks,
+          poweredBy: 'deepseek',
+        }),
+      });
+    });
+  }
+
+  materialList(input: StudentInput) {
+    return this.track('申请材料清单工具', input, () => {
+      const s = this.normalizeStudent(input);
+      return {
+        country: s.country,
+        degree: s.degree,
+        required: ['成绩单', '在读证明/毕业证', '个人陈述 PS', '简历 CV', '推荐信', '护照', '语言成绩'],
+        optional: ['课程描述', '作品集', '实习证明', '项目证明', '获奖证明', 'GitHub/作品集链接'],
+        namingRules: ['01_transcript.pdf', '02_cv.pdf', '03_ps.docx', '04_reference_1.pdf'],
+        reminders: ['不同学校材料要求可能不同。', '语言成绩未达标时可查询语言班或后补政策。', '所有材料建议统一命名并备份。'],
+      };
+    });
+  }
+
+  async growthCampaign(input: StudentInput) {
+    return this.trackAsync('AI 前台增长内容生成器', input, async () => {
+      const s = this.normalizeStudent(input);
+      const fallback = {
+        brief: `${s.experience}，目标${s.country}${s.major}${s.degree}，核心内容角度：${s.concern}。`,
         xiaohongshu: {
-          title: `GPA 不算顶尖，也能申请${country}${major}硕士吗？`,
+          title: `GPA 不算顶尖，也能申请${s.country}${s.major}${s.degree}吗？`,
           hook: '很多同学一看到 GPA 就觉得自己没机会，其实留学申请不是只看一个数字。',
           body: [
-            `如果你是${student}，目标是${country}${major}，先不要盲目按排名投。`,
+            `如果你是${s.experience}，目标是${s.country}${s.major}，先不要盲目按排名投。`,
             '正确做法是把学校拆成冲刺、匹配、保底三档，再看课程匹配、项目经历、语言成绩和预算。',
             'GPA 不够强时，项目、实习、推荐信和 PS 的解释逻辑会非常关键。',
           ],
           cta: '想看你的背景适合哪一档，可以先整理成绩单和目标专业，我帮你做一版初筛。',
-          hashtags: ['留学申请', `${country}硕士`, major, '选校定位', '留学咨询'],
+          hashtags: ['留学申请', `${s.country}硕士`, s.major, '选校定位', '留学咨询'],
         },
         videoScript: {
           opening: '如果你本科背景普通、GPA 不算高，还想申请海外硕士，这条一定要看完。',
-          shots: [
-            '镜头1：展示成绩单/项目经历，提出痛点。',
-            '镜头2：用三档选校图解释冲刺、匹配、保底。',
-            '镜头3：展示材料清单：PS、CV、推荐信、课程描述。',
-            '镜头4：提醒官网要求每年会变，必须逐校核对。',
-          ],
+          shots: ['镜头1：展示成绩单/项目经历，提出痛点。', '镜头2：用三档选校图解释冲刺、匹配、保底。', '镜头3：展示材料清单：PS、CV、推荐信、课程描述。'],
           ending: '评论区留下目标国家和专业，我给你一个选校方向。',
         },
         wechatFollowup: [
-          `你好，我看你目标是${country}${major}，我们可以先按 GPA、课程匹配、项目经历和预算做一次定位。`,
+          `你好，我看你目标是${s.country}${s.major}，我们可以先按 GPA、课程匹配、项目经历和预算做一次定位。`,
           '我建议先不要直接定学校，先做三档策略，这样既有冲刺空间，也能控制风险。',
           '你方便发一下成绩单、语言成绩和项目/实习经历吗？我可以帮你做初版方案。',
         ],
         contentCalendar: [
           { day: '周一', topic: '低 GPA 申请策略', format: '小红书笔记' },
-          { day: '周三', topic: `${country}${major}选校误区`, format: '短视频' },
+          { day: '周三', topic: `${s.country}${s.major}选校误区`, format: '短视频' },
           { day: '周五', topic: '申请材料清单', format: '图文 checklist' },
         ],
       };
 
-      if (this.demoMode()) return fallback;
-
-      try {
-        const raw = await this.llm.chat([
-          { role: 'system', content: '你是留学咨询公司的增长运营 Agent。只返回合法 JSON，不要 Markdown。字段包含 brief, xiaohongshu, videoScript, wechatFollowup, contentCalendar。内容要可直接发布，避免夸大录取结果。' },
-          { role: 'user', content: `学生背景：${student}\n目标国家：${country}\n目标专业：${major}\n内容平台：${platform}\n核心角度：${angle}` },
-        ]);
-        return this.tryJson(raw) || { ...fallback, raw };
-      } catch (error: any) {
-        return { ...fallback, llmFallbackReason: error?.message || 'LLM unavailable' };
-      }
+      return this.aiJson({
+        fallback,
+        system: '你是留学咨询公司的前台增长 Agent。内容要能直接发小红书、短视频和微信私域，避免夸大录取结果。',
+        user: `请生成多平台获客内容包 JSON。字段：brief, xiaohongshu{title,hook,body,cta,hashtags}, videoScript{opening,shots,ending}, wechatFollowup, contentCalendar。\n${JSON.stringify(s, null, 2)}`,
+        normalize: (value) => ({
+          ...fallback,
+          ...value,
+          xiaohongshu: { ...fallback.xiaohongshu, ...(value.xiaohongshu || {}) },
+          videoScript: { ...fallback.videoScript, ...(value.videoScript || {}) },
+          wechatFollowup: this.asArray(value.wechatFollowup).length ? this.asArray(value.wechatFollowup) : fallback.wechatFollowup,
+          contentCalendar: this.asArray(value.contentCalendar).length ? this.asArray(value.contentCalendar) : fallback.contentCalendar,
+          poweredBy: 'deepseek',
+        }),
+      });
     });
   }
 
-  applicationPlan(input: any) {
-    return this.track('留学申请后台规划器', input, () => {
-      const name = input.name || input.studentName || 'Chris';
-      const country = input.country || input.targetCountry || '英国';
-      const major = input.major || '计算机科学';
-      const degree = input.degree || '硕士';
-      const gpa = input.gpa || input.cgpa || '3.2/4.0';
-
-      return {
-        student: { name, country, major, degree, gpa },
+  async applicationPlan(input: StudentInput) {
+    return this.trackAsync('AI 申请后台文书规划器', input, async () => {
+      const s = this.normalizeStudent(input);
+      const fallback = {
+        student: { name: s.name, country: s.country, major: s.major, degree: s.degree, gpa: s.cgpa, language: s.language, budget: s.budget, experience: s.experience },
         pipeline: [
           { stage: '线索评估', status: '进行中', owner: '咨询顾问', tasks: ['确认预算与目标国家', '收集成绩单与语言成绩'] },
           { stage: '选校定位', status: '待开始', owner: '申请顾问', tasks: ['拆分冲刺/匹配/保底', '核对官网入学要求'] },
@@ -299,49 +312,116 @@ export class ToolsService {
           { stage: '递交追踪', status: '待开始', owner: '申请顾问', tasks: ['网申账号', '材料上传', 'offer 状态更新'] },
         ],
         writingBrief: {
-          psTheme: `围绕${major}学习经历、项目能力和未来职业目标展开，解释为什么选择${country}${degree}。`,
+          psTheme: `围绕${s.major}学习经历、项目能力和未来职业目标展开，解释为什么选择${s.country}${s.degree}。`,
+          psOutline: ['学术背景与兴趣来源', '项目/实习经历证明能力', '为什么选择目标专业和国家', '未来职业目标和课程匹配'],
           cvHighlights: ['课程匹配度', '软件/AI/数据项目', 'GitHub 或作品集', '实习与团队协作'],
           recommendationAngles: ['学术能力', '项目执行力', '英文沟通与持续学习能力'],
         },
+        drafts: {
+          personalStatement: `我希望申请${s.country}${s.major}${s.degree}，因为本科阶段的计算机学习和项目实践让我逐步形成了对软件工程、数据分析和 AI 应用的兴趣。接下来我会进一步补充具体课程、项目、实习和职业目标，使文书更贴合目标院校。`,
+          cvSummary: `${s.name}，${s.major}方向申请人，具备编程、项目协作、数据/AI 应用和跨文化学习经历。`,
+          recommendationSeed: '推荐信可重点强调课程表现、项目执行力、持续学习能力和英文沟通能力。',
+        },
         materialChecklist: ['成绩单', '在读证明/毕业证', 'PS', 'CV', '两封推荐信', '护照', '语言成绩', '课程描述', '项目证明'],
-        riskFlags: [
-          'GPA 和专业课程匹配度需要逐校核对。',
-          '预算需要区分伦敦与非伦敦城市。',
-          '语言成绩未达标时需准备语言班或后补策略。',
+        riskFlags: ['GPA 和专业课程匹配度需要逐校核对。', '预算需要区分伦敦与非伦敦城市。', '语言成绩未达标时需准备语言班或后补策略。'],
+        nextBestActions: ['上传成绩单到知识库，验证 RAG 能否命中。', '用 AI 对话生成三档选校。', '把结果转成小红书/短视频获客内容。'],
+      };
+
+      return this.aiJson({
+        fallback,
+        system: '你是留学申请后端 CRM + 文书规划 Agent，负责生成可执行申请流程、文书大纲和可导出的文书初稿。',
+        user: `请生成申请执行方案 JSON。字段：student, pipeline, writingBrief{psTheme,psOutline,cvHighlights,recommendationAngles}, drafts{personalStatement,cvSummary,recommendationSeed}, materialChecklist, riskFlags, nextBestActions。必须给出可直接编辑的 personalStatement 初稿。\n${JSON.stringify(s, null, 2)}`,
+        normalize: (value) => ({
+          ...fallback,
+          ...value,
+          student: { ...fallback.student, ...(value.student || {}) },
+          pipeline: this.asArray(value.pipeline).length ? this.asArray(value.pipeline) : fallback.pipeline,
+          writingBrief: { ...fallback.writingBrief, ...(value.writingBrief || {}) },
+          drafts: { ...fallback.drafts, ...(value.drafts || {}) },
+          materialChecklist: this.asArray(value.materialChecklist).length ? this.asArray(value.materialChecklist) : fallback.materialChecklist,
+          riskFlags: this.asArray(value.riskFlags).length ? this.asArray(value.riskFlags) : fallback.riskFlags,
+          nextBestActions: this.asArray(value.nextBestActions).length ? this.asArray(value.nextBestActions) : fallback.nextBestActions,
+          exportMarkdown: this.applicationMarkdown({ ...fallback, ...value }),
+          poweredBy: 'deepseek',
+        }),
+      });
+    });
+  }
+
+  private applicationMarkdown(result: any) {
+    const student = result.student || {};
+    const writing = result.writingBrief || {};
+    const drafts = result.drafts || {};
+    return `# ${student.name || '学生'} ${student.country || ''}${student.major || ''}${student.degree || ''}申请执行方案\n\n## 学生档案\n- GPA/CGPA：${student.gpa || '-'}\n- 语言成绩：${student.language || '-'}\n- 预算：${student.budget || '-'}\n- 背景：${student.experience || '-'}\n\n## PS 主题\n${writing.psTheme || '-'}\n\n## PS 大纲\n${this.markdownList(writing.psOutline || [])}\n\n## Personal Statement 初稿\n${drafts.personalStatement || '-'}\n\n## CV 摘要\n${drafts.cvSummary || '-'}\n\n## 推荐信素材方向\n${drafts.recommendationSeed || '-'}\n\n## 材料清单\n${this.markdownList(result.materialChecklist || [])}\n\n## 风险提示\n${this.markdownList(result.riskFlags || [])}\n\n## 下一步动作\n${this.markdownList(result.nextBestActions || [])}\n`;
+  }
+
+  async advisorSuite(input: StudentInput) {
+    return this.trackAsync('AI Agent 综合方案编排器', input, async () => {
+      const s = this.normalizeStudent(input);
+      const started = Date.now();
+      const academic = this.convertCgpa({ cgpa: Number(s.cgpa || 3.2), scale: Number(s.scale || 4), targetCountry: s.country });
+      const schools = await this.recommendSchools(s);
+      const materials = this.materialList(s);
+      const growth = await this.growthCampaign(s);
+      const application = await this.applicationPlan(s);
+      const sales = await this.generateCopywriting(s);
+
+      const result = {
+        executiveSummary: `Agent 已把 ${s.name} 的背景串联成「成绩判断 → 选校定位 → 销售跟进 → 文书规划 → 材料清单 → 递交流程」完整业务闭环。`,
+        studentProfile: s,
+        workflow: [
+          { step: 1, name: 'Academic Intake', tool: 'CGPA 换算工具', status: 'done', output: academic.level },
+          { step: 2, name: 'School Strategy', tool: 'AI 院校推荐工具', status: 'done', output: '冲刺/匹配/保底三档' },
+          { step: 3, name: 'Growth Handoff', tool: 'AI 前台增长内容生成器', status: 'done', output: '小红书/短视频/微信' },
+          { step: 4, name: 'Application CRM', tool: 'AI 申请后台文书规划器', status: 'done', output: 'PS/CV/推荐信/流程' },
+          { step: 5, name: 'Material Ops', tool: '申请材料清单工具', status: 'done', output: 'required + optional checklist' },
         ],
-        nextBestActions: [
-          '上传成绩单到知识库，验证 RAG 能否命中。',
-          '用 AI 对话生成三档选校。',
-          '把结果转成小红书/短视频获客内容。',
+        outputs: { academic, schools, growth, sales, application, materials },
+        handoff: [
+          { team: '前台/销售', action: '用 growth 和 sales 结果跟进同背景线索。' },
+          { team: '咨询顾问', action: '基于 schools 输出做三档选校初筛。' },
+          { team: '文书老师', action: '基于 application.writingBrief 和 drafts 产出 PS/CV 初稿。' },
+          { team: '申请顾问', action: '根据 materials 和 pipeline 追踪递交。' },
         ],
+        agentTrace: {
+          mode: this.hasRealLlm() ? 'real-llm' : 'safe-fallback',
+          model: process.env.LLM_MODEL || 'deepseek-chat',
+          durationMs: Date.now() - started,
+          tools: ['convertCgpa', 'recommendSchools', 'growthCampaign', 'generateCopywriting', 'applicationPlan', 'materialList'],
+        },
+      };
+
+      return {
+        ...result,
+        exportMarkdown: this.advisorMarkdown(result),
       };
     });
   }
 
-  advisorSuite(input: any) {
-    return this.track('Agent 综合方案编排器', input, () => {
-      const academic = this.convertCgpa({ cgpa: Number(input.cgpa || input.gpa || 3.2), scale: Number(input.scale || 4), targetCountry: input.country || '英国' });
-      const schools = this.recommendSchools(input);
-      const materials = this.materialList(input);
-      const application = this.applicationPlan(input);
-
-      return {
-        executiveSummary: '系统已把学生背景拆解为成绩判断、选校策略、材料清单、文书重点和运营转化内容，适合咨询顾问直接拿去跟进。',
-        academic,
-        schools,
-        materials,
-        application,
-        handoff: [
-          { team: '咨询前台', action: '使用增长内容吸引同背景学生咨询。' },
-          { team: '申请顾问', action: '用三档选校做初筛并核对官网要求。' },
-          { team: '文书老师', action: '基于 writingBrief 产出 PS/CV 初稿。' },
-          { team: '运营负责人', action: '在调用日志查看耗时、RAG 命中和失败情况。' },
-        ],
-      };
-    });
+  private advisorMarkdown(result: any) {
+    const s = result.studentProfile || {};
+    const app = result.outputs?.application || {};
+    return `# EduAgent 综合申请方案\n\n## 学生画像\n- 姓名：${s.name || '-'}\n- 国家/专业/学位：${s.country || '-'} / ${s.major || '-'} / ${s.degree || '-'}\n- GPA：${s.cgpa || '-'}\n- 语言：${s.language || '-'}\n- 预算：${s.budget || '-'}\n\n## Agent 总结\n${result.executiveSummary}\n\n## 工作流\n${this.markdownList((result.workflow || []).map((x: any) => `${x.step}. ${x.name}｜${x.tool}｜${x.output}`))}\n\n## 冲刺院校\n${this.markdownList(result.outputs?.schools?.reach?.map((x: any) => `${x.name}：${x.reason}`) || [])}\n\n## 匹配院校\n${this.markdownList(result.outputs?.schools?.match?.map((x: any) => `${x.name}：${x.reason}`) || [])}\n\n## 保底院校\n${this.markdownList(result.outputs?.schools?.safe?.map((x: any) => `${x.name}：${x.reason}`) || [])}\n\n## 文书初稿\n${app.drafts?.personalStatement || '-'}\n\n## 材料清单\n${this.markdownList(result.outputs?.materials?.required || [])}\n`;
   }
 
   async logs(limit = 50) {
+    const memoryLogs = this.store.toolLogs.slice(0, limit).map((log: any) => ({
+      id: log.id,
+      type: 'tool_call',
+      question: log.toolName,
+      model: this.hasRealLlm() ? (process.env.LLM_MODEL || 'deepseek-chat') : 'local-tool',
+      success: log.status === 'success',
+      status: log.status,
+      durationMs: log.duration,
+      ragHitCount: 0,
+      toolNames: [log.toolName],
+      error: log.status === 'success' ? '' : '工具调用失败',
+      createdAt: log.createdAt,
+      input: log.input,
+      output: log.output,
+    }));
+
+    let dbLogs: any[] = [];
     if (this.db.enabled) {
       try {
         const result = await this.db.query(
@@ -364,7 +444,7 @@ export class ToolsService {
           [limit],
         );
 
-        return result.rows.map((row: any) => ({
+        dbLogs = result.rows.map((row: any) => ({
           id: row.id,
           type: 'ai_call',
           conversationId: row.conversation_id,
@@ -383,21 +463,9 @@ export class ToolsService {
       }
     }
 
-    return this.store.toolLogs.slice(0, limit).map((log: any) => ({
-      id: log.id,
-      type: 'tool_call',
-      question: log.toolName,
-      model: 'local-tool',
-      success: log.status === 'success',
-      status: log.status,
-      durationMs: log.duration,
-      ragHitCount: 0,
-      toolNames: [log.toolName],
-      error: log.status === 'success' ? '' : '工具调用失败',
-      createdAt: log.createdAt,
-      input: log.input,
-      output: log.output,
-    }));
+    return [...memoryLogs, ...dbLogs]
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, limit);
   }
 
   async overview(limit = 80) {
@@ -413,17 +481,12 @@ export class ToolsService {
     for (const log of logs as any[]) {
       const model = log.model || 'unknown';
       modelUsageMap.set(model, (modelUsageMap.get(model) || 0) + 1);
-
       const toolNames = Array.isArray(log.toolNames) && log.toolNames.length ? log.toolNames : ['无工具调用'];
-      for (const name of toolNames) {
-        toolUsageMap.set(name, (toolUsageMap.get(name) || 0) + 1);
-      }
+      for (const name of toolNames) toolUsageMap.set(name, (toolUsageMap.get(name) || 0) + 1);
     }
 
     const toSortedArray = (map: Map<string, number>) =>
-      Array.from(map.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count);
+      Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 
     return {
       totalCalls,
@@ -436,7 +499,7 @@ export class ToolsService {
       modelUsage: toSortedArray(modelUsageMap),
       latestLogs: logs.slice(0, 8),
       generatedAt: new Date().toISOString(),
+      mode: this.hasRealLlm() ? 'real-llm' : 'safe-fallback',
     };
   }
-
 }

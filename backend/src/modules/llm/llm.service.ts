@@ -9,6 +9,10 @@ export interface LlmMessage {
 
 @Injectable()
 export class LlmService {
+  isConfigured() {
+    return Boolean(this.apiKey);
+  }
+
   private get apiKey() {
     return process.env.LLM_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || '';
   }

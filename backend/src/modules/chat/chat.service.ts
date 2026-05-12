@@ -263,10 +263,10 @@ export class ChatService {
   }
 
   private isDemoMode() {
-    return String(process.env.DEMO_MODE || 'true').toLowerCase() === 'true';
+    return !this.llmService.isConfigured() || String(process.env.FORCE_MOCK_CHAT || '').toLowerCase() === 'true';
   }
 
-  private detectTools(query: string) {
+  private async detectTools(query: string) {
     const calls: any[] = [];
     const lower = query.toLowerCase();
 
@@ -286,7 +286,7 @@ export class ChatService {
     if (/推荐|学校|院校|university|申请|硕士|master|msc/.test(lower)) {
       calls.push({
         name: '院校推荐工具',
-        result: this.tools.recommendSchools({
+        result: await this.tools.recommendSchools({
           gpa: 3.2,
           country: '英国/澳洲',
           major: '计算机',
@@ -298,7 +298,7 @@ export class ChatService {
     if (/话术|销售|文案|短视频|沟通/.test(lower)) {
       calls.push({
         name: '销售话术生成工具',
-        result: this.tools.generateCopywriting({
+        result: await this.tools.generateCopywriting({
           name: '同学',
           country: '英国',
           concern: '选校和成功率',
@@ -557,7 +557,7 @@ ${toolText}
     await this.persistMessage(conversationId, 'user', question);
 
     const sources = await this.retrieve(question, body.topK || 3, user);
-    const toolCalls = this.detectTools(question);
+    const toolCalls = await this.detectTools(question);
 
     let answer = '';
     let structured: StructuredAdvice | null = null;
