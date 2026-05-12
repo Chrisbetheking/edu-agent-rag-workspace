@@ -26,6 +26,7 @@ export function FoldSection({
   children,
   defaultOpen = false,
   className = '',
+  bodyClassName = '',
 }: {
   id?: string;
   title: string;
@@ -34,6 +35,7 @@ export function FoldSection({
   children: ReactNode;
   defaultOpen?: boolean;
   className?: string;
+  bodyClassName?: string;
 }) {
   return (
     <details id={id} className={`fold-card section-fold ${className}`.trim()} open={defaultOpen}>
@@ -44,7 +46,7 @@ export function FoldSection({
         </span>
         {badge && <b>{badge}</b>}
       </summary>
-      <div className="fold-body">{children}</div>
+      <div className={`fold-body ${bodyClassName}`.trim()}>{children}</div>
     </details>
   );
 }
@@ -55,15 +57,26 @@ export function SectionGroup({
   subtitle,
   children,
   defaultOpen = true,
+  className = '',
+  bodyClassName = '',
 }: {
   id?: string;
   title: string;
   subtitle?: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  className?: string;
+  bodyClassName?: string;
 }) {
   return (
-    <FoldSection id={id} title={title} subtitle={subtitle} defaultOpen={defaultOpen} className="section-group-card">
+    <FoldSection
+      id={id}
+      title={title}
+      subtitle={subtitle}
+      defaultOpen={defaultOpen}
+      className={`section-group-card ${className}`.trim()}
+      bodyClassName={bodyClassName}
+    >
       {children}
     </FoldSection>
   );
@@ -89,4 +102,39 @@ export function ListBlock({ items }: { items: unknown }) {
   const arr = Array.isArray(items) ? items : (items ? [items] : []);
   if (!arr.length) return <p className="muted">暂无内容</p>;
   return <ul>{arr.map((item, index) => <li key={index}>{toDisplayText(item)}</li>)}</ul>;
+}
+
+export function CompactMetric({ label, value, note }: { label: string; value: ReactNode; note?: ReactNode }) {
+  return (
+    <div className="compact-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {note && <em>{note}</em>}
+    </div>
+  );
+}
+
+export function ResultShell({
+  id,
+  title,
+  subtitle,
+  aside,
+  children,
+  defaultOpen = true,
+}: {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  aside?: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <SectionGroup id={id} title={title} subtitle={subtitle} defaultOpen={defaultOpen} bodyClassName="result-shell-body">
+      <div className={aside ? 'result-shell-grid' : 'result-shell-single'}>
+        {aside && <aside className="result-shell-aside">{aside}</aside>}
+        <div className="result-shell-main">{children}</div>
+      </div>
+    </SectionGroup>
+  );
 }

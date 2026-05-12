@@ -1,7 +1,10 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
 import { angleOptions, countryOptions, degreeOptions, majorOptions, platformOptions } from '../constants/options';
+import { readSessionState, writeSessionState } from '../utils/sessionState';
+
+const STORAGE_KEY = 'eduagent.frontdesk.v9';
 
 function CopyCard({ title, content }: { title: string; content: unknown }) {
   const items = asArray(content).filter(Boolean);
@@ -34,6 +37,7 @@ function CalendarCard({ items }: { items: any[] }) {
 }
 
 export default function FrontDesk() {
+  const [hydrated, setHydrated] = useState(false);
   const [name, setName] = useState('Chris');
   const [student, setStudent] = useState('马来西亚 APU 计算机本科，CGPA 3.2，有软件项目、AI/数据项目和实习经历');
   const [country, setCountry] = useState('英国');
@@ -46,6 +50,29 @@ export default function FrontDesk() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+
+  useEffect(() => {
+    const saved = readSessionState<any>(STORAGE_KEY, {});
+    if (saved.form) {
+      setName(saved.form.name ?? 'Chris');
+      setStudent(saved.form.student ?? '马来西亚 APU 计算机本科，CGPA 3.2，有软件项目、AI/数据项目和实习经历');
+      setCountry(saved.form.country ?? '英国');
+      setMajor(saved.form.major ?? '计算机科学');
+      setDegree(saved.form.degree ?? '硕士');
+      setAngle(saved.form.angle ?? angleOptions[0]);
+      setPlatform(saved.form.platform ?? platformOptions[0]);
+      setGaokaoTaken(saved.form.gaokaoTaken ?? '否');
+      setGaokaoScore(saved.form.gaokaoScore ?? '');
+    }
+    if (saved.result) setResult(saved.result);
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    writeSessionState(STORAGE_KEY, { form: { name, student, country, major, degree, angle, platform, gaokaoTaken, gaokaoScore }, result });
+  }, [hydrated, name, student, country, major, degree, angle, platform, gaokaoTaken, gaokaoScore, result]);
 
   const exportContent = useMemo(() => {
     if (!result) return '';
@@ -61,6 +88,7 @@ export default function FrontDesk() {
     try {
       const { data } = await api.post('/tools/growth-campaign', { name, student, background: student, country, major, degree, angle, concern: angle, platform, gaokaoTaken, gaokaoScore });
       setResult(data || {});
+      writeSessionState(STORAGE_KEY, { form: { name, student, country, major, degree, angle, platform, gaokaoTaken, gaokaoScore }, result: data || {} });
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || '生成失败');
     } finally {

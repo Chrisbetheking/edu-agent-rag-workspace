@@ -1,8 +1,11 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
-import { FoldSection, ListBlock, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
+import { CompactMetric, FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
+import { readSessionState, writeSessionState } from '../utils/sessionState';
+
+const STORAGE_KEY = 'eduagent.applications.v9';
 
 const defaultStages = [
   { stage: '背景确认', owner: '咨询顾问', tasks: ['确认目标国家、专业、预算', '收集成绩单和语言成绩'] },
@@ -29,16 +32,20 @@ function normalizeStage(stage: any, index: number) {
 function StageCard({ stage, index }: { stage: any; index: number }) {
   const item = normalizeStage(stage, index);
   return (
-    <FoldSection title={`${index + 1}. ${item.stage}`} subtitle={item.owner} badge={item.status} defaultOpen className="inner-fold-card">
+    <FoldSection title={`${index + 1}. ${item.stage}`} subtitle={item.owner} badge={item.status} defaultOpen className="inner-fold-card stage-card-v9">
       <ListBlock items={item.tasks} />
     </FoldSection>
   );
 }
 
-function TextPanel({ title, content }: { title: string; content: unknown }) {
+function CopyButton({ text }: { text: unknown }) {
+  return <button className="mini-copy" type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard?.writeText(toDisplayText(text)); }}>复制</button>;
+}
+
+function TextPanel({ title, content, className = '' }: { title: string; content: unknown; className?: string }) {
   const text = toDisplayText(content);
   return (
-    <FoldSection title={title} defaultOpen className="inner-fold-card" badge={<button className="mini-copy" type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard?.writeText(text); }}>复制</button>}>
+    <FoldSection title={title} defaultOpen className={`inner-fold-card ${className}`.trim()} badge={<CopyButton text={text} />}>
       <TextBlock value={text || '暂无内容'} />
     </FoldSection>
   );
@@ -48,21 +55,29 @@ function ScorePanel({ fit }: { fit: any }) {
   if (!fit) return null;
   const risks = [...asArray(fit.risks), ...asArray(fit.riskSignals), ...asArray(fit.riskFlags)];
   const nextActions = [...asArray(fit.nextActions), ...asArray(fit.nextBestActions)];
-  return (
-    <SectionGroup id="app-score" title={`申请适配度 ${fit.overall}/100`} subtitle="weighted-fit-v2">
-      <div className="score-layout app-score-layout">
-        <div className="score-circle"><strong>{toDisplayText(fit.band)}</strong><span>{toDisplayText(fit.overall)}</span></div>
-        <div className="score-factor-grid">
-          {asArray(fit.factors).map((factor: any) => (
-            <div className="score-factor" key={factor.key || factor.label}>
-              <div><strong>{toDisplayText(factor.label)}</strong><em>{toDisplayText(factor.score)}</em></div>
-              <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
-              <span>{toDisplayText(factor.evidence)}</span>
-            </div>
-          ))}
-        </div>
+  const aside = (
+    <div className="score-aside-card">
+      <span className="eyebrow">weighted-fit-v2</span>
+      <h2>{fit.overall}/100</h2>
+      <p>{fit.band} 档 · {toDisplayText(fit.tierAdvice?.strategy)}</p>
+      <div className="compact-metric-grid two">
+        <CompactMetric label="风险" value={risks.length} />
+        <CompactMetric label="动作" value={nextActions.length} />
       </div>
-      <div className="result-cluster-grid two mt">
+    </div>
+  );
+  return (
+    <ResultShell id="app-score" title="申请适配度" subtitle="算法评分、证据和配比" aside={aside}>
+      <div className="score-factor-grid large-score-grid comfort-score-grid">
+        {asArray(fit.factors).map((factor: any) => (
+          <div className="score-factor" key={factor.key || factor.label}>
+            <div><strong>{toDisplayText(factor.label)}</strong><em>{toDisplayText(factor.score)}</em></div>
+            <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
+            <span>{toDisplayText(factor.evidence)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="result-cluster-grid two mt balanced-blocks">
         <FoldSection title="建议配比" defaultOpen className="inner-fold-card">
           <p className="muted">冲刺 {fit.tierAdvice?.reach} / 匹配 {fit.tierAdvice?.match} / 保底 {fit.tierAdvice?.safe}。{toDisplayText(fit.tierAdvice?.strategy)}</p>
         </FoldSection>
@@ -71,19 +86,20 @@ function ScorePanel({ fit }: { fit: any }) {
         </FoldSection>
       </div>
       {!!nextActions.length && <FoldSection title="下一步动作" defaultOpen className="inner-fold-card"><ListBlock items={nextActions} /></FoldSection>}
-    </SectionGroup>
+    </ResultShell>
   );
 }
 
 function MaterialPanel({ items }: { items: any[] }) {
   return (
-    <div className="material-list single-list">
+    <div className="material-list single-list compact-material-list">
       {asArray(items).map((item, i) => <div className="material-item" key={i}><strong>{toDisplayText(item)}</strong></div>)}
     </div>
   );
 }
 
 export default function Applications() {
+  const [hydrated, setHydrated] = useState(false);
   const [name, setName] = useState('Chris');
   const [country, setCountry] = useState('英国');
   const [major, setMajor] = useState('计算机科学');
@@ -101,6 +117,23 @@ export default function Applications() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    const saved = readSessionState<any>(STORAGE_KEY, {});
+    if (saved.form) {
+      setName(saved.form.name ?? 'Chris'); setCountry(saved.form.country ?? '英国'); setMajor(saved.form.major ?? '计算机科学'); setDegree(saved.form.degree ?? '硕士');
+      setGpa(saved.form.gpa ?? '3.2'); setScale(saved.form.scale ?? '4'); setLanguageType(saved.form.languageType ?? 'IELTS'); setLanguageScore(saved.form.languageScore ?? '6.5');
+      setGaokaoTaken(saved.form.gaokaoTaken ?? '否'); setGaokaoScore(saved.form.gaokaoScore ?? ''); setBudget(saved.form.budget ?? '30万人民币');
+      setExperience(saved.form.experience ?? '马来西亚 APU 计算机本科，有软件项目、AI/数据项目、实习和 GitHub 作品集'); setTargetSchools(saved.form.targetSchools ?? '暂未确定');
+    }
+    if (saved.result) setResult(saved.result);
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    writeSessionState(STORAGE_KEY, { form: { name, country, major, degree, gpa, scale, languageType, languageScore, gaokaoTaken, gaokaoScore, budget, experience, targetSchools }, result });
+  }, [hydrated, name, country, major, degree, gpa, scale, languageType, languageScore, gaokaoTaken, gaokaoScore, budget, experience, targetSchools, result]);
+
   const language = useMemo(() => buildLanguage(languageType, languageScore), [languageType, languageScore]);
   const exportMarkdown = useMemo(() => {
     if (!result) return '';
@@ -113,11 +146,8 @@ export default function Applications() {
   async function logError(err: any, started: number) {
     try {
       await api.post('/tools/client-error-log', {
-        toolName: '申请案卷页面',
-        activeTool: 'applications',
-        endpoint: '/tools/application-plan',
-        message: err?.response?.data?.message || err?.message || '生成失败',
-        durationMs: Date.now() - started,
+        toolName: '申请案卷页面', activeTool: 'applications', endpoint: '/tools/application-plan',
+        message: err?.response?.data?.message || err?.message || '生成失败', durationMs: Date.now() - started,
       });
     } catch {}
   }
@@ -133,7 +163,9 @@ export default function Applications() {
         api.post('/tools/profile-fit', payload),
         api.post('/tools/application-plan', payload),
       ]);
-      setResult({ ...(planRes.data || {}), fit: fitRes.data || null });
+      const next = { ...(planRes.data || {}), fit: fitRes.data || null };
+      setResult(next);
+      writeSessionState(STORAGE_KEY, { form: { name, country, major, degree, gpa, scale, languageType, languageScore, gaokaoTaken, gaokaoScore, budget, experience, targetSchools }, result: next });
       window.setTimeout(() => document.querySelector('#app-score')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || '生成失败');
@@ -143,13 +175,16 @@ export default function Applications() {
     }
   }
 
+  const risks = result ? [...asArray(result.riskFlags), ...asArray(result.fit?.risks), ...asArray(result.fit?.riskSignals)] : [];
+  const actions = result ? [...asArray(result.nextBestActions), ...asArray(result.fit?.nextActions)] : [];
+
   return (
-    <section className="page-stack compact-page">
+    <section className="page-stack compact-page applications-page-v9">
       <div className="page-title elevated clean-title">
         <div>
           <span className="eyebrow">申请案卷</span>
           <h1>文书与材料流程</h1>
-          <p>生成后默认展开；需要查看下面内容时，收起上方模块即可。</p>
+          <p>结果会保存在本机；切换页面后回来不会清空。</p>
         </div>
         <div className="title-actions">
           {result && <button className="ghost-button" onClick={() => downloadText(`application-${name || 'student'}.md`, exportMarkdown)}>导出 Markdown</button>}
@@ -168,7 +203,7 @@ export default function Applications() {
         { id: 'app-materials', label: '材料' },
       ]} />}
 
-      <div className="two-col wide-left">
+      <div className="two-col application-workbench-v9">
         <section className="panel sticky-panel compact-form-card">
           <div className="panel-title compact"><span className="eyebrow">录入</span><h2>学生档案</h2></div>
           <form className="form-stack" onSubmit={run}>
@@ -191,17 +226,17 @@ export default function Applications() {
           </form>
         </section>
 
-        <section className="panel generated-result-panel">
+        <section className="panel generated-result-panel application-result-panel-v9">
           <div className="panel-title compact"><span className="eyebrow">结果</span><h2>文书方向</h2></div>
           {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
-            <SectionGroup id="app-brief" title="文书方向" subtitle="PS、CV、推荐信">
-              <div className="ops-card-grid nested-card-grid two">
-                <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} />
+            <ResultShell id="app-brief" title="文书方向" subtitle="PS、CV、推荐信">
+              <div className="app-brief-board-v9">
+                <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} className="app-brief-main" />
                 <FoldSection title="PS 大纲" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
                 <FoldSection title="CV 重点" defaultOpen className="inner-fold-card"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></FoldSection>
                 <FoldSection title="推荐信角度" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.recommendationAngles} /></FoldSection>
               </div>
-            </SectionGroup>
+            </ResultShell>
           )}
         </section>
       </div>
@@ -209,27 +244,27 @@ export default function Applications() {
       {result && <ScorePanel fit={result.fit} />}
 
       {result && (
-        <SectionGroup id="app-drafts" title="可编辑初稿" subtitle="可复制、可收起">
+        <ResultShell id="app-drafts" title="可编辑初稿" subtitle="左侧长文，右侧摘要与推荐信">
           <div className="panel-title inner-title"><span className="eyebrow">文书</span><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(exportMarkdown)}>复制全部</button></div>
-          <div className="draft-grid nested-card-grid three draft-grid-soft">
-            <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} />
+          <div className="draft-grid-comfort app-draft-grid-v9">
+            <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} className="draft-main-card" />
             <TextPanel title="CV Summary" content={result.drafts?.cvSummary} />
             <TextPanel title="推荐信素材" content={result.drafts?.recommendationSeed} />
           </div>
-        </SectionGroup>
+        </ResultShell>
       )}
 
       {result && (
-        <SectionGroup id="app-pipeline" title="申请执行" subtitle="按任务节点推进">
-          <div className="pipeline-list compact-pipeline">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div>
-        </SectionGroup>
-      )}
-
-      {result && (
-        <div id="app-materials" className="result-cluster-grid two">
-          <SectionGroup title="材料清单"><MaterialPanel items={asArray(result.materialChecklist)} /></SectionGroup>
-          <SectionGroup title="风险与下一步"><ul className="check-list">{[...asArray(result.riskFlags), ...asArray(result.nextBestActions)].map((item, i) => <li key={i}>{stringifySafe(item)}</li>)}</ul></SectionGroup>
+        <div id="app-pipeline" className="result-cluster-grid two balanced-blocks">
+          <ResultShell title="申请执行" subtitle="按任务节点推进"><div className="pipeline-list compact-pipeline">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div></ResultShell>
+          <ResultShell title="风险与下一步" subtitle="人工确认"><div className="nested-card-grid two"><FoldSection title="风险点" defaultOpen className="inner-fold-card"><ListBlock items={risks} /></FoldSection><FoldSection title="下一步" defaultOpen className="inner-fold-card"><ListBlock items={actions} /></FoldSection></div></ResultShell>
         </div>
+      )}
+
+      {result && (
+        <ResultShell id="app-materials" title="材料清单" subtitle="递交前逐校核对">
+          <MaterialPanel items={asArray(result.materialChecklist)} />
+        </ResultShell>
       )}
     </section>
   );

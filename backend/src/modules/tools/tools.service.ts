@@ -260,6 +260,14 @@ export class ToolsService {
         香港: [["HKU", "CUHK", "HKUST"], ["CityU", "PolyU", "HKBU"], ["Lingnan", "HSUHK"]],
         加拿大: [["UBC", "Toronto", "Waterloo"], ["McMaster", "Ottawa", "Simon Fraser"], ["York", "Concordia", "Windsor"]],
         美国: [["Northeastern", "USC", "NYU Tandon"], ["Stevens", "Syracuse", "George Washington"], ["Pace", "Illinois Tech", "University of Dayton"]],
+        新西兰: [["University of Auckland", "University of Otago"], ["Victoria University of Wellington", "University of Canterbury"], ["Massey University", "AUT"]],
+        爱尔兰: [["Trinity College Dublin", "University College Dublin"], ["University of Galway", "University College Cork"], ["Dublin City University", "Maynooth University"]],
+        荷兰: [["TU Delft", "University of Amsterdam"], ["Eindhoven University of Technology", "Utrecht University"], ["Tilburg University", "Vrije Universiteit Amsterdam"]],
+        德国: [["Technical University of Munich", "RWTH Aachen"], ["University of Stuttgart", "TU Darmstadt"], ["Saarland University", "University of Passau"]],
+        法国: [["École Polytechnique", "Université PSL"], ["Télécom Paris", "Université Paris-Saclay"], ["Grenoble INP", "Université Côte d'Azur"]],
+        日本: [["University of Tokyo", "Kyoto University"], ["Osaka University", "Tohoku University"], ["Waseda University", "Keio University"]],
+        韩国: [["Seoul National University", "KAIST"], ["POSTECH", "Yonsei University"], ["Korea University", "Hanyang University"]],
+        马来西亚: [["University of Malaya", "Universiti Putra Malaysia"], ["Taylor's University", "Monash Malaysia"], ["APU Malaysia", "INTI International University"]],
       };
       const pool = schoolPool[s.country] || schoolPool["英国"];
       const fallbackBands =
@@ -482,6 +490,15 @@ export class ToolsService {
       if (budgetScore < 70) risks.push("预算偏紧，需要优先设置成本更稳的匹配和保底方案。");
       riskSignals.push("最终录取要求必须逐校核对官网，系统评分只用于内部初筛和流程编排。");
 
+      const softRisks = riskSignals.length
+        ? riskSignals
+        : [
+            "仍需逐校核对官网课程、语言、截止日期和材料要求。",
+            "建议补充可验证项目证据，例如 GitHub、Demo、项目说明或实习证明。",
+          ];
+      const hardRisks = risks;
+      const combinedRisks = [...hardRisks, ...softRisks].filter(Boolean);
+
       return {
         student,
         algorithm: "weighted-fit-v2",
@@ -491,8 +508,15 @@ export class ToolsService {
         weights,
         factors,
         tierAdvice,
-        risks: risks.length ? risks : riskSignals,
-        riskSignals,
+        risks: combinedRisks,
+        hardRisks,
+        softRisks,
+        riskSignals: softRisks,
+        riskSummary: {
+          hard: hardRisks.length,
+          soft: softRisks.length,
+          total: combinedRisks.length,
+        },
         nextActions: [
           "整理成绩单、课程列表、项目经历和语言成绩。",
           "按冲刺、匹配、保底三档核对学校官网要求。",
@@ -787,6 +811,14 @@ export class ToolsService {
         香港: [["HKU", "CUHK", "HKUST"], ["CityU", "PolyU", "HKBU"], ["Lingnan", "HSUHK"]],
         加拿大: [["UBC", "Toronto", "Waterloo"], ["Ottawa", "Simon Fraser", "McMaster"], ["York", "Concordia", "Windsor"]],
         美国: [["Northeastern", "USC", "NYU Tandon"], ["Stevens", "Syracuse", "George Washington"], ["Pace", "Illinois Tech", "Dayton"]],
+        新西兰: [["University of Auckland", "University of Otago"], ["Victoria University of Wellington", "University of Canterbury"], ["Massey University", "AUT"]],
+        爱尔兰: [["Trinity College Dublin", "University College Dublin"], ["University of Galway", "University College Cork"], ["Dublin City University", "Maynooth University"]],
+        荷兰: [["TU Delft", "University of Amsterdam"], ["Eindhoven University of Technology", "Utrecht University"], ["Tilburg University", "Vrije Universiteit Amsterdam"]],
+        德国: [["Technical University of Munich", "RWTH Aachen"], ["University of Stuttgart", "TU Darmstadt"], ["Saarland University", "University of Passau"]],
+        法国: [["École Polytechnique", "Université PSL"], ["Télécom Paris", "Université Paris-Saclay"], ["Grenoble INP", "Université Côte d'Azur"]],
+        日本: [["University of Tokyo", "Kyoto University"], ["Osaka University", "Tohoku University"], ["Waseda University", "Keio University"]],
+        韩国: [["Seoul National University", "KAIST"], ["POSTECH", "Yonsei University"], ["Korea University", "Hanyang University"]],
+        马来西亚: [["University of Malaya", "Universiti Putra Malaysia"], ["Taylor's University", "Monash Malaysia"], ["APU Malaysia", "INTI International University"]],
       };
       const pool = schoolPool[s.country] || schoolPool["英国"];
       const mapSchools = (names: string[], tier: string) => names.map((name) => ({

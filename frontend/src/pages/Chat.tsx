@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
-import { FoldSection, ListBlock, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
+import { FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
+import { readSessionState, writeSessionState } from '../utils/sessionState';
 
 interface SchoolAdvice {
   name: string;
@@ -49,6 +50,15 @@ interface ChatResult {
   toolCalls: any[];
   conversationId: string;
   quota?: { limit: number | null; used: number | null; remaining: number | null };
+}
+
+
+const CHAT_STORAGE_KEY = 'eduagent.chat.v9';
+let pendingChatRequest: Promise<{ data: ChatResult; conversations: any[] }> | null = null;
+
+function persistChatSnapshot(snapshot: Partial<{ question: string; result: ChatResult | null; conversations: any[] }>) {
+  const previous = readSessionState<any>(CHAT_STORAGE_KEY, {});
+  writeSessionState(CHAT_STORAGE_KEY, { ...previous, ...snapshot });
 }
 
 const examples = [
@@ -198,11 +208,43 @@ export default function Chat() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api
-      .get('/chat/conversations')
-      .then((res) => setConversations(res.data))
-      .catch((err) => console.error('加载历史会话失败：', err));
+    let alive = true;
+    const cached = readSessionState<any>(CHAT_STORAGE_KEY, {});
+    if (cached.question) setQuestion(cached.question);
+    if (cached.result) setResult(cached.result);
+    if (Array.isArray(cached.conversations)) setConversations(cached.conversations);
+
+    if (pendingChatRequest) {
+      setLoading(true);
+      pendingChatRequest
+        .then(({ data, conversations }) => {
+          persistChatSnapshot({ result: data, conversations });
+          if (!alive) return;
+          setResult(data);
+          setConversations(conversations);
+          setError('');
+        })
+        .catch((err) => {
+          if (!alive) return;
+          const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || '请求失败，请稍后重试。';
+          setError(`AI 对话请求失败：${message}`);
+        })
+        .finally(() => { if (alive) setLoading(false); });
+    } else {
+      api
+        .get('/chat/conversations')
+        .then((res) => {
+          persistChatSnapshot({ conversations: res.data });
+          if (alive) setConversations(res.data);
+        })
+        .catch((err) => console.error('加载历史会话失败：', err));
+    }
+    return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    persistChatSnapshot({ question, result, conversations });
+  }, [question, result, conversations]);
 
   const structured = useMemo(() => {
     if (!result) return null;
@@ -218,18 +260,30 @@ export default function Chat() {
     }
     setLoading(true);
     setError('');
-    setResult(null);
+    const currentQuestion = question;
+    persistChatSnapshot({ question: currentQuestion });
+    pendingChatRequest = api
+      .post('/chat', { question: currentQuestion, topK: 3 })
+      .then(async ({ data }) => {
+        const conv = await api.get('/chat/conversations').catch(() => ({ data: conversations }));
+        persistChatSnapshot({ question: currentQuestion, result: data, conversations: conv.data });
+        return { data, conversations: conv.data };
+      })
+      .finally(() => { pendingChatRequest = null; });
+
     try {
-      const { data } = await api.post('/chat', { question, topK: 3 });
+      const { data, conversations: convData } = await pendingChatRequest;
       setResult(data);
       if (data.quota && isGuest && user) {
         setUser({ ...user, quotaLimit: data.quota.limit, quotaRemaining: data.quota.remaining });
       }
-      const conv = await api.get('/chat/conversations');
-      setConversations(conv.data);
+      setConversations(convData);
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || '请求失败，请稍后重试。';
       setError(`AI 对话请求失败：${message}`);
+      try {
+        await api.post('/tools/client-error-log', { toolName: 'AI 咨询页面', activeTool: 'chat', endpoint: '/chat', message });
+      } catch {}
     } finally {
       setLoading(false);
     }
@@ -241,7 +295,7 @@ export default function Chat() {
         <div>
           <span className="section-kicker">AI 咨询</span>
           <h1>AI 咨询与选校</h1>
-          <p>输入学生背景后，系统会结合知识库和工具判断，生成结构化选校方案。</p>
+          <p>输入学生背景后生成结构化选校方案；请求在后台继续执行，切换页面后回来结果不会丢。</p>
         </div>
         <div className="model-badge">{isGuest ? `访客额度 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端已连接'}</div>
       </div>

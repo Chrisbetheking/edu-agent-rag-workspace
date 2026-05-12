@@ -1208,3 +1208,234 @@ th { color: var(--muted); font-weight: 800; }
   .fold-card > summary::after { flex: 0 0 auto; }
   .draft-grid-soft .fold-body .pre-line { max-height: 48vh; }
 }
+
+/* V9: operator-friendly layout, persistent pages, denser result boards */
+.tools-workbench-v9,
+.application-workbench-v9 {
+  grid-template-columns: minmax(360px, 0.72fr) minmax(0, 1.28fr);
+  gap: 20px;
+}
+.application-workbench-v9 {
+  grid-template-columns: minmax(390px, 0.82fr) minmax(0, 1.18fr);
+}
+.sticky-panel {
+  position: sticky;
+  top: 18px;
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+}
+.result-panel-v9,
+.application-result-panel-v9 {
+  overflow: visible;
+}
+.result-shell-body { padding-top: 0; }
+.result-shell-grid {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.28fr) minmax(0, 0.72fr);
+  gap: 16px;
+  align-items: stretch;
+}
+.result-shell-single { display: grid; gap: 14px; }
+.result-shell-aside {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+.result-shell-main { min-width: 0; display: grid; gap: 14px; }
+.result-aside-note,
+.score-aside-card {
+  border: 1px solid #e6edf7;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #fff, #f8fbff);
+  padding: 16px;
+  box-shadow: 0 12px 28px rgba(15,23,42,.04);
+}
+.score-aside-card h2 {
+  margin: 8px 0 4px;
+  font-size: clamp(34px, 4vw, 52px);
+  line-height: 1;
+  color: #172033;
+  letter-spacing: -.06em;
+}
+.score-aside-card p,
+.result-aside-note p {
+  margin: 8px 0 0;
+  color: #64748b;
+  line-height: 1.65;
+}
+.compact-metric-grid { display: grid; gap: 10px; margin-top: 12px; }
+.compact-metric-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.compact-metric {
+  border: 1px solid #edf2f7;
+  background: #fff;
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+.compact-metric span { color: #64748b; font-weight: 900; font-size: 12px; }
+.compact-metric strong { color: #3150c8; font-size: 26px; line-height: 1; }
+.compact-metric em { font-style: normal; color: #64748b; font-size: 12px; }
+.comfort-score-grid {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+.balanced-blocks { align-items: stretch; }
+.balanced-blocks > .fold-card { height: 100%; }
+.horizontal-ratio-row .mini-result-card {
+  min-height: 112px;
+  align-content: center;
+}
+.action-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+.comfort-tier-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+.tier-column-card { height: 100%; }
+.tier-column-card > .fold-body { display: grid; }
+.school-mini-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+}
+.school-mini-card strong { color: #0f172a; }
+.school-mini-card p { color: #475569; line-height: 1.55; }
+.school-mini-card small { color: #64748b; line-height: 1.5; }
+.material-board-comfort {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.app-brief-board-v9 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+  gap: 14px;
+  align-items: start;
+}
+.app-brief-main { grid-row: span 2; }
+.draft-grid-comfort {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+  gap: 14px;
+  align-items: start;
+}
+.draft-grid-comfort .draft-main-card { grid-row: span 2; }
+.app-draft-grid-v9 .fold-body .pre-line,
+.draft-grid-comfort .fold-body .pre-line {
+  max-height: none;
+  overflow: visible;
+}
+.app-draft-grid-v9 .draft-main-card .fold-body .pre-line {
+  max-height: 62vh;
+  overflow: auto;
+}
+.stage-card-v9 ul { columns: 1; }
+.compact-pipeline {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.compact-material-list {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.advisor-main-grid {
+  display: grid;
+  gap: 18px;
+}
+.compact-advisor-hero h2 {
+  font-size: clamp(24px, 2vw, 32px);
+  line-height: 1.28;
+}
+.workflow-board-v9 {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.workflow-board-v9 .mini-result-card {
+  min-height: 126px;
+}
+.tool-tabs-v9 .tab {
+  min-height: 96px;
+}
+.fold-card > summary {
+  position: relative;
+}
+.fold-card:not([open]) {
+  margin-bottom: 6px;
+}
+.fold-card[open] > .fold-body {
+  animation: bodySlide .18s ease both;
+}
+@keyframes bodySlide {
+  from { opacity: .75; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.chat-page-v2 .advice-two-col {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, .78fr);
+  align-items: stretch;
+}
+.chat-page-v2 .meta-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.chat-page-v2 .meta-grid > .fold-card:last-child {
+  grid-column: 1 / -1;
+}
+.chat-page-v2 .timeline-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.chat-page-v2 .tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.chat-page-v2 .school-list {
+  display: grid;
+  gap: 10px;
+}
+.source-card p,
+.tool-card pre {
+  max-height: 260px;
+  overflow: auto;
+}
+.generated-result-panel .fold-card,
+.application-result-panel-v9 .fold-card,
+.chat-page-v2 .fold-card {
+  scroll-margin-top: 88px;
+}
+.section-nav {
+  margin-bottom: 2px;
+}
+.form-stack label {
+  min-width: 0;
+}
+
+@media (max-width: 1320px) {
+  .tools-workbench-v9,
+  .application-workbench-v9 { grid-template-columns: minmax(330px, .85fr) minmax(0, 1.15fr); }
+  .result-shell-grid { grid-template-columns: 1fr; }
+  .comfort-tier-grid { grid-template-columns: 1fr; }
+  .chat-page-v2 .tier-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 1060px) {
+  .tools-workbench-v9,
+  .application-workbench-v9 { grid-template-columns: 1fr; }
+  .sticky-panel { position: static; max-height: none; }
+  .app-brief-board-v9,
+  .draft-grid-comfort,
+  .chat-page-v2 .advice-two-col,
+  .chat-page-v2 .meta-grid { grid-template-columns: 1fr; }
+  .app-brief-main,
+  .draft-grid-comfort .draft-main-card { grid-row: auto; }
+  .app-draft-grid-v9 .draft-main-card .fold-body .pre-line { max-height: 54vh; }
+}
+@media (max-width: 620px) {
+  .result-shell-aside { display: block; }
+  .score-aside-card h2 { font-size: 36px; }
+  .compact-metric-grid.two,
+  .result-cluster-grid.two,
+  .nested-card-grid.two,
+  .nested-card-grid.three { grid-template-columns: 1fr !important; }
+  .workflow-board-v9 { grid-template-columns: 1fr; }
+  .app-draft-grid-v9 .draft-main-card .fold-body .pre-line { max-height: 48vh; }
+}
