@@ -51,14 +51,18 @@ export default function Layout() {
 
   return (
     <div className={collapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
-      <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label="切换侧边栏">{collapsed ? '☰' : '‹'}</button>
       <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-icon">E</div>
-          <div className="sidebar-text">
-            <strong>EduAgent</strong>
-            <span>留学咨询工作台</span>
+        <div className="sidebar-head">
+          <div className="brand">
+            <div className="brand-icon">E</div>
+            <div className="sidebar-text">
+              <strong>EduAgent</strong>
+              <span>留学咨询工作台</span>
+            </div>
           </div>
+          <button className="sidebar-toggle-inline" type="button" onClick={toggleSidebar} aria-label="切换侧边栏">
+            {collapsed ? '展开' : '收起'}
+          </button>
         </div>
 
         <div className="sidebar-status">
@@ -99,6 +103,8 @@ export default function Layout() {
           <button className="ghost-dark sidebar-text" onClick={() => { logout(); navigate('/login'); }}>退出</button>
         </div>
       </aside>
+
+      <button className="mobile-sidebar-open" type="button" onClick={toggleSidebar}>{collapsed ? '菜单' : '收起'}</button>
 
       <main className="main">
         <Outlet />

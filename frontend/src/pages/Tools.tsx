@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { asArray, downloadText, jsonMarkdown, stringifySafe } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
@@ -11,23 +11,35 @@ const toolTabs: Array<{ key: ToolKey; name: string; tag: string; desc: string }>
   { key: 'school', name: '选校分层', tag: '规划', desc: '冲刺 / 匹配 / 保底' },
   { key: 'application', name: '申请案卷', tag: '文书', desc: 'PS、CV、材料流程' },
   { key: 'copywriting', name: '销售跟进', tag: '转化', desc: '微信、电话、异议处理' },
-  { key: 'material', name: '材料清单', tag: '规则', desc: '必选、条件、命名规范' },
+  { key: 'material', name: '材料清单', tag: '规则', desc: '必交、条件、命名规范' },
 ];
 
-function ResultCard({ title, children }: { title: string; children: any }) {
+function ResultCard({ title, children }: { title: string; children: ReactNode }) {
   return <article className="ops-card enhanced-card"><h3>{title}</h3>{children}</article>;
+}
+
+function Fold({ title, subtitle, children, defaultOpen = false, badge }: { title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean; badge?: ReactNode }) {
+  return (
+    <details className="fold-card" open={defaultOpen}>
+      <summary>
+        <span><strong>{title}</strong>{subtitle && <em>{subtitle}</em>}</span>
+        {badge && <b>{badge}</b>}
+      </summary>
+      <div className="fold-body">{children}</div>
+    </details>
+  );
 }
 
 function ScoreView({ result }: { result: any }) {
   return (
     <div className="agent-output-stack">
       <div className="agent-summary-card score-summary-card">
-        <span className="eyebrow">Profile Fit Score</span>
+        <span className="eyebrow">适配评分算法</span>
         <h2>{result.overall ?? '-'}/100 · {result.band || '-'} 档</h2>
         <p>{result.tierAdvice?.strategy || '已完成背景适配度评估。'}</p>
         <div className="tag-row">
-          <span>算法：{result.algorithm || 'weighted-fit-v2'}</span>
-          <span>成绩折算：{result.percentage ?? '-'}%</span>
+          <span>{result.algorithm || 'weighted-fit-v2'}</span>
+          <span>成绩折算 {result.percentage ?? '-'}%</span>
         </div>
       </div>
       <div className="score-factor-grid large-score-grid">
@@ -47,31 +59,33 @@ function ScoreView({ result }: { result: any }) {
   );
 }
 
-function SchoolBands({ data }: { data: any }) {
+function SchoolBands({ data, folded = false }: { data: any; folded?: boolean }) {
   const bands = [
     ['冲刺', data.reach],
     ['匹配', data.match],
     ['保底', data.safe],
   ];
-  return (
+  const content = (
     <div className="school-bands-grid compact-tier-grid">
       {bands.map(([title, items]: any) => (
         <article className="school-band-card" key={title}>
           <h3>{title}</h3>
-          {asArray(items).map((school: any, index) => (
+          {asArray(items).length ? asArray(items).map((school: any, index) => (
             <div className="school-row" key={school.name || index}>
               <strong>{school.name || stringifySafe(school)}</strong>
               {school.reason && <p>{school.reason}</p>}
               {school.action && <small>{school.action}</small>}
             </div>
-          ))}
+          )) : <p className="muted">暂无推荐。</p>}
         </article>
       ))}
     </div>
   );
+  if (!folded) return content;
+  return <Fold title="选校分层" subtitle="冲刺 / 匹配 / 保底" defaultOpen>{content}</Fold>;
 }
 
-function MaterialView({ data }: { data: any }) {
+function MaterialView({ data, folded = false }: { data: any; folded?: boolean }) {
   const groups = [
     ['必交材料', data.required],
     ['条件材料', data.conditional],
@@ -81,11 +95,10 @@ function MaterialView({ data }: { data: any }) {
     ['提醒', data.reminders],
   ].filter(([, items]) => asArray(items).length > 0);
 
-  return (
+  const content = (
     <div className="material-board">
       {groups.map(([title, items]) => (
-        <article className="material-group" key={String(title)}>
-          <h3>{String(title)}</h3>
+        <Fold title={String(title)} key={String(title)} defaultOpen={String(title) === '必交材料'} badge={`${asArray(items).length} 项`}>
           <div className="material-list">
             {asArray(items).map((item, index) => {
               const label = typeof item === 'object' && item !== null
@@ -97,29 +110,32 @@ function MaterialView({ data }: { data: any }) {
               return <div className="material-item" key={index}><strong>{label}</strong>{note && <span>{note}</span>}</div>;
             })}
           </div>
-        </article>
+        </Fold>
       ))}
     </div>
   );
+  if (!folded) return content;
+  return <Fold title="材料清单" subtitle="必交、条件、补充、命名" defaultOpen>{content}</Fold>;
 }
 
-function ApplicationView({ result }: { result: any }) {
-  return (
+function ApplicationView({ result, folded = false }: { result: any; folded?: boolean }) {
+  const content = (
     <div className="agent-output-stack">
       <div className="ops-card-grid two-output-grid">
         <ResultCard title="PS 主题"><p>{result.writingBrief?.psTheme || '-'}</p></ResultCard>
         <ResultCard title="CV 重点"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{stringifySafe(x)}</span>)}</div></ResultCard>
-        <ResultCard title="PS 大纲"><ul>{asArray(result.writingBrief?.psOutline).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></ResultCard>
-        <ResultCard title="推荐信角度"><ul>{asArray(result.writingBrief?.recommendationAngles).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></ResultCard>
       </div>
-      <ResultCard title="Personal Statement 初稿"><p className="pre-line">{result.drafts?.personalStatement || '-'}</p></ResultCard>
-      {result.materialChecklist && <ResultCard title="材料清单"><div className="tag-row large-tags">{asArray(result.materialChecklist).map((x, i) => <span key={i}>{stringifySafe(x)}</span>)}</div></ResultCard>}
+      <Fold title="PS 大纲" defaultOpen><ul>{asArray(result.writingBrief?.psOutline).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></Fold>
+      <Fold title="Personal Statement 初稿"><p className="pre-line">{result.drafts?.personalStatement || '-'}</p></Fold>
+      <Fold title="推荐信角度"><ul>{asArray(result.writingBrief?.recommendationAngles).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></Fold>
     </div>
   );
+  if (!folded) return content;
+  return <Fold title="申请案卷" subtitle="PS、CV、推荐信、流程" defaultOpen>{content}</Fold>;
 }
 
-function CopywritingView({ result }: { result: any }) {
-  return (
+function CopywritingView({ result, folded = false }: { result: any; folded?: boolean }) {
+  const content = (
     <div className="ops-card-grid two-output-grid">
       <ResultCard title="微信话术"><p>{result.wechat || '-'}</p></ResultCard>
       <ResultCard title="电话提纲"><ul>{asArray(result.callOutline).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></ResultCard>
@@ -127,6 +143,8 @@ function CopywritingView({ result }: { result: any }) {
       <ResultCard title="跟进动作"><div className="tag-row">{asArray(result.followUpTasks).map((x, i) => <span key={i}>{stringifySafe(x)}</span>)}</div></ResultCard>
     </div>
   );
+  if (!folded) return content;
+  return <Fold title="销售跟进" subtitle="微信、电话、异议处理" defaultOpen>{content}</Fold>;
 }
 
 function AdvisorView({ result }: { result: any }) {
@@ -134,33 +152,34 @@ function AdvisorView({ result }: { result: any }) {
   return (
     <div className="agent-output-stack">
       <div className="agent-summary-card">
-        <span className="eyebrow">Workflow</span>
+        <span className="eyebrow">完整流程</span>
         <h2>{result.executiveSummary || '已生成综合方案'}</h2>
         <div className="tag-row">
           <span>{result.agentTrace?.model || 'deepseek-chat'}</span>
           <span>{result.agentTrace?.durationMs || 0}ms</span>
+          <span>{result.agentTrace?.algorithm || 'weighted-fit-v2'}</span>
           {outputs.fit && <span>评分 {outputs.fit.overall}/100</span>}
         </div>
       </div>
 
-      <section className="panel-lite">
-        <h3>执行链路</h3>
-        <div className="workflow-grid">
+      <Fold title="执行链路" subtitle="每个节点可单独查看" defaultOpen>
+        <div className="workflow-list">
           {asArray(result.workflow).map((step: any, index) => (
-            <div className="workflow-step" key={step.name || index}>
-              <em>{step.step || index + 1}</em><strong>{step.name || 'Step'}</strong><span>{step.tool || '-'}</span><p>{step.output || step.status || 'done'}</p>
+            <div className="workflow-line" key={step.name || index}>
+              <em>{step.step || index + 1}</em>
+              <strong>{step.name || 'Step'}</strong>
+              <span>{step.tool || '-'}</span>
+              <p>{step.output || step.status || 'done'}</p>
             </div>
           ))}
         </div>
-      </section>
+      </Fold>
 
-      {outputs.fit && <ScoreView result={outputs.fit} />}
-      {outputs.schools && <SchoolBands data={outputs.schools} />}
-      <div className="two-col">
-        <ResultCard title="销售跟进"><p>{outputs.sales?.wechat || '-'}</p></ResultCard>
-        <ResultCard title="文书初稿"><p className="pre-line">{outputs.application?.drafts?.personalStatement || '-'}</p></ResultCard>
-      </div>
-      {outputs.materials && <MaterialView data={outputs.materials} />}
+      {outputs.fit && <Fold title="适配评分" subtitle="算法权重和风险点" defaultOpen><ScoreView result={outputs.fit} /></Fold>}
+      {outputs.schools && <SchoolBands data={outputs.schools} folded />}
+      {outputs.application && <ApplicationView result={outputs.application} folded />}
+      {outputs.sales && <CopywritingView result={outputs.sales} folded />}
+      {outputs.materials && <MaterialView data={outputs.materials} folded />}
     </div>
   );
 }
@@ -172,7 +191,7 @@ function GenericResult({ result, active }: { result: any; active: ToolKey }) {
   if (active === 'application' && result.writingBrief) return <ApplicationView result={result} />;
   if (active === 'copywriting') return <CopywritingView result={result} />;
   if (active === 'material') return <MaterialView data={result} />;
-  return <pre className="json-block">{JSON.stringify(result || {}, null, 2)}</pre>;
+  return <pre className="json-block compact-json">{JSON.stringify(result || {}, null, 2)}</pre>;
 }
 
 export default function Tools() {
@@ -214,8 +233,23 @@ export default function Tools() {
     return '/tools/material-list';
   }
 
+  async function logClientError(type: ToolKey, err: any, started: number) {
+    try {
+      await api.post('/tools/client-error-log', {
+        toolName: toolTabs.find((item) => item.key === type)?.name || type,
+        activeTool: type,
+        endpoint: endpointFor(type),
+        message: err?.response?.data?.message || err?.message || '工具调用失败',
+        durationMs: Date.now() - started,
+      });
+    } catch {
+      // 记录失败不影响前端提示
+    }
+  }
+
   async function callTool(type: ToolKey, e?: FormEvent) {
     e?.preventDefault();
+    const started = Date.now();
     setActive(type);
     setLoadingTool(type);
     setError('');
@@ -233,7 +267,9 @@ export default function Tools() {
         return next;
       });
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || '工具调用失败');
+      const message = err?.response?.data?.message || err?.message || '工具调用失败';
+      setError(message);
+      await logClientError(type, err, started);
     } finally { setLoadingTool(null); }
   }
 
@@ -254,7 +290,7 @@ export default function Tools() {
         {toolTabs.map((tool) => <button className={active === tool.key ? 'tab active' : 'tab'} key={tool.key} onClick={() => setActive(tool.key)} type="button"><em>{tool.tag}</em><strong>{tool.name}</strong><span>{tool.desc}</span>{results[tool.key] && <b className="tab-done">已生成</b>}</button>)}
       </div>
 
-      {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p></div>}
+      {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p><small>已尝试写入系统日志。若是超时，建议重新运行完整流程；后端会优先返回本地评分和兜底方案。</small></div>}
       {activeResult?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{activeResult.llmFallbackReason}</div>}
 
       <div className="two-col wide-right">
@@ -282,7 +318,7 @@ export default function Tools() {
 
         <section className="panel result-panel">
           <div className="panel-title"><div><span className="eyebrow">结果</span><h2>{activeMeta.name}</h2></div>{activeResult && <span className="pill success">完成</span>}</div>
-          {activeResult ? <><GenericResult result={activeResult} active={active} /><details className="raw-json-details"><summary>查看结构化数据</summary><pre className="json-block">{JSON.stringify(activeResult, null, 2)}</pre></details></> : <div className="empty-advice compact-empty"><div className="empty-icon">⌘</div><h2>{loadingTool ? '正在运行' : '等待运行'}</h2><p>建议先运行“完整流程”，再查看各节点结果。</p></div>}
+          {activeResult ? <><GenericResult result={activeResult} active={active} /><details className="raw-json-details"><summary>查看结构化数据</summary><pre className="json-block compact-json">{JSON.stringify(activeResult, null, 2)}</pre></details></> : <div className="empty-advice compact-empty"><div className="empty-icon">⌘</div><h2>{loadingTool ? '正在运行' : '等待运行'}</h2><p>建议先运行“完整流程”，再查看各节点结果。</p></div>}
         </section>
       </div>
     </section>

@@ -3,13 +3,40 @@ import { api } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
 
+const defaultStages = [
+  { stage: '背景确认', owner: '咨询顾问', tasks: ['确认目标国家、专业、预算', '收集成绩单和语言成绩'] },
+  { stage: '选校定位', owner: '申请顾问', tasks: ['拆分冲刺、匹配、保底', '逐校核对官网要求'] },
+  { stage: '材料准备', owner: '学生 + 顾问', tasks: ['补齐护照、成绩单、在读证明', '整理项目、实习和作品集'] },
+  { stage: '文书制作', owner: '文书顾问', tasks: ['确定 PS 主线', '优化 CV 和推荐信素材'] },
+  { stage: '网申递交', owner: '申请顾问', tasks: ['创建网申账号', '上传材料并核对文件命名'] },
+  { stage: 'Offer 跟进', owner: '顾问 + 学生', tasks: ['跟进补件', '比较录取、押金和住宿'] },
+];
+
+function normalizeStage(stage: any, index: number) {
+  const base = defaultStages[index] || defaultStages[defaultStages.length - 1];
+  const title = !stage?.stage || stage.stage === '申请阶段' ? base.stage : stage.stage;
+  return {
+    ...base,
+    ...stage,
+    stage: title,
+    owner: stage?.owner || base.owner,
+    tasks: asArray(stage?.tasks).length ? asArray(stage.tasks) : base.tasks,
+    status: stage?.status || (index === 0 ? '进行中' : '待开始'),
+  };
+}
+
 function StageCard({ stage, index }: { stage: any; index: number }) {
+  const item = normalizeStage(stage, index);
   return (
-    <article className="pipeline-stage enhanced-card">
-      <div className="stage-number">{index + 1}</div>
-      <div><span className="pill success">{stage.status || '待开始'}</span><h3>{stage.stage || '申请阶段'}</h3><p>负责人：{stage.owner || '申请顾问'}</p></div>
-      <ul>{asArray(stage.tasks).map((task, i) => <li key={i}>{stringifySafe(task)}</li>)}</ul>
-    </article>
+    <details className="fold-card pipeline-fold" open={index < 2}>
+      <summary>
+        <span><strong>{index + 1}. {item.stage}</strong><em>{item.owner}</em></span>
+        <b>{item.status}</b>
+      </summary>
+      <div className="fold-body">
+        <ul>{asArray(item.tasks).map((task, i) => <li key={i}>{stringifySafe(task)}</li>)}</ul>
+      </div>
+    </details>
   );
 }
 
@@ -166,7 +193,7 @@ export default function Applications() {
 
       <section className="panel">
         <div className="panel-title compact"><span className="eyebrow">流程</span><h2>申请执行</h2></div>
-        {!result ? <div className="empty-mini">生成后会出现后续流程。</div> : <div className="pipeline-grid">{asArray(result.pipeline).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div>}
+        {!result ? <div className="empty-mini">生成后会出现后续流程。</div> : <div className="pipeline-list">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div>}
       </section>
 
       {result && (

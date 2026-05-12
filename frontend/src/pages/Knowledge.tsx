@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 
@@ -55,6 +55,7 @@ export default function Knowledge() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const chunkPreviewRef = useRef<HTMLElement | null>(null);
 
   async function load() {
     setError('');
@@ -116,8 +117,14 @@ export default function Knowledge() {
   async function viewChunks(doc: DocumentItem) {
     setSelectedDoc(doc);
     setChunks([]);
-    const { data } = await api.get(`/documents/${doc.id}/切片`);
-    setChunks(Array.isArray(data) ? data : []);
+    setError('');
+    try {
+      const { data } = await api.get(`/documents/${doc.id}/chunks`);
+      setChunks(Array.isArray(data) ? data : []);
+      setTimeout(() => chunkPreviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || '读取切片失败');
+    }
   }
 
   async function remove(doc: DocumentItem) {
@@ -237,7 +244,7 @@ export default function Knowledge() {
         </section>
       </div>
 
-      <section className="panel">
+      <section className="panel" ref={chunkPreviewRef}>
         <div className="panel-title compact"><span className="eyebrow">切片预览</span><h2>{selectedDoc ? selectedDoc.title : '文档切片预览'}</h2></div>
         {切片.length === 0 ? (
           <div className="empty-mini">选择一个文档查看切片内容、切片序号 和关键词。</div>

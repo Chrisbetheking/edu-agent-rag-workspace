@@ -767,100 +767,53 @@ export class ToolsService {
         targetCountry: s.country,
       });
       const fit = this.assessProfile(s);
-      const schools = await this.recommendSchools(s);
       const materials = this.materialList(s);
-      const growth = await this.growthCampaign(s);
-      const application = await this.applicationPlan(s);
-      const sales = await this.generateCopywriting(s);
+
+      const settle = async <T>(name: string, promise: Promise<T>, fallback: T): Promise<T> => {
+        try {
+          const result = await promise;
+          return result || fallback;
+        } catch (error: any) {
+          this.addToolLog(name, s, { message: error?.message || "子工具失败，已跳过" }, Date.now() - started, "failed");
+          return { ...(fallback as any), llmFallbackReason: error?.message || "子工具失败" } as T;
+        }
+      };
+
+      // 完整流程要稳定，子任务并行执行，避免多个 LLM 请求串行导致前端超时。
+      const [schools, growth, application, sales] = await Promise.all([
+        settle("院校推荐工具", this.recommendSchools(s), { reach: [], match: [], safe: [], risk: [] } as any),
+        settle("线索内容生成器", this.growthCampaign(s), { brief: "", xiaohongshu: {}, videoScript: {}, wechatFollowup: [], contentCalendar: [] } as any),
+        settle("申请文书规划器", this.applicationPlan(s), { writingBrief: {}, drafts: {}, pipeline: [], materialChecklist: [] } as any),
+        settle("销售话术生成工具", this.generateCopywriting(s), { wechat: "", objectionHandling: [], callOutline: [], followUpTasks: [] } as any),
+      ]);
 
       const result = {
-        executiveSummary: `已完成 ${s.name} 的背景评分、选校分层、跟进内容、文书规划和材料清单。`,
+        executiveSummary: `${s.name}｜${s.country}${s.major}${s.degree}：评分 ${fit.overall}/100（${fit.band}），建议按冲刺 ${fit.tierAdvice.reach} / 匹配 ${fit.tierAdvice.match} / 保底 ${fit.tierAdvice.safe} 配置。`,
         studentProfile: s,
         workflow: [
-          {
-            step: 1,
-            name: "Academic Intake",
-            tool: "CGPA 换算工具",
-            status: "done",
-            output: academic.level,
-          },
-          {
-            step: 2,
-            name: "Fit Scoring",
-            tool: "申请适配评分算法",
-            status: "done",
-            output: `综合评分 ${fit.overall}/100，等级 ${fit.band}`,
-          },
-          {
-            step: 3,
-            name: "School Strategy",
-            tool: "院校推荐工具",
-            status: "done",
-            output: "冲刺/匹配/保底三档",
-          },
-          {
-            step: 4,
-            name: "Growth Handoff",
-            tool: "线索内容生成器",
-            status: "done",
-            output: "小红书/短视频/微信",
-          },
-          {
-            step: 5,
-            name: "Application CRM",
-            tool: "申请文书规划器",
-            status: "done",
-            output: "PS/CV/推荐信/流程",
-          },
-          {
-            step: 6,
-            name: "Material Ops",
-            tool: "申请材料清单工具",
-            status: "done",
-            output: "required + optional checklist",
-          },
+          { step: 1, name: "适配评分", tool: "weighted-fit-v2", status: "done", output: `${fit.overall}/100 · ${fit.band}` },
+          { step: 2, name: "选校分层", tool: "院校推荐", status: "done", output: "冲刺 / 匹配 / 保底" },
+          { step: 3, name: "申请案卷", tool: "文书规划", status: "done", output: "PS / CV / 推荐信" },
+          { step: 4, name: "销售跟进", tool: "话术生成", status: "done", output: "微信 / 电话 / 异议" },
+          { step: 5, name: "材料清单", tool: "规则引擎", status: "done", output: "必交 / 条件 / 命名" },
         ],
-        outputs: {
-          academic,
-          fit,
-          schools,
-          growth,
-          sales,
-          application,
-          materials,
-        },
+        outputs: { academic, fit, schools, growth, sales, application, materials },
         handoff: [
-          {
-            team: "前台/销售",
-            action: "用 growth 和 sales 结果跟进同背景线索。",
-          },
-          { team: "咨询顾问", action: "基于 schools 输出做三档选校初筛。" },
-          {
-            team: "文书老师",
-            action: "基于 application.writingBrief 和 drafts 产出 PS/CV 初稿。",
-          },
-          { team: "申请顾问", action: "根据 materials 和 pipeline 追踪递交。" },
+          { team: "咨询", action: "按评分和三档选校给学生解释风险。" },
+          { team: "文书", action: "基于 PS 主线、CV 重点和推荐信角度改稿。" },
+          { team: "运营", action: "用销售跟进和增长内容做后续触达。" },
+          { team: "申请", action: "按材料清单和时间节点跟进递交。" },
         ],
         agentTrace: {
           mode: this.hasRealLlm() ? "真实模型" : "兜底模式",
           model: process.env.LLM_MODEL || "deepseek-chat",
           durationMs: Date.now() - started,
-          tools: [
-            "convertCgpa",
-            "assessProfile",
-            "recommendSchools",
-            "growthCampaign",
-            "generateCopywriting",
-            "applicationPlan",
-            "materialList",
-          ],
+          algorithm: "weighted-fit-v2",
+          tools: ["assessProfile", "recommendSchools", "applicationPlan", "generateCopywriting", "materialList"],
         },
       };
 
-      return {
-        ...result,
-        exportMarkdown: this.advisorMarkdown(result),
-      };
+      return { ...result, exportMarkdown: this.advisorMarkdown(result) };
     });
   }
 
@@ -868,6 +821,18 @@ export class ToolsService {
     const s = result.studentProfile || {};
     const app = result.outputs?.application || {};
     return `# EduAgent 综合申请方案\n\n## 学生画像\n- 姓名：${s.name || "-"}\n- 国家/专业/学位：${s.country || "-"} / ${s.major || "-"} / ${s.degree || "-"}\n- GPA：${s.cgpa || "-"}\n- 语言：${s.language || "-"}\n- 预算：${s.budget || "-"}\n\n## 总结\n${result.executiveSummary}\n\n## 适配评分\n${result.outputs?.fit?.overall || "-"} / 100（${result.outputs?.fit?.band || "-"}）\n\n## 工作流\n${this.markdownList((result.workflow || []).map((x: any) => `${x.step}. ${x.name}｜${x.tool}｜${x.output}`))}\n\n## 冲刺院校\n${this.markdownList(result.outputs?.schools?.reach?.map((x: any) => `${x.name}：${x.reason}`) || [])}\n\n## 匹配院校\n${this.markdownList(result.outputs?.schools?.match?.map((x: any) => `${x.name}：${x.reason}`) || [])}\n\n## 保底院校\n${this.markdownList(result.outputs?.schools?.safe?.map((x: any) => `${x.name}：${x.reason}`) || [])}\n\n## 文书初稿\n${app.drafts?.personalStatement || "-"}\n\n## 材料清单\n${this.markdownList(result.outputs?.materials?.required || [])}\n`;
+  }
+
+  recordClientFailure(input: any = {}) {
+    const toolName = input.toolName || input.activeTool || "前端工具调用";
+    const output = {
+      message: input.message || "前端请求失败",
+      endpoint: input.endpoint || "",
+      activeTool: input.activeTool || "",
+      createdAt: new Date().toISOString(),
+    };
+    this.addToolLog(`${toolName}（前端失败）`, input, output, Number(input.durationMs || 0), "failed");
+    return { success: true, logged: true, output };
   }
 
   async logs(limit = 50) {

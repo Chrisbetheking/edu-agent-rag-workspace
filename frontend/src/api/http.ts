@@ -3,7 +3,7 @@ import { clearEduAgentAuth, useAuthStore } from '../store/auth';
 
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
-  timeout: 90000,
+  timeout: 180000,
 });
 
 function syncGuestQuota(payload: any) {

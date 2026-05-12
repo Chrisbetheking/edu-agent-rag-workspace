@@ -110,6 +110,11 @@ export class ToolsController {
     return this.withQuota(authorization, () => this.tools.advisorSuite(body));
   }
 
+  @Post("client-error-log")
+  clientErrorLog(@Body() body: any) {
+    return this.tools.recordClientFailure(body);
+  }
+
   @Get("overview")
   async overview(@Query("limit") limit?: string) {
     return this.tools.overview(Number(limit || 80));
