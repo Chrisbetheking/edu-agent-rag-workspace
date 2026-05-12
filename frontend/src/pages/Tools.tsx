@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { asArray, downloadText, jsonMarkdown, stringifySafe } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
+import { FoldSection, ListBlock, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 
 type ToolKey = 'advisor' | 'score' | 'school' | 'application' | 'copywriting' | 'material';
 
@@ -14,20 +15,8 @@ const toolTabs: Array<{ key: ToolKey; name: string; tag: string; desc: string }>
   { key: 'material', name: '材料清单', tag: '规则', desc: '必交、条件、命名规范' },
 ];
 
-function ResultCard({ title, children }: { title: string; children: ReactNode }) {
-  return <article className="ops-card enhanced-card"><h3>{title}</h3>{children}</article>;
-}
-
-function Fold({ title, subtitle, children, defaultOpen = false, badge }: { title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean; badge?: ReactNode }) {
-  return (
-    <details className="fold-card" open={defaultOpen}>
-      <summary>
-        <span><strong>{title}</strong>{subtitle && <em>{subtitle}</em>}</span>
-        {badge && <b>{badge}</b>}
-      </summary>
-      <div className="fold-body">{children}</div>
-    </details>
-  );
+function ResultCard({ title, children, defaultOpen = false }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
+  return <FoldSection title={title} defaultOpen={defaultOpen}>{children}</FoldSection>;
 }
 
 function ScoreView({ result }: { result: any }) {
@@ -36,56 +25,57 @@ function ScoreView({ result }: { result: any }) {
       <div className="agent-summary-card score-summary-card">
         <span className="eyebrow">适配评分算法</span>
         <h2>{result.overall ?? '-'}/100 · {result.band || '-'} 档</h2>
-        <p>{result.tierAdvice?.strategy || '已完成背景适配度评估。'}</p>
+        <p>{toDisplayText(result.tierAdvice?.strategy) || '已完成背景适配度评估。'}</p>
         <div className="tag-row">
-          <span>{result.algorithm || 'weighted-fit-v2'}</span>
+          <span>{toDisplayText(result.algorithm) || 'weighted-fit-v2'}</span>
           <span>成绩折算 {result.percentage ?? '-'}%</span>
         </div>
       </div>
       <div className="score-factor-grid large-score-grid">
         {asArray(result.factors).map((factor: any) => (
           <div className="score-factor" key={factor.key || factor.label}>
-            <div><strong>{factor.label}</strong><em>{factor.score}</em></div>
+            <div><strong>{toDisplayText(factor.label)}</strong><em>{toDisplayText(factor.score)}</em></div>
             <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
-            <span>{factor.evidence}</span>
+            <span>{toDisplayText(factor.evidence)}</span>
           </div>
         ))}
       </div>
       <div className="two-col">
-        <ResultCard title="选校配比"><p>冲刺 {result.tierAdvice?.reach ?? '-'} 所，匹配 {result.tierAdvice?.match ?? '-'} 所，保底 {result.tierAdvice?.safe ?? '-'} 所。</p></ResultCard>
-        <ResultCard title="风险点"><ul>{asArray(result.risks).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></ResultCard>
+        <ResultCard title="选校配比" defaultOpen><p>冲刺 {result.tierAdvice?.reach ?? '-'} 所，匹配 {result.tierAdvice?.match ?? '-'} 所，保底 {result.tierAdvice?.safe ?? '-'} 所。</p></ResultCard>
+        <ResultCard title="风险点"><ListBlock items={result.risks} /></ResultCard>
       </div>
     </div>
   );
 }
 
-function SchoolBands({ data, folded = false }: { data: any; folded?: boolean }) {
+function SchoolBands({ data }: { data: any }) {
   const bands = [
     ['冲刺', data.reach],
     ['匹配', data.match],
     ['保底', data.safe],
   ];
-  const content = (
+  return (
     <div className="school-bands-grid compact-tier-grid">
       {bands.map(([title, items]: any) => (
-        <article className="school-band-card" key={title}>
-          <h3>{title}</h3>
-          {asArray(items).length ? asArray(items).map((school: any, index) => (
-            <div className="school-row" key={school.name || index}>
-              <strong>{school.name || stringifySafe(school)}</strong>
-              {school.reason && <p>{school.reason}</p>}
-              {school.action && <small>{school.action}</small>}
-            </div>
-          )) : <p className="muted">暂无推荐。</p>}
-        </article>
+        <FoldSection title={title} subtitle={`${asArray(items).length} 所`} key={title} defaultOpen={title !== '冲刺'}>
+          <div className="school-list">
+            {asArray(items).length ? asArray(items).map((school: any, index) => (
+              <div className="school-row" key={school.name || index}>
+                <strong>{toDisplayText(school.name || school)}</strong>
+                {(school.reason || school.fit) && <p>{toDisplayText(school.reason || school.fit)}</p>}
+                {school.risk && <small>风险：{toDisplayText(school.risk)}</small>}
+                {school.action && <small>下一步：{toDisplayText(school.action)}</small>}
+              </div>
+            )) : <p className="muted">暂无推荐。</p>}
+          </div>
+        </FoldSection>
       ))}
+      {!!asArray(data.risk).length && <FoldSection title="整体风险"><ListBlock items={data.risk} /></FoldSection>}
     </div>
   );
-  if (!folded) return content;
-  return <Fold title="选校分层" subtitle="冲刺 / 匹配 / 保底" defaultOpen>{content}</Fold>;
 }
 
-function MaterialView({ data, folded = false }: { data: any; folded?: boolean }) {
+function MaterialView({ data }: { data: any }) {
   const groups = [
     ['必交材料', data.required],
     ['条件材料', data.conditional],
@@ -95,91 +85,96 @@ function MaterialView({ data, folded = false }: { data: any; folded?: boolean })
     ['提醒', data.reminders],
   ].filter(([, items]) => asArray(items).length > 0);
 
-  const content = (
+  return (
     <div className="material-board">
       {groups.map(([title, items]) => (
-        <Fold title={String(title)} key={String(title)} defaultOpen={String(title) === '必交材料'} badge={`${asArray(items).length} 项`}>
+        <FoldSection title={String(title)} key={String(title)} defaultOpen={String(title) === '必交材料'} badge={`${asArray(items).length} 项`}>
           <div className="material-list">
             {asArray(items).map((item, index) => {
               const label = typeof item === 'object' && item !== null
-                ? item.name || item.item || item.file || item.stage || stringifySafe(item)
-                : stringifySafe(item);
+                ? (item as any).name || (item as any).item || (item as any).file || (item as any).stage || toDisplayText(item)
+                : toDisplayText(item);
               const note = typeof item === 'object' && item !== null
-                ? item.note || item.desc || item.owner || item.deadline || ''
+                ? (item as any).note || (item as any).desc || (item as any).owner || (item as any).deadline || ''
                 : '';
-              return <div className="material-item" key={index}><strong>{label}</strong>{note && <span>{note}</span>}</div>;
+              return <div className="material-item" key={index}><strong>{toDisplayText(label)}</strong>{note && <span>{toDisplayText(note)}</span>}</div>;
             })}
           </div>
-        </Fold>
+        </FoldSection>
       ))}
     </div>
   );
-  if (!folded) return content;
-  return <Fold title="材料清单" subtitle="必交、条件、补充、命名" defaultOpen>{content}</Fold>;
 }
 
-function ApplicationView({ result, folded = false }: { result: any; folded?: boolean }) {
-  const content = (
+function ApplicationView({ result }: { result: any }) {
+  return (
     <div className="agent-output-stack">
       <div className="ops-card-grid two-output-grid">
-        <ResultCard title="PS 主题"><p>{result.writingBrief?.psTheme || '-'}</p></ResultCard>
-        <ResultCard title="CV 重点"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{stringifySafe(x)}</span>)}</div></ResultCard>
+        <ResultCard title="PS 主题" defaultOpen><TextBlock value={result.writingBrief?.psTheme} /></ResultCard>
+        <ResultCard title="CV 重点"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
       </div>
-      <Fold title="PS 大纲" defaultOpen><ul>{asArray(result.writingBrief?.psOutline).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></Fold>
-      <Fold title="Personal Statement 初稿"><p className="pre-line">{result.drafts?.personalStatement || '-'}</p></Fold>
-      <Fold title="推荐信角度"><ul>{asArray(result.writingBrief?.recommendationAngles).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></Fold>
+      <FoldSection title="PS 大纲" defaultOpen><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
+      <FoldSection title="Personal Statement 初稿"><TextBlock value={result.drafts?.personalStatement} /></FoldSection>
+      <FoldSection title="CV Summary"><TextBlock value={result.drafts?.cvSummary} /></FoldSection>
+      <FoldSection title="推荐信角度"><ListBlock items={result.writingBrief?.recommendationAngles || result.drafts?.recommendationSeed} /></FoldSection>
+      {!!asArray(result.pipeline).length && <FoldSection title="申请流程"><div className="pipeline-list">{asArray(result.pipeline).map((stage: any, index) => <div className="material-item" key={index}><strong>{toDisplayText(stage.stage || `阶段 ${index + 1}`)}</strong><span>{toDisplayText(stage.owner)} · {toDisplayText(stage.status)}</span><ListBlock items={stage.tasks} /></div>)}</div></FoldSection>}
     </div>
   );
-  if (!folded) return content;
-  return <Fold title="申请案卷" subtitle="PS、CV、推荐信、流程" defaultOpen>{content}</Fold>;
 }
 
-function CopywritingView({ result, folded = false }: { result: any; folded?: boolean }) {
-  const content = (
+function CopywritingView({ result }: { result: any }) {
+  return (
     <div className="ops-card-grid two-output-grid">
-      <ResultCard title="微信话术"><p>{result.wechat || '-'}</p></ResultCard>
-      <ResultCard title="电话提纲"><ul>{asArray(result.callOutline).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></ResultCard>
-      <ResultCard title="异议处理"><ul>{asArray(result.objectionHandling).map((x: any, i) => <li key={i}>{x.concern ? `${x.concern}：${x.answer}` : stringifySafe(x)}</li>)}</ul></ResultCard>
-      <ResultCard title="跟进动作"><div className="tag-row">{asArray(result.followUpTasks).map((x, i) => <span key={i}>{stringifySafe(x)}</span>)}</div></ResultCard>
+      <ResultCard title="微信话术" defaultOpen><TextBlock value={result.wechat || result.wechatFollowup} /></ResultCard>
+      <ResultCard title="电话提纲"><ListBlock items={result.callOutline} /></ResultCard>
+      <ResultCard title="异议处理"><ListBlock items={result.objectionHandling} /></ResultCard>
+      <ResultCard title="短视频脚本"><TextBlock value={result.shortVideoScript || result.videoScript} /></ResultCard>
+      <ResultCard title="跟进动作"><div className="tag-row">{asArray(result.followUpTasks || result.wechatFollowup).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
     </div>
   );
-  if (!folded) return content;
-  return <Fold title="销售跟进" subtitle="微信、电话、异议处理" defaultOpen>{content}</Fold>;
 }
 
 function AdvisorView({ result }: { result: any }) {
   const outputs = result.outputs || {};
   return (
     <div className="agent-output-stack">
+      <SectionNav items={[
+        { id: 'advisor-trace', label: '链路' },
+        { id: 'advisor-score', label: '评分' },
+        { id: 'advisor-schools', label: '学校' },
+        { id: 'advisor-application', label: '文书' },
+        { id: 'advisor-sales', label: '跟进' },
+        { id: 'advisor-materials', label: '材料' },
+      ]} />
       <div className="agent-summary-card">
         <span className="eyebrow">完整流程</span>
-        <h2>{result.executiveSummary || '已生成综合方案'}</h2>
+        <h2>{toDisplayText(result.executiveSummary) || '已生成综合方案'}</h2>
         <div className="tag-row">
-          <span>{result.agentTrace?.model || 'deepseek-chat'}</span>
-          <span>{result.agentTrace?.durationMs || 0}ms</span>
-          <span>{result.agentTrace?.algorithm || 'weighted-fit-v2'}</span>
+          <span>{toDisplayText(result.agentTrace?.mode) || 'algorithm-first'}</span>
+          <span>{toDisplayText(result.agentTrace?.durationMs) || 0}ms</span>
+          <span>{toDisplayText(result.agentTrace?.algorithm) || 'weighted-fit-v2'}</span>
           {outputs.fit && <span>评分 {outputs.fit.overall}/100</span>}
         </div>
       </div>
 
-      <Fold title="执行链路" subtitle="每个节点可单独查看" defaultOpen>
+      <FoldSection id="advisor-trace" title="执行链路" subtitle="每个节点可单独查看" defaultOpen>
         <div className="workflow-list">
           {asArray(result.workflow).map((step: any, index) => (
             <div className="workflow-line" key={step.name || index}>
               <em>{step.step || index + 1}</em>
-              <strong>{step.name || 'Step'}</strong>
-              <span>{step.tool || '-'}</span>
-              <p>{step.output || step.status || 'done'}</p>
+              <strong>{toDisplayText(step.name) || 'Step'}</strong>
+              <span>{toDisplayText(step.tool) || '-'}</span>
+              <p>{toDisplayText(step.output || step.status || 'done')}</p>
             </div>
           ))}
         </div>
-      </Fold>
+      </FoldSection>
 
-      {outputs.fit && <Fold title="适配评分" subtitle="算法权重和风险点" defaultOpen><ScoreView result={outputs.fit} /></Fold>}
-      {outputs.schools && <SchoolBands data={outputs.schools} folded />}
-      {outputs.application && <ApplicationView result={outputs.application} folded />}
-      {outputs.sales && <CopywritingView result={outputs.sales} folded />}
-      {outputs.materials && <MaterialView data={outputs.materials} folded />}
+      {outputs.fit && <FoldSection id="advisor-score" title="适配评分" subtitle="算法权重和风险点" defaultOpen><ScoreView result={outputs.fit} /></FoldSection>}
+      {outputs.schools && <FoldSection id="advisor-schools" title="选校分层" subtitle="冲刺 / 匹配 / 保底"><SchoolBands data={outputs.schools} /></FoldSection>}
+      {outputs.application && <FoldSection id="advisor-application" title="申请案卷" subtitle="PS、CV、推荐信、流程"><ApplicationView result={outputs.application} /></FoldSection>}
+      {outputs.sales && <FoldSection id="advisor-sales" title="销售跟进" subtitle="微信、电话、异议处理"><CopywritingView result={outputs.sales} /></FoldSection>}
+      {outputs.materials && <FoldSection id="advisor-materials" title="材料清单" subtitle="必交、条件、命名"><MaterialView data={outputs.materials} /></FoldSection>}
     </div>
   );
 }
@@ -243,7 +238,7 @@ export default function Tools() {
         durationMs: Date.now() - started,
       });
     } catch {
-      // 记录失败不影响前端提示
+      // ignore
     }
   }
 
@@ -290,8 +285,8 @@ export default function Tools() {
         {toolTabs.map((tool) => <button className={active === tool.key ? 'tab active' : 'tab'} key={tool.key} onClick={() => setActive(tool.key)} type="button"><em>{tool.tag}</em><strong>{tool.name}</strong><span>{tool.desc}</span>{results[tool.key] && <b className="tab-done">已生成</b>}</button>)}
       </div>
 
-      {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p><small>已尝试写入系统日志。若是超时，建议重新运行完整流程；后端会优先返回本地评分和兜底方案。</small></div>}
-      {activeResult?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{activeResult.llmFallbackReason}</div>}
+      {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p><small>已写入前端失败日志；如果仍看不到，请确认后端已部署本次补丁。</small></div>}
+      {activeResult?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(activeResult.llmFallbackReason)}</div>}
 
       <div className="two-col wide-right">
         <section className="panel form-panel sticky-panel">

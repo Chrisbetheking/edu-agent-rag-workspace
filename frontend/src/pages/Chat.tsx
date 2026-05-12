@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
+import { FoldSection, ListBlock, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 
 interface SchoolAdvice {
   name: string;
@@ -56,13 +57,18 @@ const examples = [
   '双非本科均分82，想申请英国人工智能硕士，预算35万，有哪些学校适合？',
 ];
 
-function cleanText(text?: string) {
-  return String(text || '')
+function cleanText(text?: unknown) {
+  return toDisplayText(text)
     .replace(/\*\*/g, '')
     .replace(/###/g, '')
     .replace(/```json/g, '')
     .replace(/```/g, '')
     .trim();
+}
+
+function cleanTime(text?: unknown) {
+  const value = cleanText(text).replace(/20\d{2}年/g, '').replace(/^[-—\s]+/, '').trim();
+  return value || '按申请开放时间调整';
 }
 
 function stripCodeFence(text: string) {
@@ -76,15 +82,12 @@ function stripCodeFence(text: string) {
 
 function tryParseStructuredAnswer(text?: string): StructuredAdvice | null {
   if (!text) return null;
-
   const cleaned = stripCodeFence(text);
-
   try {
     return JSON.parse(cleaned);
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (!match) return null;
-
     try {
       return JSON.parse(match[0]);
     } catch {
@@ -93,7 +96,7 @@ function tryParseStructuredAnswer(text?: string): StructuredAdvice | null {
   }
 }
 
-function DetailItem({ label, value }: { label: string; value?: string }) {
+function DetailItem({ label, value }: { label: string; value?: unknown }) {
   return (
     <div className="profile-item">
       <span>{label}</span>
@@ -107,9 +110,7 @@ function EmptyState() {
     <div className="empty-advice">
       <div className="empty-icon">AI</div>
       <h2>输入学生背景，生成结构化选校方案</h2>
-      <p>
-        系统会拆成背景判断、三档院校、风险提醒和下一步动作。
-      </p>
+      <p>系统会拆成背景判断、三档院校、风险提醒和下一步动作。</p>
     </div>
   );
 }
@@ -117,122 +118,71 @@ function EmptyState() {
 function StructuredResult({ data }: { data: StructuredAdvice }) {
   return (
     <div className="advice-result">
-      <div className="summary-card">
-        <span className="section-kicker">总体判断</span>
-        <h2>{cleanText(data.summary)}</h2>
-      </div>
+      <SectionNav items={[
+        { id: 'chat-summary', label: '判断' },
+        { id: 'chat-profile', label: '背景' },
+        { id: 'chat-schools', label: '学校' },
+        { id: 'chat-timeline', label: '时间线' },
+        { id: 'chat-risk', label: '风险' },
+      ]} />
 
-      <div className="profile-grid">
-        <DetailItem label="学生背景" value={data.profile?.education} />
-        <DetailItem label="成绩判断" value={data.profile?.gpa} />
-        <DetailItem label="目标国家" value={data.profile?.targetCountry} />
-        <DetailItem label="专业方向" value={data.profile?.targetMajor} />
-        <DetailItem label="预算判断" value={data.profile?.budget} />
-        <DetailItem label="竞争力" value={data.profile?.competitiveness} />
-      </div>
+      <FoldSection id="chat-summary" title="总体判断" defaultOpen>
+        <div className="summary-card inner-summary">
+          <h2>{cleanText(data.summary)}</h2>
+        </div>
+      </FoldSection>
 
-      <div className="section-heading">
-        <span>选校方案</span>
-        <h2>三档选校方案</h2>
-      </div>
+      <FoldSection id="chat-profile" title="背景拆解" subtitle="成绩、国家、专业、预算" defaultOpen>
+        <div className="profile-grid">
+          <DetailItem label="学生背景" value={data.profile?.education} />
+          <DetailItem label="成绩判断" value={data.profile?.gpa} />
+          <DetailItem label="目标国家" value={data.profile?.targetCountry} />
+          <DetailItem label="专业方向" value={data.profile?.targetMajor} />
+          <DetailItem label="预算判断" value={data.profile?.budget} />
+          <DetailItem label="竞争力" value={data.profile?.competitiveness} />
+        </div>
+      </FoldSection>
 
-      <div className="tier-grid">
-        {(data.schoolTiers || []).map((tier) => (
-          <div className="tier-card" key={tier.tier}>
-            <div className="tier-header">
-              <div>
-                <span>{cleanText(tier.level)}</span>
-                <h3>{cleanText(tier.tier)}</h3>
+      <FoldSection id="chat-schools" title="三档选校方案" subtitle="冲刺 / 匹配 / 保底" defaultOpen>
+        <div className="tier-grid">
+          {(data.schoolTiers || []).map((tier) => (
+            <FoldSection title={cleanText(tier.tier)} subtitle={cleanText(tier.level)} key={tier.tier} defaultOpen={tier.tier !== '冲刺'}>
+              <p className="tier-strategy">{cleanText(tier.strategy)}</p>
+              <div className="school-list">
+                {(tier.schools || []).map((school, index) => (
+                  <FoldSection title={cleanText(school.name)} subtitle={cleanText(tier.tier)} key={`${tier.tier}-${school.name}-${index}`}>
+                    <div className="school-detail"><span>推荐原因</span><p>{cleanText(school.reason)}</p></div>
+                    <div className="school-detail"><span>适配点</span><p>{cleanText(school.fit)}</p></div>
+                    <div className="school-detail warn"><span>风险点</span><p>{cleanText(school.risk)}</p></div>
+                    <div className="school-action">下一步：{cleanText(school.action)}</div>
+                  </FoldSection>
+                ))}
               </div>
-            </div>
-
-            <p className="tier-strategy">{cleanText(tier.strategy)}</p>
-
-            <div className="school-list">
-              {(tier.schools || []).map((school, index) => (
-                <div className="school-card" key={`${tier.tier}-${school.name}-${index}`}>
-                  <div className="school-topline">
-                    <strong>{cleanText(school.name)}</strong>
-                    <em>{cleanText(tier.tier)}</em>
-                  </div>
-
-                  <div className="school-detail">
-                    <span>推荐原因</span>
-                    <p>{cleanText(school.reason)}</p>
-                  </div>
-
-                  <div className="school-detail">
-                    <span>适配点</span>
-                    <p>{cleanText(school.fit)}</p>
-                  </div>
-
-                  <div className="school-detail warn">
-                    <span>风险点</span>
-                    <p>{cleanText(school.risk)}</p>
-                  </div>
-
-                  <div className="school-action">
-                    下一步：{cleanText(school.action)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+            </FoldSection>
+          ))}
+        </div>
+      </FoldSection>
 
       <div className="advice-two-col">
-        <div className="insight-panel">
-          <div className="section-heading compact">
-            <span>时间线</span>
-            <h2>申请时间规划</h2>
-          </div>
-
+        <FoldSection id="chat-timeline" title="申请时间规划" defaultOpen>
           <div className="timeline-cards">
             {(data.timeline || []).map((item, index) => (
-              <div className="timeline-card" key={`${item.phase}-${index}`}>
-                <div className="timeline-index">{index + 1}</div>
-
-                <div>
-                  <strong>{cleanText(item.phase)}</strong>
-                  <span>{cleanText(item.time)}</span>
-
-                  <ul>
-                    {(item.tasks || []).map((task, i) => (
-                      <li key={i}>{cleanText(task)}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+              <FoldSection title={`${index + 1}. ${cleanText(item.phase)}`} subtitle={cleanTime(item.time)} key={`${item.phase}-${index}`} defaultOpen={index === 0}>
+                <ListBlock items={item.tasks} />
+              </FoldSection>
             ))}
           </div>
-        </div>
+        </FoldSection>
 
-        <div className="insight-panel">
-          <div className="section-heading compact">
-            <span>风险与动作</span>
-            <h2>风险和下一步</h2>
-          </div>
-
+        <FoldSection id="chat-risk" title="风险和下一步" defaultOpen>
           <h3>风险提醒</h3>
-          <div className="tag-list danger">
-            {(data.risks || []).map((risk, index) => (
-              <span key={index}>{cleanText(risk)}</span>
-            ))}
-          </div>
-
+          <div className="tag-list danger">{(data.risks || []).map((risk, index) => <span key={index}>{cleanText(risk)}</span>)}</div>
           <h3>下一步动作</h3>
-          <div className="action-list">
-            {(data.nextActions || []).map((action, index) => (
-              <div key={index}>{cleanText(action)}</div>
-            ))}
-          </div>
-        </div>
+          <div className="action-list">{(data.nextActions || []).map((action, index) => <div key={index}>{cleanText(action)}</div>)}</div>
+        </FoldSection>
       </div>
 
-      <div className="disclaimer-card">
-        {cleanText(data.disclaimer)}
-      </div>
+      <div className="disclaimer-card">{cleanText(data.disclaimer) || '最终要求以学校官网和当年招生要求为准。'}</div>
     </div>
   );
 }
@@ -256,52 +206,29 @@ export default function Chat() {
 
   const structured = useMemo(() => {
     if (!result) return null;
-
-    if (result.structured) {
-      return result.structured;
-    }
-
-    return (
-      tryParseStructuredAnswer(result.rawAnswer) ||
-      tryParseStructuredAnswer(result.answer) ||
-      null
-    );
+    if (result.structured) return result.structured;
+    return tryParseStructuredAnswer(result.rawAnswer) || tryParseStructuredAnswer(result.answer) || null;
   }, [result]);
 
   async function ask(e: FormEvent) {
     e.preventDefault();
-
     if (!question.trim()) {
       setError('请输入问题。');
       return;
     }
-
     setLoading(true);
     setError('');
     setResult(null);
-
     try {
-      const { data } = await api.post('/chat', {
-        question,
-        topK: 3,
-      });
-
+      const { data } = await api.post('/chat', { question, topK: 3 });
       setResult(data);
       if (data.quota && isGuest && user) {
         setUser({ ...user, quotaLimit: data.quota.limit, quotaRemaining: data.quota.remaining });
       }
-
       const conv = await api.get('/chat/conversations');
       setConversations(conv.data);
     } catch (err: any) {
-      console.error('AI 对话请求失败：', err);
-
-      const message =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        '请求失败，请稍后重试。';
-
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || '请求失败，请稍后重试。';
       setError(`AI 对话请求失败：${message}`);
     } finally {
       setLoading(false);
@@ -316,121 +243,60 @@ export default function Chat() {
           <h1>AI 咨询与选校</h1>
           <p>输入学生背景后，系统会结合知识库和工具判断，生成结构化选校方案。</p>
         </div>
-
         <div className="model-badge">{isGuest ? `访客额度 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端已连接'}</div>
       </div>
 
       <div className="prompt-panel">
         <form onSubmit={ask} className="prompt-box">
           <label>学生背景 / 咨询问题</label>
-
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="请输入学生背景、目标国家、专业方向、预算等信息..."
-          />
-
-          <div className="example-row">
-            {examples.map((item) => (
-              <button
-                type="button"
-                key={item}
-                onClick={() => setQuestion(item)}
-              >
-                {item.slice(0, 18)}...
-              </button>
-            ))}
-          </div>
-
-          <button className="primary ask-button" disabled={loading}>
-            {loading ? '正在生成结构化方案...' : '生成选校方案'}
-          </button>
+          <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="请输入学生背景、目标国家、专业方向、预算等信息..." />
+          <div className="example-row">{examples.map((item) => <button type="button" key={item} onClick={() => setQuestion(item)}>{item.slice(0, 18)}...</button>)}</div>
+          <button className="primary ask-button" disabled={loading}>{loading ? '正在生成结构化方案...' : '生成选校方案'}</button>
         </form>
       </div>
 
-      {error && (
-        <div className="error-card">
-          <strong>请求失败</strong>
-          <p>{error}</p>
-        </div>
-      )}
-
+      {error && <div className="error-card"><strong>请求失败</strong><p>{error}</p></div>}
       {!result && !loading && !error && <EmptyState />}
-
-      {loading && (
-        <div className="loading-card">
-          <div className="loader-dot" />
-
-          <div>
-            <strong>正在分析学生背景和院校档次</strong>
-            <p>系统会把回答拆成一个个卡片，并附上来源引用和工具调用记录。</p>
-          </div>
-        </div>
-      )}
+      {loading && <div className="loading-card"><div className="loader-dot" /><div><strong>正在分析学生背景和院校档次</strong><p>系统会把回答拆成卡片，并附上来源引用和工具调用记录。</p></div></div>}
 
       {structured && <StructuredResult data={structured} />}
 
       {result && !structured && (
-        <div className="fallback-answer">
-          <h2>AI 回答</h2>
-          <p>{cleanText(result.answer)}</p>
-
-          <div className="error-card" style={{ marginTop: 16 }}>
-            <strong>提示</strong>
-            <p>
-              当前回答没有解析成卡片，可能是模型返回被截断。可以稍后重试，或调高后端输出上限。
-            </p>
-          </div>
-        </div>
+        <FoldSection title="AI 回答" defaultOpen>
+          <TextBlock value={result.answer} />
+          <div className="error-card" style={{ marginTop: 16 }}><strong>提示</strong><p>当前回答没有解析成卡片，可能是模型返回被截断。可以稍后重试，或调高后端输出上限。</p></div>
+        </FoldSection>
       )}
 
       {result && (
         <div className="meta-grid">
-          <div className="meta-panel">
-            <h2>来源引用</h2>
+          <FoldSection title="来源引用" defaultOpen>
+            {result.sources?.length ? result.sources.map((s, i) => (
+              <div className="source-card" key={s.id || i}>
+                <strong>{cleanText(s.documentTitle || '未命名资料')}</strong>
+                <span>相似度：{cleanText(s.score)}</span>
+                <p>{cleanText(s.content)}</p>
+              </div>
+            )) : <p className="muted-text">暂无来源引用。</p>}
+          </FoldSection>
 
-            {result.sources?.length ? (
-              result.sources.map((s, i) => (
-                <div className="source-card" key={s.id || i}>
-                  <strong>{s.documentTitle || '未命名资料'}</strong>
-                  <span>相似度：{s.score}</span>
-                  <p>{s.content}</p>
-                </div>
-              ))
-            ) : (
-              <p className="muted-text">暂无来源引用。</p>
-            )}
-          </div>
+          <FoldSection title="工具调用">
+            {result.toolCalls?.length ? result.toolCalls.map((t, i) => (
+              <div className="tool-card" key={i}>
+                <strong>{cleanText(t.name)}</strong>
+                <pre>{JSON.stringify(t.result, null, 2)}</pre>
+              </div>
+            )) : <p className="muted-text">本次未触发工具。</p>}
+          </FoldSection>
 
-          <div className="meta-panel">
-            <h2>工具调用</h2>
-
-            {result.toolCalls?.length ? (
-              result.toolCalls.map((t, i) => (
-                <div className="tool-card" key={i}>
-                  <strong>{t.name}</strong>
-                  <pre>{JSON.stringify(t.result, null, 2)}</pre>
-                </div>
-              ))
-            ) : (
-              <p className="muted-text">本次未触发工具。</p>
-            )}
-          </div>
-
-          <div className="meta-panel history-panel">
-            <h2>历史会话</h2>
-
-            {conversations.length ? (
-              conversations.slice(0, 6).map((c) => (
-                <div className="history-row" key={c.id}>
-                  <strong>{c.title}</strong>
-                  <span>{new Date(c.updatedAt).toLocaleString()}</span>
-                </div>
-              ))
-            ) : (
-              <p className="muted-text">暂无历史会话。</p>
-            )}
-          </div>
+          <FoldSection title="历史会话">
+            {conversations.length ? conversations.slice(0, 6).map((c) => (
+              <div className="history-row" key={c.id}>
+                <strong>{cleanText(c.title)}</strong>
+                <span>{new Date(c.updatedAt).toLocaleString()}</span>
+              </div>
+            )) : <p className="muted-text">暂无历史会话。</p>}
+          </FoldSection>
         </div>
       )}
     </section>

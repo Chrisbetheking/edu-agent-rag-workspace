@@ -1005,3 +1005,83 @@ th { color: var(--muted); font-weight: 800; }
   .stats-grid, .stats-grid.four, .form-grid.two, .score-factor-grid, .large-score-grid, .draft-grid, .ops-card-grid, .two-output-grid { grid-template-columns: 1fr !important; }
   .sidebar { width: min(88vw, 310px); }
 }
+
+/* V7: dense workflow navigation + foldable long content */
+.section-nav {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(99, 102, 241, .14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, .08);
+  overflow-x: auto;
+}
+.section-nav span { color: #64748b; font-size: 12px; font-weight: 900; white-space: nowrap; }
+.section-nav a {
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: #3150c8;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eef4ff;
+}
+.section-nav a:hover { background: #dbeafe; }
+.section-fold { scroll-margin-top: 92px; }
+.inner-summary { box-shadow: none; border: 1px solid #edf2f7; }
+.mini-copy {
+  border: 0;
+  background: #eef4ff;
+  color: #3150c8;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.section-fold .section-fold {
+  box-shadow: none;
+  background: #fff;
+}
+.meta-grid > .fold-card { min-width: 0; }
+.school-list .fold-card { margin-top: 10px; }
+.tier-grid { display: grid; gap: 12px; }
+.timeline-cards { display: grid; gap: 12px; }
+.chunk-grid .fold-card { box-shadow: none; }
+.raw-json-details { margin-top: 14px; }
+.raw-json-details > summary {
+  cursor: pointer;
+  color: #3150c8;
+  font-weight: 900;
+  padding: 12px 0;
+}
+.pre-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.fold-body .pre-line {
+  max-height: 52vh;
+  overflow: auto;
+  padding-right: 6px;
+}
+.sidebar-head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: linear-gradient(180deg, rgba(11,18,32,.98), rgba(11,18,32,.92));
+  padding-top: 2px;
+  padding-bottom: 10px;
+}
+.sidebar-toggle-inline { align-self: flex-start; margin-top: 2px; }
+
+@media (max-width: 900px) {
+  .section-nav { top: 62px; margin-inline: -2px; }
+  .section-nav a { padding: 7px 10px; font-size: 12px; }
+  .fold-body .pre-line { max-height: 44vh; }
+}

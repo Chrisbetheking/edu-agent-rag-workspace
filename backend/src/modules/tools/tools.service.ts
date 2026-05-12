@@ -769,47 +769,93 @@ export class ToolsService {
       const fit = this.assessProfile(s);
       const materials = this.materialList(s);
 
-      const settle = async <T>(name: string, promise: Promise<T>, fallback: T): Promise<T> => {
-        try {
-          const result = await promise;
-          return result || fallback;
-        } catch (error: any) {
-          this.addToolLog(name, s, { message: error?.message || "子工具失败，已跳过" }, Date.now() - started, "failed");
-          return { ...(fallback as any), llmFallbackReason: error?.message || "子工具失败" } as T;
-        }
+      // 完整流程默认走 algorithm-first，避免一次点击触发多个 LLM 请求导致超时。
+      // 单个节点仍然可以单独调用 DeepSeek；完整流程负责稳定编排和可解释输出。
+      const schoolPool: Record<string, string[][]> = {
+        英国: [["Manchester", "Bristol", "Glasgow"], ["Cardiff", "Liverpool", "Sheffield"], ["Sussex", "Swansea", "Portsmouth"]],
+        澳洲: [["University of Sydney", "UNSW", "Monash"], ["Adelaide", "UTS", "RMIT"], ["Deakin", "Swinburne", "Macquarie"]],
+        新加坡: [["NUS", "NTU"], ["SMU", "SUTD"], ["SIM / Kaplan", "PSB Academy"]],
+        香港: [["HKU", "CUHK", "HKUST"], ["CityU", "PolyU", "HKBU"], ["Lingnan", "HSUHK"]],
+        加拿大: [["UBC", "Toronto", "Waterloo"], ["Ottawa", "Simon Fraser", "McMaster"], ["York", "Concordia", "Windsor"]],
+        美国: [["Northeastern", "USC", "NYU Tandon"], ["Stevens", "Syracuse", "George Washington"], ["Pace", "Illinois Tech", "Dayton"]],
+      };
+      const pool = schoolPool[s.country] || schoolPool["英国"];
+      const mapSchools = (names: string[], tier: string) => names.map((name) => ({
+        name,
+        reason: `${tier}档候选，需结合${s.major}课程设置、语言要求和预算进一步筛选。`,
+        fit: tier === "冲刺" ? "适合保留少量高目标" : tier === "匹配" ? "适合作为主申请区间" : "用于控制整体录取风险",
+        risk: tier === "冲刺" ? "对成绩、课程匹配和文书要求更高" : "需逐校核对官网要求",
+        action: "核对官网要求后再进入最终名单。",
+      }));
+      const schools = {
+        profile: s,
+        reach: mapSchools(pool[0].slice(0, fit.tierAdvice.reach || 1), "冲刺"),
+        match: mapSchools(pool[1].slice(0, fit.tierAdvice.match || 2), "匹配"),
+        safe: mapSchools(pool[2].slice(0, fit.tierAdvice.safe || 2), "保底"),
+        risk: fit.risks || [],
+        poweredBy: "algorithm-first",
       };
 
-      // 完整流程要稳定，子任务并行执行，避免多个 LLM 请求串行导致前端超时。
-      const [schools, growth, application, sales] = await Promise.all([
-        settle("院校推荐工具", this.recommendSchools(s), { reach: [], match: [], safe: [], risk: [] } as any),
-        settle("线索内容生成器", this.growthCampaign(s), { brief: "", xiaohongshu: {}, videoScript: {}, wechatFollowup: [], contentCalendar: [] } as any),
-        settle("申请文书规划器", this.applicationPlan(s), { writingBrief: {}, drafts: {}, pipeline: [], materialChecklist: [] } as any),
-        settle("销售话术生成工具", this.generateCopywriting(s), { wechat: "", objectionHandling: [], callOutline: [], followUpTasks: [] } as any),
-      ]);
+      const application = {
+        student: { name: s.name, country: s.country, major: s.major, degree: s.degree, gpa: s.cgpa, language: s.language, budget: s.budget, experience: s.experience },
+        pipeline: [
+          { stage: "背景确认", status: "进行中", owner: "咨询顾问", tasks: ["确认目标国家、专业、预算", "收集成绩单和语言成绩"] },
+          { stage: "选校定位", status: "待开始", owner: "申请顾问", tasks: ["拆分冲刺/匹配/保底", "逐校核对官网要求"] },
+          { stage: "材料准备", status: "待开始", owner: "学生 + 顾问", tasks: ["补齐护照、成绩单、在读证明", "整理项目、实习和作品集"] },
+          { stage: "文书制作", status: "待开始", owner: "文书顾问", tasks: ["确定 PS 主线", "优化 CV 和推荐信素材"] },
+          { stage: "递交追踪", status: "待开始", owner: "申请顾问", tasks: ["网申递交", "补件和 offer 跟进"] },
+        ],
+        writingBrief: {
+          psTheme: `围绕${s.major}学习背景、项目能力和职业目标展开，重点解释为什么选择${s.country}${s.degree}。`,
+          psOutline: ["专业动机", "课程与项目基础", "实习/作品集证明", "目标课程匹配", "职业规划"],
+          cvHighlights: ["课程匹配度", "软件/AI/数据项目", "GitHub 或作品集", "实习与团队协作"],
+          recommendationAngles: ["学习能力", "项目执行力", "沟通协作", "持续改进"],
+        },
+        drafts: {
+          personalStatement: `${s.name}希望申请${s.country}${s.major}${s.degree}。现阶段文书主线建议围绕课程基础、项目经历、实习/作品集和未来职业目标展开，避免只解释 GPA，把重点放在可验证的能力证据上。`,
+          cvSummary: `${s.major}方向申请人，具备项目、实习和跨文化学习经历，适合突出工程实践和学习能力。`,
+          recommendationSeed: "推荐信可重点强调课程表现、项目执行力、团队协作和持续学习能力。",
+        },
+        materialChecklist: materials.required?.map((x: any) => x.name || x) || [],
+        riskFlags: fit.risks || [],
+        nextBestActions: fit.nextActions || [],
+        poweredBy: "algorithm-first",
+      };
+
+      const sales = {
+        student: s,
+        wechat: `你好${s.name}，我先按成绩、专业匹配、项目经历、语言和预算给你做了初筛。建议先确定冲刺/匹配/保底比例，再逐校核对官网要求。`,
+        objectionHandling: [
+          { concern: "担心成绩不够", answer: "成绩是重要因素，但项目、课程匹配、推荐信和文书主线也会影响整体竞争力。" },
+          { concern: "担心预算", answer: "先区分城市和学校档位，保留主申请区间，同时设置预算更稳的保底方案。" },
+        ],
+        callOutline: ["确认成绩单和语言", "解释适配评分", "确认三档选校", "收集项目/实习素材", "安排下一次方案确认"],
+        followUpTasks: ["索要成绩单", "确认语言成绩", "整理项目经历", "确认预算上限"],
+        poweredBy: "algorithm-first",
+      };
 
       const result = {
         executiveSummary: `${s.name}｜${s.country}${s.major}${s.degree}：评分 ${fit.overall}/100（${fit.band}），建议按冲刺 ${fit.tierAdvice.reach} / 匹配 ${fit.tierAdvice.match} / 保底 ${fit.tierAdvice.safe} 配置。`,
         studentProfile: s,
         workflow: [
           { step: 1, name: "适配评分", tool: "weighted-fit-v2", status: "done", output: `${fit.overall}/100 · ${fit.band}` },
-          { step: 2, name: "选校分层", tool: "院校推荐", status: "done", output: "冲刺 / 匹配 / 保底" },
-          { step: 3, name: "申请案卷", tool: "文书规划", status: "done", output: "PS / CV / 推荐信" },
-          { step: 4, name: "销售跟进", tool: "话术生成", status: "done", output: "微信 / 电话 / 异议" },
+          { step: 2, name: "选校分层", tool: "规则分层", status: "done", output: "冲刺 / 匹配 / 保底" },
+          { step: 3, name: "申请案卷", tool: "文书规则", status: "done", output: "PS / CV / 推荐信" },
+          { step: 4, name: "销售跟进", tool: "话术模板", status: "done", output: "微信 / 电话 / 异议" },
           { step: 5, name: "材料清单", tool: "规则引擎", status: "done", output: "必交 / 条件 / 命名" },
         ],
-        outputs: { academic, fit, schools, growth, sales, application, materials },
+        outputs: { academic, fit, schools, sales, application, materials },
         handoff: [
           { team: "咨询", action: "按评分和三档选校给学生解释风险。" },
           { team: "文书", action: "基于 PS 主线、CV 重点和推荐信角度改稿。" },
-          { team: "运营", action: "用销售跟进和增长内容做后续触达。" },
           { team: "申请", action: "按材料清单和时间节点跟进递交。" },
         ],
         agentTrace: {
-          mode: this.hasRealLlm() ? "真实模型" : "兜底模式",
-          model: process.env.LLM_MODEL || "deepseek-chat",
+          mode: "algorithm-first",
+          model: "local-orchestrator",
           durationMs: Date.now() - started,
           algorithm: "weighted-fit-v2",
-          tools: ["assessProfile", "recommendSchools", "applicationPlan", "generateCopywriting", "materialList"],
+          tools: ["assessProfile", "schoolBanding", "applicationRules", "salesRules", "materialList"],
         },
       };
 
@@ -848,7 +894,7 @@ export class ToolsService {
       durationMs: log.duration,
       ragHitCount: 0,
       toolNames: [log.toolName],
-      error: log.status === "success" ? "" : "工具调用失败",
+      error: log.status === "success" ? "" : (log.output?.message || log.output?.error || "工具调用失败"),
       createdAt: log.createdAt,
       input: log.input,
       output: log.output,

@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
+import { FoldSection, ListBlock, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 
 const defaultStages = [
   { stage: '背景确认', owner: '咨询顾问', tasks: ['确认目标国家、专业、预算', '收集成绩单和语言成绩'] },
@@ -28,54 +29,46 @@ function normalizeStage(stage: any, index: number) {
 function StageCard({ stage, index }: { stage: any; index: number }) {
   const item = normalizeStage(stage, index);
   return (
-    <details className="fold-card pipeline-fold" open={index < 2}>
-      <summary>
-        <span><strong>{index + 1}. {item.stage}</strong><em>{item.owner}</em></span>
-        <b>{item.status}</b>
-      </summary>
-      <div className="fold-body">
-        <ul>{asArray(item.tasks).map((task, i) => <li key={i}>{stringifySafe(task)}</li>)}</ul>
-      </div>
-    </details>
+    <FoldSection title={`${index + 1}. ${item.stage}`} subtitle={item.owner} badge={item.status} defaultOpen={index < 1}>
+      <ListBlock items={item.tasks} />
+    </FoldSection>
   );
 }
 
-function TextPanel({ title, content }: { title: string; content: unknown }) {
-  const text = stringifySafe(content);
+function TextPanel({ title, content, defaultOpen = false }: { title: string; content: unknown; defaultOpen?: boolean }) {
+  const text = toDisplayText(content);
   return (
-    <article className="ops-card enhanced-card">
-      <div className="row-between top-align"><h3>{title}</h3><button className="ghost-button" type="button" onClick={() => navigator.clipboard?.writeText(text)}>复制</button></div>
-      <p className="pre-line">{text || '暂无内容'}</p>
-    </article>
+    <FoldSection title={title} defaultOpen={defaultOpen} badge={<button className="mini-copy" type="button" onClick={(e) => { e.preventDefault(); navigator.clipboard?.writeText(text); }}>复制</button>}>
+      <TextBlock value={text || '暂无内容'} />
+    </FoldSection>
   );
 }
 
 function ScorePanel({ fit }: { fit: any }) {
   if (!fit) return null;
   return (
-    <section className="panel score-panel">
-      <div className="panel-title compact"><span className="eyebrow">评分</span><h2>申请适配度 {fit.overall}/100</h2></div>
+    <FoldSection id="app-score" title={`申请适配度 ${fit.overall}/100`} subtitle="weighted-fit-v2" defaultOpen>
       <div className="score-layout">
-        <div className="score-circle"><strong>{fit.band}</strong><span>{fit.overall}</span></div>
+        <div className="score-circle"><strong>{toDisplayText(fit.band)}</strong><span>{toDisplayText(fit.overall)}</span></div>
         <div className="score-factor-grid">
           {asArray(fit.factors).map((factor: any) => (
             <div className="score-factor" key={factor.key || factor.label}>
-              <div><strong>{factor.label}</strong><em>{factor.score}</em></div>
+              <div><strong>{toDisplayText(factor.label)}</strong><em>{toDisplayText(factor.score)}</em></div>
               <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
-              <span>{factor.evidence}</span>
+              <span>{toDisplayText(factor.evidence)}</span>
             </div>
           ))}
         </div>
       </div>
-      <p className="muted">建议配比：冲刺 {fit.tierAdvice?.reach} / 匹配 {fit.tierAdvice?.match} / 保底 {fit.tierAdvice?.safe}。{fit.tierAdvice?.strategy}</p>
-    </section>
+      <p className="muted">建议配比：冲刺 {fit.tierAdvice?.reach} / 匹配 {fit.tierAdvice?.match} / 保底 {fit.tierAdvice?.safe}。{toDisplayText(fit.tierAdvice?.strategy)}</p>
+    </FoldSection>
   );
 }
 
 function MaterialPanel({ items }: { items: any[] }) {
   return (
     <div className="material-list single-list">
-      {asArray(items).map((item, i) => <div className="material-item" key={i}><strong>{stringifySafe(item)}</strong></div>)}
+      {asArray(items).map((item, i) => <div className="material-item" key={i}><strong>{toDisplayText(item)}</strong></div>)}
     </div>
   );
 }
@@ -104,11 +97,24 @@ export default function Applications() {
     if (result.exportMarkdown) return result.exportMarkdown;
     const writing = result.writingBrief || {};
     const drafts = result.drafts || {};
-    return `# ${name} 申请案卷\n\n## 适配评分\n${result.fit?.overall || '-'} / 100（${result.fit?.band || '-'}）\n\n## PS 主题\n${writing.psTheme || ''}\n\n## PS 大纲\n${asArray(writing.psOutline).map((x) => `- ${stringifySafe(x)}`).join('\n')}\n\n## Personal Statement 初稿\n${drafts.personalStatement || ''}\n\n## CV 摘要\n${drafts.cvSummary || ''}\n\n## 推荐信素材\n${drafts.recommendationSeed || ''}\n\n## 材料清单\n${asArray(result.materialChecklist).map((x) => `- ${stringifySafe(x)}`).join('\n')}\n`;
+    return `# ${name} 申请案卷\n\n## 适配评分\n${result.fit?.overall || '-'} / 100（${result.fit?.band || '-'}）\n\n## PS 主题\n${toDisplayText(writing.psTheme)}\n\n## PS 大纲\n${asArray(writing.psOutline).map((x) => `- ${toDisplayText(x)}`).join('\n')}\n\n## Personal Statement 初稿\n${toDisplayText(drafts.personalStatement)}\n\n## CV 摘要\n${toDisplayText(drafts.cvSummary)}\n\n## 推荐信素材\n${toDisplayText(drafts.recommendationSeed)}\n\n## 材料清单\n${asArray(result.materialChecklist).map((x) => `- ${toDisplayText(x)}`).join('\n')}\n`;
   }, [result, name]);
+
+  async function logError(err: any, started: number) {
+    try {
+      await api.post('/tools/client-error-log', {
+        toolName: '申请案卷页面',
+        activeTool: 'applications',
+        endpoint: '/tools/application-plan',
+        message: err?.response?.data?.message || err?.message || '生成失败',
+        durationMs: Date.now() - started,
+      });
+    } catch {}
+  }
 
   async function run(e?: FormEvent) {
     e?.preventDefault();
+    const started = Date.now();
     setLoading(true);
     setError('');
     try {
@@ -120,6 +126,7 @@ export default function Applications() {
       setResult({ ...(planRes.data || {}), fit: fitRes.data || null });
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || '生成失败');
+      await logError(err, started);
     } finally {
       setLoading(false);
     }
@@ -140,7 +147,15 @@ export default function Applications() {
       </div>
 
       {error && <div className="error-card"><strong>操作失败</strong><p>{error}</p></div>}
-      {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{result.llmFallbackReason}</div>}
+      {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(result.llmFallbackReason)}</div>}
+
+      {result && <SectionNav items={[
+        { id: 'app-score', label: '评分' },
+        { id: 'app-brief', label: '方向' },
+        { id: 'app-drafts', label: '初稿' },
+        { id: 'app-pipeline', label: '流程' },
+        { id: 'app-materials', label: '材料' },
+      ]} />}
 
       <div className="two-col wide-left">
         <section className="panel sticky-panel">
@@ -168,38 +183,40 @@ export default function Applications() {
         <section className="panel">
           <div className="panel-title compact"><span className="eyebrow">结果</span><h2>文书方向</h2></div>
           {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
-            <div className="ops-card-grid">
-              <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} />
-              <div className="ops-card enhanced-card"><h3>PS 大纲</h3><ul>{asArray(result.writingBrief?.psOutline).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></div>
-              <div className="ops-card enhanced-card"><h3>CV 重点</h3><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{stringifySafe(x)}</span>)}</div></div>
-              <div className="ops-card enhanced-card"><h3>推荐信角度</h3><ul>{asArray(result.writingBrief?.recommendationAngles).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></div>
-            </div>
+            <FoldSection id="app-brief" title="文书方向" subtitle="PS、CV、推荐信" defaultOpen>
+              <div className="ops-card-grid">
+                <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} defaultOpen />
+                <FoldSection title="PS 大纲" defaultOpen><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
+                <FoldSection title="CV 重点"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></FoldSection>
+                <FoldSection title="推荐信角度"><ListBlock items={result.writingBrief?.recommendationAngles} /></FoldSection>
+              </div>
+            </FoldSection>
           )}
         </section>
       </div>
 
-      {result && <ScorePanel fit={result.fit} />}
+      {result && <section className="panel"><ScorePanel fit={result.fit} /></section>}
 
       {result && (
-        <section className="panel document-draft-panel">
+        <section id="app-drafts" className="panel document-draft-panel">
           <div className="panel-title"><div><span className="eyebrow">文书</span><h2>可编辑初稿</h2></div><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(exportMarkdown)}>复制全部</button></div>
           <div className="draft-grid">
-            <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} />
+            <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} defaultOpen />
             <TextPanel title="CV Summary" content={result.drafts?.cvSummary} />
             <TextPanel title="推荐信素材" content={result.drafts?.recommendationSeed} />
           </div>
         </section>
       )}
 
-      <section className="panel">
+      <section id="app-pipeline" className="panel">
         <div className="panel-title compact"><span className="eyebrow">流程</span><h2>申请执行</h2></div>
         {!result ? <div className="empty-mini">生成后会出现后续流程。</div> : <div className="pipeline-list">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div>}
       </section>
 
       {result && (
-        <div className="two-col">
-          <section className="panel"><div className="panel-title compact"><span className="eyebrow">材料</span><h2>清单</h2></div><MaterialPanel items={asArray(result.materialChecklist)} /></section>
-          <section className="panel"><div className="panel-title compact"><span className="eyebrow">风险</span><h2>下一步</h2></div><ul className="check-list">{[...asArray(result.riskFlags), ...asArray(result.nextBestActions)].map((item, i) => <li key={i}>{stringifySafe(item)}</li>)}</ul></section>
+        <div id="app-materials" className="two-col">
+          <section className="panel"><FoldSection title="材料清单" defaultOpen><MaterialPanel items={asArray(result.materialChecklist)} /></FoldSection></section>
+          <section className="panel"><FoldSection title="风险与下一步" defaultOpen><ul className="check-list">{[...asArray(result.riskFlags), ...asArray(result.nextBestActions)].map((item, i) => <li key={i}>{stringifySafe(item)}</li>)}</ul></FoldSection></section>
         </div>
       )}
     </section>
