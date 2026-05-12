@@ -172,7 +172,7 @@ export default function FrontDesk() {
       {error && <div className="error-card"><strong>生成失败</strong><p>{error}</p></div>}
       {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{result.llmFallbackReason}</div>}
 
-      <div className={`two-col wide-right frontdesk-workbench-v13 ${result ? 'with-result' : ''}`}>
+      <div className={`two-col wide-right frontdesk-workbench-v13 frontdesk-workbench-v15 ${result ? 'with-result' : ''}`}>
         <section className="panel form-panel sticky-panel">
           <div className="panel-title compact form-action-title"><div><span className="eyebrow">录入</span><h2>学生信息</h2></div><button className="primary compact-run-button" type="button" disabled={loading} onClick={() => generate()}>{loading ? '生成中...' : '生成内容'}</button></div>
           <form className="form-stack" onSubmit={generate}>
@@ -192,7 +192,7 @@ export default function FrontDesk() {
           </form>
         </section>
 
-        <section className="panel result-panel frontdesk-result-panel-v13">
+        <section className="panel result-panel frontdesk-result-panel-v13 frontdesk-result-panel-v15">
           <div className="panel-title compact"><span className="eyebrow">结果</span><h2>内容包</h2></div>
           {!result ? (
             <div className="empty-advice compact-empty"><div className="empty-icon">✍</div><h2>等待生成</h2><p>填写左侧信息后生成内容。</p></div>

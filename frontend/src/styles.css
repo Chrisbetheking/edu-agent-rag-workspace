@@ -2275,3 +2275,347 @@ th { color: var(--muted); font-weight: 800; }
   .calendar-row-index { grid-template-columns: auto auto; justify-content: start; place-items: center; }
   .application-output-grid-v13 .app-pipeline-grid-v10 { grid-template-columns: 1fr !important; }
 }
+
+/* V15: readable enterprise workspace reset - no vertical cards, working directory buttons, full-width results */
+.section-nav-v15 {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  position: static !important;
+  top: auto !important;
+  z-index: 1 !important;
+  margin: 0 0 18px !important;
+  padding: 10px 12px !important;
+  border: 1px solid #e6edf7 !important;
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, #fff, #f8fbff) !important;
+  box-shadow: 0 10px 26px rgba(15,23,42,.04) !important;
+}
+.section-nav-v15 .section-nav-label { min-width: 76px; }
+.section-nav-v15 .section-nav-links { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.section-nav-v15 .section-nav-links button {
+  border: 0;
+  background: #eef4ff;
+  color: #3150c8;
+  border-radius: 999px;
+  height: 32px;
+  padding: 0 12px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.section-nav-v15 .section-nav-links button:hover { background: #dfeaff; transform: translateY(-1px); }
+.section-nav-v15 .section-nav-top { margin-left: 0; box-shadow: none; }
+
+/* After generation, use full-width workspaces. The form becomes a compact toolbar and results get all horizontal space. */
+.tools-workbench-v15.with-result,
+.application-workbench-v15.with-result,
+.frontdesk-workbench-v15.with-result {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 18px !important;
+}
+.tools-workbench-v15.with-result .form-panel,
+.application-workbench-v15.with-result .form-panel,
+.frontdesk-workbench-v15.with-result .form-panel {
+  position: static !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 18px 20px !important;
+}
+.tools-workbench-v15.with-result .form-stack,
+.application-workbench-v15.with-result .form-stack,
+.frontdesk-workbench-v15.with-result .form-stack {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(180px, 1fr)) !important;
+  gap: 12px !important;
+  align-items: end !important;
+}
+.tools-workbench-v15.with-result .form-stack > .form-grid,
+.application-workbench-v15.with-result .form-stack > .form-grid,
+.frontdesk-workbench-v15.with-result .form-stack > .form-grid { display: contents !important; }
+.tools-workbench-v15.with-result textarea,
+.application-workbench-v15.with-result textarea,
+.frontdesk-workbench-v15.with-result textarea { min-height: 70px !important; max-height: 104px !important; }
+.tools-workbench-v15.with-result .form-stack > label:has(textarea),
+.application-workbench-v15.with-result .form-stack > label:has(textarea),
+.frontdesk-workbench-v15.with-result .form-stack > label:has(textarea) { grid-column: span 2 !important; }
+.tools-workbench-v15.with-result .result-panel-v15,
+.application-workbench-v15.with-result .application-result-panel-v15,
+.frontdesk-workbench-v15.with-result .frontdesk-result-panel-v15 { width: 100%; min-width: 0; }
+
+/* Global typography guard: never allow Chinese/English content to become one-character-per-line. */
+.fold-card,
+.fold-card *,
+.mini-result-card,
+.mini-result-card *,
+.school-row-v15,
+.school-row-v15 *,
+.material-item-v15,
+.material-item-v15 *,
+.copy-card,
+.copy-card *,
+.trace-card,
+.trace-card * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+.fold-card > summary {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+}
+.fold-card > summary span { min-width: 0 !important; }
+.fold-card > summary b { flex-shrink: 0; }
+
+/* V15 core result boards */
+.advisor-output-v15 { display: grid; gap: 18px; }
+.advisor-output-v15 .section-group-card { min-width: 0; }
+.advisor-pair-v15 {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.9fr) minmax(520px, 1.1fr);
+  gap: 18px;
+  align-items: start;
+}
+.workflow-board-v15 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.workflow-board-v15 .mini-result-card { min-height: 118px; border-top: 3px solid #93c5fd; }
+
+.score-output-v15 { display: grid; gap: 16px; }
+.score-board-v15 {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.34fr) minmax(0, 0.66fr);
+  gap: 16px;
+  align-items: stretch;
+}
+.score-hero-v15 {
+  border: 1px solid #e6edf7;
+  background: linear-gradient(180deg, #fff, #f8fbff);
+  border-radius: 22px;
+  padding: 20px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.score-hero-v15 strong {
+  font-size: clamp(42px, 5vw, 76px);
+  line-height: 0.95;
+  letter-spacing: -.07em;
+  color: #111827;
+}
+.score-hero-v15 p { margin: 0; color: #64748b; line-height: 1.7; }
+.score-mini-grid-v15 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+.score-mini-grid-v15 span {
+  border: 1px solid #e8eef8;
+  background: #fff;
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 3px;
+}
+.score-mini-grid-v15 b { color: #3150c8; font-size: 24px; line-height: 1; }
+.score-mini-grid-v15 em { color: #64748b; font-style: normal; font-size: 12px; font-weight: 900; }
+.score-factors-v15 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  align-content: stretch;
+}
+.score-factor-v15 {
+  border: 1px solid #e6edf7;
+  border-radius: 18px;
+  background: #fff;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  min-height: 126px;
+}
+.score-factor-v15 > div:first-child { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.score-factor-v15 strong { color: #0f172a; font-size: 16px; line-height: 1.35; }
+.score-factor-v15 b { color: #3150c8; font-size: 20px; }
+.score-factor-v15 p { margin: 0; color: #64748b; line-height: 1.5; font-size: 13px; }
+.risk-action-grid-v15 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.risk-action-grid-v15.two-only { grid-template-columns: repeat(2, minmax(260px, 1fr)); }
+
+.school-board-v15 {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.22fr) repeat(3, minmax(250px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.school-summary-v15 {
+  border: 1px solid #e6edf7;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #fff, #f8fbff);
+  padding: 16px;
+  min-height: 160px;
+}
+.school-summary-v15 span { color: #64748b; font-weight: 900; }
+.school-summary-v15 strong { display: block; color: #3150c8; font-size: 42px; line-height: 1; margin: 6px 0; }
+.school-summary-v15 p { margin: 0; color: #64748b; line-height: 1.65; }
+.school-band-v15 { height: 100%; }
+.school-card-list-v15 { display: grid; gap: 10px; }
+.school-row-v15 {
+  border: 1px solid #edf2f7;
+  background: #f8fbff;
+  border-radius: 16px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+.school-row-v15 strong { font-size: 16px; color: #0f172a; }
+.school-row-v15 p { margin: 0; color: #475569; line-height: 1.55; }
+.school-row-v15 small { color: #64748b; line-height: 1.5; }
+
+.app-brief-grid-v15,
+.sales-board-v15,
+.material-board-v15 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+.draft-board-v15 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 14px;
+  align-items: start;
+}
+.draft-side-v15 { display: grid; gap: 14px; }
+.draft-board-v15 .draft-main-card .pre-line { max-height: 58vh; overflow: auto; padding-right: 8px; }
+.draft-side-v15 .pre-line { max-height: 260px; overflow: auto; padding-right: 6px; }
+.pair-board-v15 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.78fr);
+  gap: 18px;
+  align-items: start;
+}
+.pipeline-board-v15 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+.stage-card-readable-v15 { min-width: 0; }
+.material-list-v15 { display: grid; gap: 10px; }
+.material-item-v15 {
+  border: 1px solid #edf2f7;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+.material-item-v15 strong { color: #0f172a; line-height: 1.35; }
+.material-item-v15 span { color: #64748b; line-height: 1.55; }
+.tag-row-readable-v15 span { white-space: normal !important; text-align: left !important; border-radius: 16px; }
+
+/* Kill older v11/v13/v14 advisor grid splits that caused narrow vertical cards. */
+.advisor-grid-v11,
+.advisor-grid-v13 { display: contents !important; }
+.advisor-grid-v11 > *,
+.advisor-grid-v13 > * { grid-column: auto !important; }
+.advisor-grid-v13 .result-shell-grid,
+.advisor-grid-v11 .result-shell-grid,
+.advisor-output-v15 .result-shell-grid { grid-template-columns: 1fr !important; }
+.advisor-grid-v13 .decision-grid-v10,
+.advisor-grid-v13 .risk-board-v10,
+.advisor-grid-v13 .nested-card-grid.two,
+.advisor-grid-v13 .result-cluster-grid.two,
+.advisor-grid-v13 .app-brief-board-v10,
+.advisor-grid-v13 .app-draft-grid-v10,
+.advisor-grid-v13 .draft-grid-comfort,
+.advisor-output-v15 .decision-grid-v10,
+.advisor-output-v15 .risk-board-v10 { grid-template-columns: 1fr !important; }
+.advisor-output-v15 .fold-body .pre-line { max-height: 420px; overflow: auto; }
+
+/* Application page generated dossier: use horizontal boards, not skinny side columns. */
+.application-output-grid-v15 {
+  display: grid !important;
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+}
+.application-output-grid-v15 > .section-nav { grid-column: 1 / -1 !important; }
+.application-output-grid-v15 .app-grid-score { grid-column: span 5 !important; }
+.application-output-grid-v15 .app-grid-brief { grid-column: span 7 !important; }
+.application-output-grid-v15 .app-grid-drafts,
+.application-output-grid-v15 .app-grid-pipeline,
+.application-output-grid-v15 .app-grid-materials { grid-column: 1 / -1 !important; }
+.application-output-grid-v15 .app-brief-board-v10 { grid-template-columns: minmax(320px, .7fr) minmax(0, 1.3fr) !important; }
+.application-output-grid-v15 .app-brief-side-v10 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important; }
+.application-output-grid-v15 .app-pipeline-grid-v10 { grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr) !important; }
+.application-output-grid-v15 .compact-pipeline { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important; }
+.application-output-grid-v15 .result-shell-grid { grid-template-columns: 1fr !important; }
+
+/* Front desk: content calendar becomes a real horizontal schedule board. */
+.frontdesk-result-panel-v15 .copy-grid.two-output-grid { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)) !important; }
+.calendar-board-v14 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)) !important;
+  gap: 12px;
+}
+.calendar-row-v14 { grid-template-columns: 82px minmax(0, 1fr) !important; }
+.calendar-row-main p { line-height: 1.72; }
+
+/* Observability filters */
+.filter-grid-v15 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) minmax(260px, 1.4fr);
+  gap: 12px;
+  align-items: end;
+}
+.filter-grid-v15 label { display: grid; gap: 7px; color: #334155; font-weight: 900; }
+.filter-grid-v15 input,
+.filter-grid-v15 select {
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid #dbe5f1;
+  padding: 0 12px;
+  background: #fff;
+  font-weight: 800;
+}
+.stats-grid-v15.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.trace-card-v15 .trace-head strong { line-height: 1.45; }
+
+@media (max-width: 1480px) {
+  .advisor-pair-v15,
+  .school-board-v15,
+  .draft-board-v15,
+  .pair-board-v15 { grid-template-columns: 1fr !important; }
+  .application-output-grid-v15 .app-grid-score,
+  .application-output-grid-v15 .app-grid-brief { grid-column: 1 / -1 !important; }
+  .application-output-grid-v15 .app-brief-board-v10,
+  .application-output-grid-v15 .app-pipeline-grid-v10 { grid-template-columns: 1fr !important; }
+  .stats-grid-v15.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 920px) {
+  .tools-workbench-v15.with-result .form-stack,
+  .application-workbench-v15.with-result .form-stack,
+  .frontdesk-workbench-v15.with-result .form-stack,
+  .score-board-v15,
+  .risk-action-grid-v15,
+  .risk-action-grid-v15.two-only,
+  .filter-grid-v15,
+  .stats-grid-v15.six { grid-template-columns: 1fr !important; }
+  .tools-workbench-v15.with-result .form-stack > label:has(textarea),
+  .application-workbench-v15.with-result .form-stack > label:has(textarea),
+  .frontdesk-workbench-v15.with-result .form-stack > label:has(textarea) { grid-column: auto !important; }
+  .section-nav-v15 { grid-template-columns: 1fr !important; }
+  .section-nav-v15 .section-nav-top { width: 100%; }
+  .calendar-board-v14 { grid-template-columns: 1fr !important; }
+  .calendar-row-v14 { grid-template-columns: 1fr !important; }
+  .score-mini-grid-v15 { grid-template-columns: repeat(3, 1fr); }
+}

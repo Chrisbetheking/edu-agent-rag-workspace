@@ -85,27 +85,31 @@ export function SectionGroup({
 export function SectionNav({ items }: { items: Array<{ id: string; label: string }> }) {
   if (!items.length) return null;
 
+  function scrollToId(id: string) {
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `#${id}`);
+  }
+
   function backToTop() {
-    const main = document.querySelector('.main');
-    if (main) {
-      main.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const main = document.querySelector('.main') || document.querySelector('main') || document.body;
+    main.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.replaceState(null, '', window.location.pathname);
   }
 
   return (
-    <nav className="section-nav section-nav-inline section-nav-v14" aria-label="页面目录">
+    <nav className="section-nav section-nav-inline section-nav-v15" aria-label="页面目录">
       <div className="section-nav-label">
-        <strong>页面导航</strong>
-        <span>快速定位长内容</span>
+        <strong>目录</strong>
+        <span>点击定位</span>
       </div>
       <div className="section-nav-links">
         {items.map((item) => (
-          <a key={item.id} href={`#${item.id}`}>{item.label}</a>
+          <button key={item.id} type="button" onClick={() => scrollToId(item.id)}>{item.label}</button>
         ))}
       </div>
-      <button className="section-nav-top" type="button" onClick={backToTop}>回到顶部</button>
+      <button className="section-nav-top" type="button" onClick={backToTop}>顶部</button>
     </nav>
   );
 }

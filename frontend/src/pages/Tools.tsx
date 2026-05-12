@@ -54,86 +54,69 @@ function TextPanel({ title, value, className = '' }: { title: string; value: unk
   );
 }
 
-function ScoreView({ result }: { result: any }) {
+
+function ScoreView({ result, id = 'score-detail' }: { result: any; id?: string }) {
   const risks = uniqueList(result.hardRisks, result.softRisks, result.risks, result.riskSignals, result.riskFlags);
   const hardRisks = uniqueList(result.hardRisks);
   const softRisks = uniqueList(result.softRisks, result.riskSignals).filter((item) => !hardRisks.includes(item));
   const nextActions = uniqueList(result.nextActions, result.nextBestActions);
   const factors = asArray(result.factors);
-  const aside = (
-    <div className="score-aside-card score-aside-v10">
-      <span className="eyebrow">weighted-fit-v2</span>
-      <h2>{result.overall ?? '-'}/100</h2>
-      <p>{result.band || '-'} 档 · {toDisplayText(result.tierAdvice?.strategy) || '完成初筛'}</p>
-      <div className="compact-metric-grid two">
-        <CompactMetric label="硬风险" value={hardRisks.length} />
-        <CompactMetric label="待确认" value={softRisks.length || risks.length} />
-      </div>
-    </div>
-  );
+  const tier = result.tierAdvice || {};
 
   return (
-    <div className="agent-output-stack generated-output score-view-v10">
-      <ResultShell id="score-detail" title="适配评分" subtitle="左侧结论，右侧评分证据" aside={aside}>
-        <div className="score-factor-grid large-score-grid comfort-score-grid score-factor-grid-v10">
-          {factors.map((factor: any) => (
-            <div className="score-factor" key={factor.key || factor.label}>
-              <div><strong>{toDisplayText(factor.label)}</strong><em>{toDisplayText(factor.score)}</em></div>
-              <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
-              <span>{toDisplayText(factor.evidence)}</span>
+    <div className="agent-output-stack generated-output score-output-v15">
+      <ResultShell id={id} title="适配评分" subtitle="算法结论、评分证据和风险点">
+        <div className="score-board-v15">
+          <div className="score-hero-v15">
+            <span className="eyebrow">weighted-fit-v2</span>
+            <strong>{result.overall ?? '-'}/100</strong>
+            <p>{result.band || '-'} 档 · {toDisplayText(tier.strategy) || '完成内部初筛'}</p>
+            <div className="score-mini-grid-v15">
+              <span><b>{hardRisks.length}</b><em>硬风险</em></span>
+              <span><b>{softRisks.length || risks.length}</b><em>待确认</em></span>
+              <span><b>{tier.reach ?? '-'}/{tier.match ?? '-'}/{tier.safe ?? '-'}</b><em>冲/匹/保</em></span>
             </div>
-          ))}
-        </div>
-      </ResultShell>
-
-      <ResultShell title="选校配比与风险" subtitle="同一模块内左右查看">
-        <div className="decision-grid-v10">
-          <div className="ratio-board-v10">
-            <div><span>冲刺</span><strong>{result.tierAdvice?.reach ?? '-'}</strong><em>所</em></div>
-            <div><span>匹配</span><strong>{result.tierAdvice?.match ?? '-'}</strong><em>所</em></div>
-            <div><span>保底</span><strong>{result.tierAdvice?.safe ?? '-'}</strong><em>所</em></div>
           </div>
-          <div className="risk-board-v10">
-            <FoldSection title="硬风险" subtitle="需要优先处理" defaultOpen className="inner-fold-card">
-              <ListBlock items={hardRisks.length ? hardRisks : ['暂无硬风险，仍需逐校核对官网要求。']} />
-            </FoldSection>
-            <FoldSection title="待人工确认" subtitle="官网、预算、材料证据" defaultOpen className="inner-fold-card">
-              <ListBlock items={softRisks.length ? softRisks : risks} />
-            </FoldSection>
+          <div className="score-factors-v15">
+            {factors.map((factor: any) => (
+              <div className="score-factor-v15" key={factor.key || factor.label}>
+                <div><strong>{toDisplayText(factor.label)}</strong><b>{toDisplayText(factor.score)}</b></div>
+                <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
+                <p>{toDisplayText(factor.evidence)}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </ResultShell>
-
-      <ResultShell title="下一步动作" subtitle="按优先级处理">
-        <div className="action-board action-board-v10">
-          {nextActions.length ? nextActions.map((item, i) => <MiniCard title={`动作 ${i + 1}`} key={i}>{item}</MiniCard>) : <p className="muted">暂无内容</p>}
+        <div className="risk-action-grid-v15">
+          <MiniCard title="硬风险" subtitle="优先处理"><ListBlock items={hardRisks.length ? hardRisks : ['暂无硬风险，仍需逐校核对官网要求。']} /></MiniCard>
+          <MiniCard title="待人工确认" subtitle="官网 / 预算 / 材料"><ListBlock items={softRisks.length ? softRisks : risks} /></MiniCard>
+          <MiniCard title="下一步动作" subtitle="按优先级推进"><ListBlock items={nextActions} /></MiniCard>
         </div>
       </ResultShell>
     </div>
   );
 }
 
-function SchoolBands({ data }: { data: any }) {
+function SchoolBands({ data, id = 'schools' }: { data: any; id?: string }) {
   const bands = [
     ['冲刺', data.reach, '高目标，保留机会但控制数量'],
     ['匹配', data.match, '主申请区间，重点核对课程匹配'],
     ['保底', data.safe, '控制风险，保证方案完整性'],
   ];
   const total = bands.reduce((sum, [, items]: any) => sum + asArray(items).length, 0);
-  const aside = (
-    <div className="result-aside-note">
-      <CompactMetric label="候选学校" value={total} note="按三档拆分" />
-      <p>每档先保留候选，最终名单需要核对官网要求、预算和申请截止时间。</p>
-    </div>
-  );
   return (
-    <ResultShell id="schools" title="三档选校" subtitle="冲刺 / 匹配 / 保底" aside={aside}>
-      <div className="school-bands-grid comfort-tier-grid nested-card-grid three">
+    <ResultShell id={id} title="三档选校" subtitle="候选学校横向展示，便于对比">
+      <div className="school-board-v15">
+        <div className="school-summary-v15">
+          <span>候选学校</span>
+          <strong>{total}</strong>
+          <p>每档先保留候选，最终名单需要核对官网要求、预算和申请截止时间。</p>
+        </div>
         {bands.map(([title, items, desc]: any) => (
-          <FoldSection title={title} subtitle={`${asArray(items).length} 所 · ${desc}`} key={title} defaultOpen className="inner-fold-card tier-column-card">
-            <div className="school-list">
+          <FoldSection title={title} subtitle={`${asArray(items).length} 所 · ${desc}`} key={title} defaultOpen className="inner-fold-card school-band-v15">
+            <div className="school-card-list-v15">
               {asArray(items).length ? asArray(items).map((school: any, index) => (
-                <div className="school-row school-mini-card" key={school.name || index}>
+                <div className="school-row-v15" key={school.name || index}>
                   <strong>{toDisplayText(school.name || school)}</strong>
                   {(school.reason || school.fit) && <p>{toDisplayText(school.reason || school.fit)}</p>}
                   {school.risk && <small>风险：{toDisplayText(school.risk)}</small>}
@@ -149,7 +132,7 @@ function SchoolBands({ data }: { data: any }) {
   );
 }
 
-function MaterialView({ data }: { data: any }) {
+function MaterialView({ data, id = 'materials' }: { data: any; id?: string }) {
   const groups = [
     ['必交材料', data.required],
     ['条件材料', data.conditional],
@@ -158,14 +141,13 @@ function MaterialView({ data }: { data: any }) {
     ['时间节点', data.timeline],
     ['提醒', data.reminders],
   ].filter(([, items]) => asArray(items).length > 0);
-  const aside = <div className="result-aside-note"><CompactMetric label="材料组" value={groups.length} /><p>按“先必交、再条件、最后补充”的顺序推进。</p></div>;
 
   return (
-    <ResultShell id="materials" title="材料清单" subtitle="按递交优先级分组" aside={aside}>
-      <div className="material-board nested-card-grid two material-board-comfort">
+    <ResultShell id={id} title="材料清单" subtitle="按递交优先级分组">
+      <div className="material-board-v15">
         {groups.map(([title, items]) => (
-          <FoldSection title={String(title)} key={String(title)} defaultOpen badge={`${asArray(items).length} 项`} className="inner-fold-card">
-            <div className="material-list">
+          <FoldSection title={String(title)} key={String(title)} defaultOpen badge={`${asArray(items).length} 项`} className="inner-fold-card material-group-v15">
+            <div className="material-list-v15">
               {asArray(items).map((item, index) => {
                 const label = typeof item === 'object' && item !== null
                   ? (item as any).name || (item as any).item || (item as any).file || (item as any).stage || toDisplayText(item)
@@ -173,7 +155,7 @@ function MaterialView({ data }: { data: any }) {
                 const note = typeof item === 'object' && item !== null
                   ? (item as any).note || (item as any).desc || (item as any).owner || (item as any).deadline || ''
                   : '';
-                return <div className="material-item" key={index}><strong>{toDisplayText(label)}</strong>{note && <span>{toDisplayText(note)}</span>}</div>;
+                return <div className="material-item-v15" key={index}><strong>{toDisplayText(label)}</strong>{note && <span>{toDisplayText(note)}</span>}</div>;
               })}
             </div>
           </FoldSection>
@@ -183,35 +165,37 @@ function MaterialView({ data }: { data: any }) {
   );
 }
 
-function ApplicationView({ result }: { result: any }) {
+function ApplicationView({ result, id = 'application-brief' }: { result: any; id?: string }) {
   const pipeline = asArray(result.pipeline);
   const risks = safeList(result.riskFlags, result.risks);
   const actions = safeList(result.nextBestActions, result.nextActions);
   return (
-    <div className="agent-output-stack generated-output">
-      <ResultShell id="application-brief" title="申请案卷" subtitle="文书方向、初稿和流程">
-        <div className="nested-card-grid two app-brief-grid">
+    <div className="agent-output-stack generated-output application-output-v15">
+      <ResultShell id={id} title="申请案卷" subtitle="文书方向、执行流程和材料">
+        <div className="app-brief-grid-v15">
           <TextPanel title="PS 主题" value={result.writingBrief?.psTheme} />
           <ResultCard title="PS 大纲"><ListBlock items={result.writingBrief?.psOutline} /></ResultCard>
-          <ResultCard title="CV 重点"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
+          <ResultCard title="CV 重点"><div className="tag-row tag-row-readable-v15">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
           <ResultCard title="推荐信角度"><ListBlock items={result.writingBrief?.recommendationAngles} /></ResultCard>
         </div>
       </ResultShell>
 
-      <ResultShell id="application-drafts" title="可编辑初稿" subtitle="复制后再人工润色">
-        <div className="draft-grid-comfort">
+      <ResultShell id="application-drafts" title="可编辑初稿" subtitle="长文独占左侧，摘要在右侧">
+        <div className="draft-board-v15">
           <TextPanel title="Personal Statement 初稿" value={result.drafts?.personalStatement} className="draft-main-card" />
-          <TextPanel title="CV Summary" value={result.drafts?.cvSummary} />
-          <TextPanel title="推荐信素材" value={result.drafts?.recommendationSeed} />
+          <div className="draft-side-v15">
+            <TextPanel title="CV Summary" value={result.drafts?.cvSummary} />
+            <TextPanel title="推荐信素材" value={result.drafts?.recommendationSeed} />
+          </div>
         </div>
       </ResultShell>
 
-      <div className="result-cluster-grid two balanced-blocks">
-        <ResultShell title="申请执行" subtitle="节点推进">
-          <div className="pipeline-list compact-pipeline">{pipeline.map((stage: any, index) => <FoldSection title={`${index + 1}. ${toDisplayText(stage.stage || stage.name || '任务')}`} subtitle={toDisplayText(stage.owner)} badge={toDisplayText(stage.status || '待开始')} key={index} defaultOpen className="inner-fold-card"><ListBlock items={stage.tasks || stage.items || stage.action} /></FoldSection>)}</div>
+      <div className="pair-board-v15">
+        <ResultShell title="申请执行" subtitle="按任务节点推进">
+          <div className="pipeline-board-v15">{pipeline.map((stage: any, index) => <FoldSection title={`${index + 1}. ${toDisplayText(stage.stage || stage.name || '任务')}`} subtitle={toDisplayText(stage.owner)} badge={toDisplayText(stage.status || '待开始')} key={index} defaultOpen className="inner-fold-card stage-card-readable-v15"><ListBlock items={stage.tasks || stage.items || stage.action} /></FoldSection>)}</div>
         </ResultShell>
         <ResultShell title="风险与下一步" subtitle="人工确认">
-          <div className="nested-card-grid two">
+          <div className="risk-action-grid-v15 two-only">
             <MiniCard title="风险点"><ListBlock items={risks} /></MiniCard>
             <MiniCard title="下一步"><ListBlock items={actions} /></MiniCard>
           </div>
@@ -221,10 +205,10 @@ function ApplicationView({ result }: { result: any }) {
   );
 }
 
-function CopywritingView({ result }: { result: any }) {
+function CopywritingView({ result, id = 'sales' }: { result: any; id?: string }) {
   return (
-    <ResultShell id="sales" title="销售跟进" subtitle="微信、电话、异议处理">
-      <div className="nested-card-grid two">
+    <ResultShell id={id} title="销售跟进" subtitle="微信、电话、异议处理">
+      <div className="sales-board-v15">
         <TextPanel title="微信跟进" value={result.wechat} />
         <TextPanel title="短视频脚本" value={result.shortVideoScript || result.videoScript} />
         <ResultCard title="异议处理"><ListBlock items={result.objectionHandling} /></ResultCard>
@@ -237,9 +221,9 @@ function CopywritingView({ result }: { result: any }) {
 
 function AdvisorView({ result }: { result: any }) {
   const outputs = result.outputs || {};
-  const risks = Array.from(new Set(safeList(outputs.fit?.risks, outputs.fit?.riskSignals, outputs.application?.riskFlags).map(toDisplayText))).filter(Boolean);
+  const risks = safeList(outputs.fit?.risks, outputs.fit?.riskSignals, outputs.application?.riskFlags);
   return (
-    <div className="agent-output-stack generated-output advisor-output-v9">
+    <div className="agent-output-stack generated-output advisor-output-v15">
       <SectionNav items={[
         { id: 'advisor-trace', label: '链路' },
         { id: 'advisor-score', label: '评分' },
@@ -259,24 +243,25 @@ function AdvisorView({ result }: { result: any }) {
         </div>
       </div>
 
-      <div className="advisor-grid-v11 advisor-grid-v13">
-        <div id="advisor-trace" className="advisor-module advisor-trace-module">
-          <ResultShell title="执行链路" subtitle="一次录入，多节点复用">
-            <div className="workflow-board workflow-board-v9 workflow-board-v11">
-              {asArray(result.workflow).map((step: any, index) => (
-                <MiniCard key={step.name || index} title={`${step.step || index + 1}. ${toDisplayText(step.name) || 'Step'}`} subtitle={toDisplayText(step.tool) || '-'}>
-                  <p>{toDisplayText(step.output || step.status || 'done')}</p>
-                </MiniCard>
-              ))}
-            </div>
-          </ResultShell>
+      <ResultShell id="advisor-trace" title="执行链路" subtitle="一次录入，多节点复用">
+        <div className="workflow-board-v15">
+          {asArray(result.workflow).map((step: any, index) => (
+            <MiniCard key={step.name || index} title={`${step.step || index + 1}. ${toDisplayText(step.name) || 'Step'}`} subtitle={toDisplayText(step.tool) || '-'}>
+              <p>{toDisplayText(step.output || step.status || 'done')}</p>
+            </MiniCard>
+          ))}
         </div>
-        {outputs.fit && <div id="advisor-score" className="advisor-module advisor-score-module"><ScoreView result={outputs.fit} /></div>}
-        {outputs.schools && <div id="advisor-schools" className="advisor-module advisor-schools-module"><SchoolBands data={outputs.schools} /></div>}
-        {outputs.application && <div id="advisor-application" className="advisor-module advisor-application-module"><ApplicationView result={outputs.application} /></div>}
-        {outputs.sales && <div id="advisor-sales" className="advisor-module advisor-sales-module"><CopywritingView result={outputs.sales} /></div>}
-        {outputs.materials && <div id="advisor-materials" className="advisor-module advisor-materials-module"><MaterialView data={outputs.materials} /></div>}
+      </ResultShell>
+
+      <div className="advisor-pair-v15">
+        {outputs.fit && <ScoreView result={outputs.fit} id="advisor-score" />}
+        {outputs.schools && <SchoolBands data={outputs.schools} id="advisor-schools" />}
       </div>
+      <div className="advisor-pair-v15">
+        {outputs.application && <ApplicationView result={outputs.application} id="advisor-application" />}
+        {outputs.sales && <CopywritingView result={outputs.sales} id="advisor-sales" />}
+      </div>
+      {outputs.materials && <MaterialView data={outputs.materials} id="advisor-materials" />}
     </div>
   );
 }
@@ -394,7 +379,7 @@ export default function Tools() {
   const isLoading = loadingTool === active;
 
   return (
-    <section className="page-stack compact-page tools-page-v9">
+    <section className="page-stack compact-page tools-page-v9 tools-page-v15">
       <div className="page-title elevated clean-title">
         <div><span className="eyebrow">方案引擎</span><h1>评分与工具编排</h1><p>完整流程会复用同一份学生信息；离开页面后结果也会保留。</p></div>
         <div className="title-actions">
@@ -410,7 +395,7 @@ export default function Tools() {
       {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p><small>已尝试写入前端失败日志；如系统日志没有出现，请重新部署后端。</small></div>}
       {activeResult?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(activeResult.llmFallbackReason)}</div>}
 
-      <div className={`two-col wide-right tools-workbench-grid tools-workbench-v9 tools-workbench-v13 ${activeResult ? 'with-result' : ''}`}>
+      <div className={`two-col wide-right tools-workbench-grid tools-workbench-v9 tools-workbench-v13 tools-workbench-v15 ${activeResult ? 'with-result' : ''}`}>
         <section className={`panel form-panel compact-form-card ${activeResult ? 'form-panel-inline' : 'sticky-panel'}`}>
           <div className="panel-title compact form-action-title">
             <div><span className="eyebrow">录入</span><h2>{activeMeta.name}</h2></div>
@@ -437,7 +422,7 @@ export default function Tools() {
           </form>
         </section>
 
-        <section className="panel result-panel generated-result-panel result-panel-v9 result-panel-v13">
+        <section className="panel result-panel generated-result-panel result-panel-v9 result-panel-v13 result-panel-v15">
           <div className="panel-title"><div><span className="eyebrow">结果</span><h2>{activeMeta.name}</h2></div>{activeResult && <span className="pill success">完成</span>}</div>
           {activeResult ? <><GenericResult result={activeResult} active={active} /><details className="raw-json-details"><summary>查看结构化数据</summary><pre className="json-block compact-json">{JSON.stringify(activeResult, null, 2)}</pre></details></> : <div className="empty-advice compact-empty"><div className="empty-icon">⌘</div><h2>{loadingTool ? '正在运行' : '等待运行'}</h2><p>建议先运行“完整流程”，再查看各节点结果。</p></div>}
         </section>
