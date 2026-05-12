@@ -74,7 +74,7 @@ export default function Logs() {
     <section className="page-stack">
       <div className="page-title elevated">
         <div>
-          <span className="eyebrow">Observability</span>
+          <span className="eyebrow">日志</span>
           <h1>调用日志</h1>
           <p>从 call_logs 读取真实调用记录，用于追踪模型耗时、RAG 命中、工具调用链和错误信息。</p>
         </div>
@@ -84,14 +84,14 @@ export default function Logs() {
       <div className="stats-grid">
         <div className="stat-card"><span>总调用数</span><strong>{stats.total}</strong><p>最近 50 条</p></div>
         <div className="stat-card"><span>成功率</span><strong>{stats.successRate}%</strong><p>{stats.failedCount} 次失败</p></div>
-        <div className="stat-card"><span>平均耗时</span><strong>{formatDuration(stats.avgDuration)}</strong><p>LLM + RAG + tools</p></div>
-        <div className="stat-card"><span>平均 RAG 命中</span><strong>{stats.avgRag}</strong><p>chunks per call</p></div>
+        <div className="stat-card"><span>平均耗时</span><strong>{formatDuration(stats.avgDuration)}</strong><p>模型、检索、工具</p></div>
+        <div className="stat-card"><span>平均 RAG 命中</span><strong>{stats.avgRag}</strong><p>每次命中切片</p></div>
       </div>
 
       {error && <div className="error-card"><strong>加载失败</strong><p>{error}</p></div>}
 
       <section className="panel">
-        <div className="panel-title compact"><span className="eyebrow">Trace List</span><h2>最近 50 次 AI 调用</h2></div>
+        <div className="panel-title compact"><span className="eyebrow">调用列表</span><h2>最近 50 次 AI 调用</h2></div>
 
         {!loading && logs.length === 0 && (
           <div className="empty-advice compact-empty">
@@ -107,7 +107,7 @@ export default function Logs() {
               <div className="trace-head">
                 <div>
                   <strong>{log.question || '未记录问题'}</strong>
-                  <span>{formatDate(log.createdAt)} · {log.type || 'ai_call'}</span>
+                  <span>{formatDate(log.createdAt)} · {log.type || 'AI 调用'}</span>
                 </div>
                 <small className={log.success ? 'pill success' : 'pill danger'}>{log.success ? '成功' : '失败'}</small>
               </div>

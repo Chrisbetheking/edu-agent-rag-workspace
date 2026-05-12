@@ -17,7 +17,7 @@ interface SchoolTier {
   schools: SchoolAdvice[];
 }
 
-interface TimelineItem {
+interface 时间线Item {
   phase: string;
   time: string;
   tasks: string[];
@@ -34,7 +34,7 @@ interface StructuredAdvice {
     competitiveness: string;
   };
   schoolTiers: SchoolTier[];
-  timeline: TimelineItem[];
+  timeline: 时间线Item[];
   risks: string[];
   nextActions: string[];
   disclaimer: string;
@@ -108,7 +108,7 @@ function EmptyState() {
       <div className="empty-icon">AI</div>
       <h2>输入学生背景，生成结构化选校方案</h2>
       <p>
-        系统会自动拆成背景判断、冲刺 / 匹配 / 保底院校、推荐原因、风险提醒和时间规划。
+        系统会拆成背景判断、三档院校、风险提醒和下一步动作。
       </p>
     </div>
   );
@@ -132,7 +132,7 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
       </div>
 
       <div className="section-heading">
-        <span>School Shortlist</span>
+        <span>选校方案</span>
         <h2>三档选校方案</h2>
       </div>
 
@@ -184,7 +184,7 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
       <div className="advice-two-col">
         <div className="insight-panel">
           <div className="section-heading compact">
-            <span>Timeline</span>
+            <span>时间线</span>
             <h2>申请时间规划</h2>
           </div>
 
@@ -210,7 +210,7 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
 
         <div className="insight-panel">
           <div className="section-heading compact">
-            <span>Risks & Actions</span>
+            <span>风险与动作</span>
             <h2>风险和下一步</h2>
           </div>
 
@@ -312,12 +312,12 @@ export default function Chat() {
     <section className="chat-page-v2">
       <div className="hero-panel">
         <div>
-          <span className="section-kicker">EduAgent RAG Workspace</span>
-          <h1>AI 留学选校工作台</h1>
-          <p>真实大模型 + 工具调用 + RAG 来源引用，输出卡片化申请方案；右侧展示 RAG 来源、工具调用和历史会话。</p>
+          <span className="section-kicker">AI 咨询</span>
+          <h1>AI 咨询与选校</h1>
+          <p>输入学生背景后，系统会结合知识库和工具判断，生成结构化选校方案。</p>
         </div>
 
-        <div className="model-badge">{isGuest ? `Guest quota ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : 'DeepSeek Connected'}</div>
+        <div className="model-badge">{isGuest ? `访客额度 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端已连接'}</div>
       </div>
 
       <div className="prompt-panel">
@@ -378,8 +378,7 @@ export default function Chat() {
           <div className="error-card" style={{ marginTop: 16 }}>
             <strong>提示</strong>
             <p>
-              当前回答没有被成功解析成结构化卡片。通常是因为大模型返回的 JSON
-              被截断，或者不是合法 JSON。请把 Render 里的 LLM_MAX_TOKENS 调高，并限制后端提示词输出长度。
+              当前回答没有解析成卡片，可能是模型返回被截断。可以稍后重试，或调高后端输出上限。
             </p>
           </div>
         </div>

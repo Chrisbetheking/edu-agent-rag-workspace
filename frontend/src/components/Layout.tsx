@@ -3,19 +3,15 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { api } from '../api/client';
 
-const RESUME_URL = 'https://chrisbetheking.github.io/WANGHONG-s-Resume-Website/';
-
 const navs = [
-  { to: '/workspace', label: '工作台', icon: '▦', desc: '业务总览' },
-  { to: '/frontdesk', label: '前台增长', icon: '✍', desc: '小红书 / 视频脚本' },
-  { to: '/chat', label: 'AI 对话', icon: '✦', desc: 'RAG 选校方案' },
-  { to: '/applications', label: '申请后台', icon: '▣', desc: '文书与递交流程' },
-  { to: '/knowledge', label: '知识库', icon: '▤', desc: '文档 / 批量切片' },
-  { to: '/tools', label: 'Agent 工具', icon: '⌘', desc: '业务工具链' },
-  { to: '/prompts', label: 'Prompt 管理', icon: '◇', desc: '模板运营' },
-  { to: '/evaluation', label: 'RAG 评测', icon: '◎', desc: '质量验证' },
-  { to: '/logs', label: '调用日志', icon: '◌', desc: '可观测性' },
-  { to: '/architecture', label: '项目架构', icon: '↗', desc: '面试展示页' },
+  { to: '/workspace', label: '工作台', icon: '▦', desc: '概览' },
+  { to: '/frontdesk', label: '客户线索', icon: '✍', desc: '内容与跟进' },
+  { to: '/chat', label: 'AI 咨询', icon: '✦', desc: '选校问答' },
+  { to: '/applications', label: '申请案卷', icon: '▣', desc: '文书与材料' },
+  { to: '/knowledge', label: '知识库', icon: '▤', desc: '资料切片' },
+  { to: '/tools', label: '方案引擎', icon: '⌘', desc: '评分与编排' },
+  { to: '/evaluation', label: '检索评测', icon: '◎', desc: '命中验证' },
+  { to: '/logs', label: '系统日志', icon: '◌', desc: '调用追踪' },
 ];
 
 function pageLabel(pathname: string) {
@@ -44,15 +40,15 @@ export default function Layout() {
           <div className="brand-icon">E</div>
           <div>
             <strong>EduAgent</strong>
-            <span>AI Agent + RAG Workspace</span>
+            <span>留学咨询工作台</span>
           </div>
         </div>
 
         <div className="sidebar-status">
           <span className="pulse-dot" />
           <div>
-            <strong>{isGuest ? 'Guest Safe Demo' : 'Production Demo'}</strong>
-            <small>{isGuest ? `剩余 AI 次数 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : 'DeepSeek · Supabase · NestJS'}</small>
+            <strong>{isGuest ? '访客体验' : '管理员'}</strong>
+            <small>{isGuest ? `今日剩余 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端服务在线'}</small>
           </div>
         </div>
 
@@ -74,15 +70,14 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-footer">
-          <a className="sidebar-resume" href={RESUME_URL} target="_blank" rel="noreferrer">Resume Website ↗</a>
           <div className="user-card">
             <div className="avatar">{(user?.displayName || user?.username || 'U').slice(0, 1).toUpperCase()}</div>
             <div>
-              <strong>{user?.displayName || 'Demo Admin'}</strong>
-              <small>{isGuest ? 'guest · 只读系统数据' : `${user?.role || 'admin'} · ${pageLabel(location.pathname)}`}</small>
+              <strong>{user?.displayName || '用户'}</strong>
+              <small>{isGuest ? '访客 · 部分操作受限' : `${user?.role || 'admin'} · ${pageLabel(location.pathname)}`}</small>
             </div>
           </div>
-          <button className="ghost-dark" onClick={() => { logout(); navigate('/login'); }}>退出登录</button>
+          <button className="ghost-dark" onClick={() => { logout(); navigate('/login'); }}>退出</button>
         </div>
       </aside>
 

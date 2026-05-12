@@ -753,3 +753,38 @@ th { color: var(--muted); font-weight: 800; }
   .landing-actions { flex-direction: column; align-items: stretch; }
   .landing-primary, .landing-secondary { justify-content: center; }
 }
+
+/* v4 normal product polish */
+.compact-page { gap: 18px; }
+.clean-title p { max-width: 780px; }
+.compact-products .product-card { min-height: 0; }
+.compact-dashboard-grid { align-items: start; }
+.compact-section { padding-block: 22px; }
+.compact-tabs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.compact-tabs .tab { min-height: 104px; }
+.clean-login { background: radial-gradient(circle at 18% 12%, rgba(54,87,227,.15), transparent 34%), linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%); }
+.compact-login-hero h1 { letter-spacing: -.06em; }
+.login-brand { margin-bottom: 36px; }
+.clean-login-card p, .login-footnote { color: #64748b; line-height: 1.6; }
+.simple-showcase div { min-height: 96px; }
+.score-layout { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; align-items: center; }
+.score-circle { width: 140px; height: 140px; border-radius: 999px; display: grid; place-items: center; background: radial-gradient(circle at 35% 25%, #ffffff, #eef2ff 58%, #dbeafe); border: 1px solid #dbeafe; box-shadow: 0 22px 60px rgba(49,80,200,.16); }
+.score-circle strong { font-size: 42px; line-height: 1; color: #3150c8; }
+.score-circle span { margin-top: -28px; color: #64748b; font-weight: 950; }
+.score-factor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.large-score-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.score-factor { padding: 14px; border: 1px solid #e8eef8; border-radius: 18px; background: #fff; display: grid; gap: 8px; }
+.score-factor div:first-child { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.score-factor strong { color: #0f172a; }
+.score-factor em { font-style: normal; color: #3150c8; font-weight: 950; }
+.score-factor span { color: #64748b; font-size: 12px; line-height: 1.5; }
+.score-summary-card p { margin: 0 0 12px; color: #64748b; line-height: 1.7; }
+.empty-advice.compact-empty { min-height: 260px; }
+.raw-json-details.full-span-card { border: 1px solid #e8eef8; border-radius: 20px; padding: 16px; background: #fff; }
+.nav-list { padding-bottom: 12px; }
+.sidebar-footer { gap: 12px; }
+.page-title.elevated { padding: clamp(22px, 3vw, 34px); }
+.product-card, .panel, .stat-card { box-shadow: 0 18px 50px rgba(15,23,42,.06); }
+
+@media (max-width: 1320px) { .compact-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); } .large-score-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .score-layout { grid-template-columns: 1fr; } .compact-tabs, .score-factor-grid, .large-score-grid { grid-template-columns: 1fr; } }
