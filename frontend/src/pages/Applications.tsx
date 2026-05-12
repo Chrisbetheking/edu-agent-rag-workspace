@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
-import { FoldSection, ListBlock, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
+import { FoldSection, ListBlock, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 
 const defaultStages = [
   { stage: '背景确认', owner: '咨询顾问', tasks: ['确认目标国家、专业、预算', '收集成绩单和语言成绩'] },
@@ -29,16 +29,16 @@ function normalizeStage(stage: any, index: number) {
 function StageCard({ stage, index }: { stage: any; index: number }) {
   const item = normalizeStage(stage, index);
   return (
-    <FoldSection title={`${index + 1}. ${item.stage}`} subtitle={item.owner} badge={item.status} defaultOpen={index < 1}>
+    <FoldSection title={`${index + 1}. ${item.stage}`} subtitle={item.owner} badge={item.status} defaultOpen className="inner-fold-card">
       <ListBlock items={item.tasks} />
     </FoldSection>
   );
 }
 
-function TextPanel({ title, content, defaultOpen = false }: { title: string; content: unknown; defaultOpen?: boolean }) {
+function TextPanel({ title, content }: { title: string; content: unknown }) {
   const text = toDisplayText(content);
   return (
-    <FoldSection title={title} defaultOpen={defaultOpen} badge={<button className="mini-copy" type="button" onClick={(e) => { e.preventDefault(); navigator.clipboard?.writeText(text); }}>复制</button>}>
+    <FoldSection title={title} defaultOpen className="inner-fold-card" badge={<button className="mini-copy" type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard?.writeText(text); }}>复制</button>}>
       <TextBlock value={text || '暂无内容'} />
     </FoldSection>
   );
@@ -46,9 +46,11 @@ function TextPanel({ title, content, defaultOpen = false }: { title: string; con
 
 function ScorePanel({ fit }: { fit: any }) {
   if (!fit) return null;
+  const risks = [...asArray(fit.risks), ...asArray(fit.riskSignals), ...asArray(fit.riskFlags)];
+  const nextActions = [...asArray(fit.nextActions), ...asArray(fit.nextBestActions)];
   return (
-    <FoldSection id="app-score" title={`申请适配度 ${fit.overall}/100`} subtitle="weighted-fit-v2" defaultOpen>
-      <div className="score-layout">
+    <SectionGroup id="app-score" title={`申请适配度 ${fit.overall}/100`} subtitle="weighted-fit-v2">
+      <div className="score-layout app-score-layout">
         <div className="score-circle"><strong>{toDisplayText(fit.band)}</strong><span>{toDisplayText(fit.overall)}</span></div>
         <div className="score-factor-grid">
           {asArray(fit.factors).map((factor: any) => (
@@ -60,8 +62,16 @@ function ScorePanel({ fit }: { fit: any }) {
           ))}
         </div>
       </div>
-      <p className="muted">建议配比：冲刺 {fit.tierAdvice?.reach} / 匹配 {fit.tierAdvice?.match} / 保底 {fit.tierAdvice?.safe}。{toDisplayText(fit.tierAdvice?.strategy)}</p>
-    </FoldSection>
+      <div className="result-cluster-grid two mt">
+        <FoldSection title="建议配比" defaultOpen className="inner-fold-card">
+          <p className="muted">冲刺 {fit.tierAdvice?.reach} / 匹配 {fit.tierAdvice?.match} / 保底 {fit.tierAdvice?.safe}。{toDisplayText(fit.tierAdvice?.strategy)}</p>
+        </FoldSection>
+        <FoldSection title="风险点" defaultOpen className="inner-fold-card">
+          <ListBlock items={risks} />
+        </FoldSection>
+      </div>
+      {!!nextActions.length && <FoldSection title="下一步动作" defaultOpen className="inner-fold-card"><ListBlock items={nextActions} /></FoldSection>}
+    </SectionGroup>
   );
 }
 
@@ -124,6 +134,7 @@ export default function Applications() {
         api.post('/tools/application-plan', payload),
       ]);
       setResult({ ...(planRes.data || {}), fit: fitRes.data || null });
+      window.setTimeout(() => document.querySelector('#app-score')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || '生成失败');
       await logError(err, started);
@@ -138,7 +149,7 @@ export default function Applications() {
         <div>
           <span className="eyebrow">申请案卷</span>
           <h1>文书与材料流程</h1>
-          <p>生成评分、文书方向、材料清单和递交流程。</p>
+          <p>生成后默认展开；需要查看下面内容时，收起上方模块即可。</p>
         </div>
         <div className="title-actions">
           {result && <button className="ghost-button" onClick={() => downloadText(`application-${name || 'student'}.md`, exportMarkdown)}>导出 Markdown</button>}
@@ -158,7 +169,7 @@ export default function Applications() {
       ]} />}
 
       <div className="two-col wide-left">
-        <section className="panel sticky-panel">
+        <section className="panel sticky-panel compact-form-card">
           <div className="panel-title compact"><span className="eyebrow">录入</span><h2>学生档案</h2></div>
           <form className="form-stack" onSubmit={run}>
             <div className="form-grid two">
@@ -180,43 +191,44 @@ export default function Applications() {
           </form>
         </section>
 
-        <section className="panel">
+        <section className="panel generated-result-panel">
           <div className="panel-title compact"><span className="eyebrow">结果</span><h2>文书方向</h2></div>
           {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
-            <FoldSection id="app-brief" title="文书方向" subtitle="PS、CV、推荐信" defaultOpen>
-              <div className="ops-card-grid">
-                <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} defaultOpen />
-                <FoldSection title="PS 大纲" defaultOpen><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
-                <FoldSection title="CV 重点"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></FoldSection>
-                <FoldSection title="推荐信角度"><ListBlock items={result.writingBrief?.recommendationAngles} /></FoldSection>
+            <SectionGroup id="app-brief" title="文书方向" subtitle="PS、CV、推荐信">
+              <div className="ops-card-grid nested-card-grid two">
+                <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} />
+                <FoldSection title="PS 大纲" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
+                <FoldSection title="CV 重点" defaultOpen className="inner-fold-card"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></FoldSection>
+                <FoldSection title="推荐信角度" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.recommendationAngles} /></FoldSection>
               </div>
-            </FoldSection>
+            </SectionGroup>
           )}
         </section>
       </div>
 
-      {result && <section className="panel"><ScorePanel fit={result.fit} /></section>}
+      {result && <ScorePanel fit={result.fit} />}
 
       {result && (
-        <section id="app-drafts" className="panel document-draft-panel">
-          <div className="panel-title"><div><span className="eyebrow">文书</span><h2>可编辑初稿</h2></div><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(exportMarkdown)}>复制全部</button></div>
-          <div className="draft-grid">
-            <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} defaultOpen />
+        <SectionGroup id="app-drafts" title="可编辑初稿" subtitle="可复制、可收起">
+          <div className="panel-title inner-title"><span className="eyebrow">文书</span><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(exportMarkdown)}>复制全部</button></div>
+          <div className="draft-grid nested-card-grid three draft-grid-soft">
+            <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} />
             <TextPanel title="CV Summary" content={result.drafts?.cvSummary} />
             <TextPanel title="推荐信素材" content={result.drafts?.recommendationSeed} />
           </div>
-        </section>
+        </SectionGroup>
       )}
 
-      <section id="app-pipeline" className="panel">
-        <div className="panel-title compact"><span className="eyebrow">流程</span><h2>申请执行</h2></div>
-        {!result ? <div className="empty-mini">生成后会出现后续流程。</div> : <div className="pipeline-list">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div>}
-      </section>
+      {result && (
+        <SectionGroup id="app-pipeline" title="申请执行" subtitle="按任务节点推进">
+          <div className="pipeline-list compact-pipeline">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div>
+        </SectionGroup>
+      )}
 
       {result && (
-        <div id="app-materials" className="two-col">
-          <section className="panel"><FoldSection title="材料清单" defaultOpen><MaterialPanel items={asArray(result.materialChecklist)} /></FoldSection></section>
-          <section className="panel"><FoldSection title="风险与下一步" defaultOpen><ul className="check-list">{[...asArray(result.riskFlags), ...asArray(result.nextBestActions)].map((item, i) => <li key={i}>{stringifySafe(item)}</li>)}</ul></FoldSection></section>
+        <div id="app-materials" className="result-cluster-grid two">
+          <SectionGroup title="材料清单"><MaterialPanel items={asArray(result.materialChecklist)} /></SectionGroup>
+          <SectionGroup title="风险与下一步"><ul className="check-list">{[...asArray(result.riskFlags), ...asArray(result.nextBestActions)].map((item, i) => <li key={i}>{stringifySafe(item)}</li>)}</ul></SectionGroup>
         </div>
       )}
     </section>

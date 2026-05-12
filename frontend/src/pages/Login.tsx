@@ -10,6 +10,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
   const setAuth = useAuthStore((s) => s.setAuth);
+  const resumeUrl = 'https://chrisbetheking.github.io/WANGHONG-s-Resume-Website/';
   const navigate = useNavigate();
 
   async function submit(e: FormEvent) {
@@ -78,6 +79,7 @@ export default function Login() {
         <button className="guest-login-button" type="button" onClick={guestLogin} disabled={guestLoading}>
           {guestLoading ? '正在进入...' : '访客体验'}
         </button>
+        <a className="guest-resume-link" href={resumeUrl} target="_blank" rel="noreferrer">查看我的 Resume Web ↗</a>
         <small className="login-footnote">访客模式有每日 AI 调用额度，不能删除系统示例资料。</small>
       </form>
     </div>

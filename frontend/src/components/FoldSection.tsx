@@ -25,6 +25,7 @@ export function FoldSection({
   badge,
   children,
   defaultOpen = false,
+  className = '',
 }: {
   id?: string;
   title: string;
@@ -32,9 +33,10 @@ export function FoldSection({
   badge?: ReactNode;
   children: ReactNode;
   defaultOpen?: boolean;
+  className?: string;
 }) {
   return (
-    <details id={id} className="fold-card section-fold" open={defaultOpen}>
+    <details id={id} className={`fold-card section-fold ${className}`.trim()} open={defaultOpen}>
       <summary>
         <span>
           <strong>{title}</strong>
@@ -44,6 +46,26 @@ export function FoldSection({
       </summary>
       <div className="fold-body">{children}</div>
     </details>
+  );
+}
+
+export function SectionGroup({
+  id,
+  title,
+  subtitle,
+  children,
+  defaultOpen = true,
+}: {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <FoldSection id={id} title={title} subtitle={subtitle} defaultOpen={defaultOpen} className="section-group-card">
+      {children}
+    </FoldSection>
   );
 }
 

@@ -1,77 +1,112 @@
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { api } from '../api/client';
-import { asArray, downloadText, jsonMarkdown, stringifySafe } from '../utils/export';
+import { asArray, downloadText, jsonMarkdown } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
-import { FoldSection, ListBlock, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
+import { FoldSection, ListBlock, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 
 type ToolKey = 'advisor' | 'score' | 'school' | 'application' | 'copywriting' | 'material';
 
 const toolTabs: Array<{ key: ToolKey; name: string; tag: string; desc: string }> = [
   { key: 'advisor', name: '完整流程', tag: '编排', desc: '评分 → 选校 → 文书 → 跟进 → 材料' },
-  { key: 'score', name: '适配评分', tag: '算法', desc: 'GPA、专业、项目、语言、预算' },
+  { key: 'score', name: '适配评分', tag: '算法', desc: '权重、风险、建议配比' },
   { key: 'school', name: '选校分层', tag: '规划', desc: '冲刺 / 匹配 / 保底' },
-  { key: 'application', name: '申请案卷', tag: '文书', desc: 'PS、CV、材料流程' },
-  { key: 'copywriting', name: '销售跟进', tag: '转化', desc: '微信、电话、异议处理' },
-  { key: 'material', name: '材料清单', tag: '规则', desc: '必交、条件、命名规范' },
+  { key: 'application', name: '申请案卷', tag: '文书', desc: 'PS、CV、流程' },
+  { key: 'copywriting', name: '销售跟进', tag: '转化', desc: '微信、电话、异议' },
+  { key: 'material', name: '材料清单', tag: '规则', desc: '必交、条件、命名' },
 ];
 
-function ResultCard({ title, children, defaultOpen = false }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
-  return <FoldSection title={title} defaultOpen={defaultOpen}>{children}</FoldSection>;
+function safeList(...values: unknown[]) {
+  return values.flatMap((value) => asArray(value)).filter(Boolean);
+}
+
+function MiniCard({ title, children, subtitle }: { title: string; subtitle?: string; children: ReactNode }) {
+  return (
+    <div className="mini-result-card">
+      <div className="mini-result-head">
+        <strong>{title}</strong>
+        {subtitle && <span>{subtitle}</span>}
+      </div>
+      <div className="mini-result-body">{children}</div>
+    </div>
+  );
+}
+
+function ResultCard({ title, children, subtitle }: { title: string; children: ReactNode; subtitle?: string }) {
+  return <FoldSection title={title} subtitle={subtitle} defaultOpen className="inner-fold-card">{children}</FoldSection>;
 }
 
 function ScoreView({ result }: { result: any }) {
+  const risks = safeList(result.risks, result.riskSignals, result.riskFlags);
+  const nextActions = safeList(result.nextActions, result.nextBestActions);
   return (
-    <div className="agent-output-stack">
+    <div className="agent-output-stack generated-output">
       <div className="agent-summary-card score-summary-card">
-        <span className="eyebrow">适配评分算法</span>
+        <span className="eyebrow">weighted-fit-v2</span>
         <h2>{result.overall ?? '-'}/100 · {result.band || '-'} 档</h2>
         <p>{toDisplayText(result.tierAdvice?.strategy) || '已完成背景适配度评估。'}</p>
         <div className="tag-row">
-          <span>{toDisplayText(result.algorithm) || 'weighted-fit-v2'}</span>
           <span>成绩折算 {result.percentage ?? '-'}%</span>
+          <span>风险点 {risks.length}</span>
+          <span>下一步 {nextActions.length}</span>
         </div>
       </div>
-      <div className="score-factor-grid large-score-grid">
-        {asArray(result.factors).map((factor: any) => (
-          <div className="score-factor" key={factor.key || factor.label}>
-            <div><strong>{toDisplayText(factor.label)}</strong><em>{toDisplayText(factor.score)}</em></div>
-            <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
-            <span>{toDisplayText(factor.evidence)}</span>
+
+      <SectionGroup title="评分明细" subtitle="各维度权重与证据">
+        <div className="score-factor-grid large-score-grid">
+          {asArray(result.factors).map((factor: any) => (
+            <div className="score-factor" key={factor.key || factor.label}>
+              <div><strong>{toDisplayText(factor.label)}</strong><em>{toDisplayText(factor.score)}</em></div>
+              <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
+              <span>{toDisplayText(factor.evidence)}</span>
+            </div>
+          ))}
+        </div>
+      </SectionGroup>
+
+      <div className="result-cluster-grid two">
+        <SectionGroup title="选校配比" subtitle="冲刺 / 匹配 / 保底">
+          <div className="ratio-row">
+            <MiniCard title="冲刺"><strong>{result.tierAdvice?.reach ?? '-'}</strong><span>所</span></MiniCard>
+            <MiniCard title="匹配"><strong>{result.tierAdvice?.match ?? '-'}</strong><span>所</span></MiniCard>
+            <MiniCard title="保底"><strong>{result.tierAdvice?.safe ?? '-'}</strong><span>所</span></MiniCard>
           </div>
-        ))}
+        </SectionGroup>
+        <SectionGroup title="风险点" subtitle="需要人工确认的地方">
+          <ListBlock items={risks} />
+        </SectionGroup>
       </div>
-      <div className="two-col">
-        <ResultCard title="选校配比" defaultOpen><p>冲刺 {result.tierAdvice?.reach ?? '-'} 所，匹配 {result.tierAdvice?.match ?? '-'} 所，保底 {result.tierAdvice?.safe ?? '-'} 所。</p></ResultCard>
-        <ResultCard title="风险点"><ListBlock items={result.risks} /></ResultCard>
-      </div>
+
+      {!!nextActions.length && <SectionGroup title="下一步动作"><ListBlock items={nextActions} /></SectionGroup>}
     </div>
   );
 }
 
 function SchoolBands({ data }: { data: any }) {
   const bands = [
-    ['冲刺', data.reach],
-    ['匹配', data.match],
-    ['保底', data.safe],
+    ['冲刺', data.reach, '高目标，保留机会但控制数量'],
+    ['匹配', data.match, '主申请区间，重点核对课程匹配'],
+    ['保底', data.safe, '控制风险，保证方案完整性'],
   ];
   return (
-    <div className="school-bands-grid compact-tier-grid">
-      {bands.map(([title, items]: any) => (
-        <FoldSection title={title} subtitle={`${asArray(items).length} 所`} key={title} defaultOpen={title !== '冲刺'}>
-          <div className="school-list">
-            {asArray(items).length ? asArray(items).map((school: any, index) => (
-              <div className="school-row" key={school.name || index}>
-                <strong>{toDisplayText(school.name || school)}</strong>
-                {(school.reason || school.fit) && <p>{toDisplayText(school.reason || school.fit)}</p>}
-                {school.risk && <small>风险：{toDisplayText(school.risk)}</small>}
-                {school.action && <small>下一步：{toDisplayText(school.action)}</small>}
-              </div>
-            )) : <p className="muted">暂无推荐。</p>}
-          </div>
-        </FoldSection>
-      ))}
-      {!!asArray(data.risk).length && <FoldSection title="整体风险"><ListBlock items={data.risk} /></FoldSection>}
-    </div>
+    <SectionGroup title="三档选校" subtitle="每档都可以单独收起">
+      <div className="school-bands-grid compact-tier-grid nested-card-grid three">
+        {bands.map(([title, items, desc]: any) => (
+          <FoldSection title={title} subtitle={`${asArray(items).length} 所 · ${desc}`} key={title} defaultOpen className="inner-fold-card">
+            <div className="school-list">
+              {asArray(items).length ? asArray(items).map((school: any, index) => (
+                <div className="school-row school-mini-card" key={school.name || index}>
+                  <strong>{toDisplayText(school.name || school)}</strong>
+                  {(school.reason || school.fit) && <p>{toDisplayText(school.reason || school.fit)}</p>}
+                  {school.risk && <small>风险：{toDisplayText(school.risk)}</small>}
+                  {school.action && <small>下一步：{toDisplayText(school.action)}</small>}
+                </div>
+              )) : <p className="muted">暂无推荐。</p>}
+            </div>
+          </FoldSection>
+        ))}
+      </div>
+      {!!asArray(data.risk).length && <FoldSection title="整体风险" defaultOpen className="inner-fold-card"><ListBlock items={data.risk} /></FoldSection>}
+    </SectionGroup>
   );
 }
 
@@ -86,58 +121,79 @@ function MaterialView({ data }: { data: any }) {
   ].filter(([, items]) => asArray(items).length > 0);
 
   return (
-    <div className="material-board">
-      {groups.map(([title, items]) => (
-        <FoldSection title={String(title)} key={String(title)} defaultOpen={String(title) === '必交材料'} badge={`${asArray(items).length} 项`}>
-          <div className="material-list">
-            {asArray(items).map((item, index) => {
-              const label = typeof item === 'object' && item !== null
-                ? (item as any).name || (item as any).item || (item as any).file || (item as any).stage || toDisplayText(item)
-                : toDisplayText(item);
-              const note = typeof item === 'object' && item !== null
-                ? (item as any).note || (item as any).desc || (item as any).owner || (item as any).deadline || ''
-                : '';
-              return <div className="material-item" key={index}><strong>{toDisplayText(label)}</strong>{note && <span>{toDisplayText(note)}</span>}</div>;
-            })}
-          </div>
-        </FoldSection>
-      ))}
-    </div>
+    <SectionGroup title="材料清单" subtitle="按递交优先级分组">
+      <div className="material-board nested-card-grid two">
+        {groups.map(([title, items]) => (
+          <FoldSection title={String(title)} key={String(title)} defaultOpen badge={`${asArray(items).length} 项`} className="inner-fold-card">
+            <div className="material-list">
+              {asArray(items).map((item, index) => {
+                const label = typeof item === 'object' && item !== null
+                  ? (item as any).name || (item as any).item || (item as any).file || (item as any).stage || toDisplayText(item)
+                  : toDisplayText(item);
+                const note = typeof item === 'object' && item !== null
+                  ? (item as any).note || (item as any).desc || (item as any).owner || (item as any).deadline || ''
+                  : '';
+                return <div className="material-item" key={index}><strong>{toDisplayText(label)}</strong>{note && <span>{toDisplayText(note)}</span>}</div>;
+              })}
+            </div>
+          </FoldSection>
+        ))}
+      </div>
+    </SectionGroup>
   );
 }
 
 function ApplicationView({ result }: { result: any }) {
   return (
-    <div className="agent-output-stack">
-      <div className="ops-card-grid two-output-grid">
-        <ResultCard title="PS 主题" defaultOpen><TextBlock value={result.writingBrief?.psTheme} /></ResultCard>
-        <ResultCard title="CV 重点"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
-      </div>
-      <FoldSection title="PS 大纲" defaultOpen><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
-      <FoldSection title="Personal Statement 初稿"><TextBlock value={result.drafts?.personalStatement} /></FoldSection>
-      <FoldSection title="CV Summary"><TextBlock value={result.drafts?.cvSummary} /></FoldSection>
-      <FoldSection title="推荐信角度"><ListBlock items={result.writingBrief?.recommendationAngles || result.drafts?.recommendationSeed} /></FoldSection>
-      {!!asArray(result.pipeline).length && <FoldSection title="申请流程"><div className="pipeline-list">{asArray(result.pipeline).map((stage: any, index) => <div className="material-item" key={index}><strong>{toDisplayText(stage.stage || `阶段 ${index + 1}`)}</strong><span>{toDisplayText(stage.owner)} · {toDisplayText(stage.status)}</span><ListBlock items={stage.tasks} /></div>)}</div></FoldSection>}
+    <div className="agent-output-stack generated-output">
+      <SectionGroup title="文书方向" subtitle="PS、CV、推荐信">
+        <div className="nested-card-grid two">
+          <ResultCard title="PS 主题"><TextBlock value={result.writingBrief?.psTheme} /></ResultCard>
+          <ResultCard title="CV 重点"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
+          <ResultCard title="PS 大纲"><ListBlock items={result.writingBrief?.psOutline} /></ResultCard>
+          <ResultCard title="推荐信角度"><ListBlock items={result.writingBrief?.recommendationAngles || result.drafts?.recommendationSeed} /></ResultCard>
+        </div>
+      </SectionGroup>
+      <SectionGroup title="可编辑初稿" subtitle="长文本默认展开，可手动收起">
+        <div className="nested-card-grid three draft-grid-soft">
+          <ResultCard title="Personal Statement 初稿"><TextBlock value={result.drafts?.personalStatement} /></ResultCard>
+          <ResultCard title="CV Summary"><TextBlock value={result.drafts?.cvSummary} /></ResultCard>
+          <ResultCard title="推荐信素材"><TextBlock value={result.drafts?.recommendationSeed} /></ResultCard>
+        </div>
+      </SectionGroup>
+      {!!asArray(result.pipeline).length && (
+        <SectionGroup title="申请流程">
+          <div className="pipeline-list compact-pipeline">
+            {asArray(result.pipeline).map((stage: any, index) => (
+              <FoldSection title={`${index + 1}. ${toDisplayText(stage.stage || `阶段 ${index + 1}`)}`} subtitle={toDisplayText(stage.owner)} badge={toDisplayText(stage.status)} defaultOpen key={index} className="inner-fold-card">
+                <ListBlock items={stage.tasks} />
+              </FoldSection>
+            ))}
+          </div>
+        </SectionGroup>
+      )}
     </div>
   );
 }
 
 function CopywritingView({ result }: { result: any }) {
   return (
-    <div className="ops-card-grid two-output-grid">
-      <ResultCard title="微信话术" defaultOpen><TextBlock value={result.wechat || result.wechatFollowup} /></ResultCard>
-      <ResultCard title="电话提纲"><ListBlock items={result.callOutline} /></ResultCard>
-      <ResultCard title="异议处理"><ListBlock items={result.objectionHandling} /></ResultCard>
-      <ResultCard title="短视频脚本"><TextBlock value={result.shortVideoScript || result.videoScript} /></ResultCard>
-      <ResultCard title="跟进动作"><div className="tag-row">{asArray(result.followUpTasks || result.wechatFollowup).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
-    </div>
+    <SectionGroup title="销售跟进" subtitle="微信、电话、异议、短视频">
+      <div className="ops-card-grid two-output-grid nested-card-grid two">
+        <ResultCard title="微信话术"><TextBlock value={result.wechat || result.wechatFollowup} /></ResultCard>
+        <ResultCard title="电话提纲"><ListBlock items={result.callOutline} /></ResultCard>
+        <ResultCard title="异议处理"><ListBlock items={result.objectionHandling} /></ResultCard>
+        <ResultCard title="短视频脚本"><TextBlock value={result.shortVideoScript || result.videoScript} /></ResultCard>
+        <ResultCard title="跟进动作"><div className="tag-row">{asArray(result.followUpTasks || result.wechatFollowup).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
+      </div>
+    </SectionGroup>
   );
 }
 
 function AdvisorView({ result }: { result: any }) {
   const outputs = result.outputs || {};
   return (
-    <div className="agent-output-stack">
+    <div className="agent-output-stack generated-output advisor-dashboard">
       <SectionNav items={[
         { id: 'advisor-trace', label: '链路' },
         { id: 'advisor-score', label: '评分' },
@@ -146,35 +202,32 @@ function AdvisorView({ result }: { result: any }) {
         { id: 'advisor-sales', label: '跟进' },
         { id: 'advisor-materials', label: '材料' },
       ]} />
-      <div className="agent-summary-card">
-        <span className="eyebrow">完整流程</span>
+      <div className="agent-summary-card advisor-hero-card">
+        <span className="eyebrow">完整流程已生成</span>
         <h2>{toDisplayText(result.executiveSummary) || '已生成综合方案'}</h2>
         <div className="tag-row">
           <span>{toDisplayText(result.agentTrace?.mode) || 'algorithm-first'}</span>
-          <span>{toDisplayText(result.agentTrace?.durationMs) || 0}ms</span>
           <span>{toDisplayText(result.agentTrace?.algorithm) || 'weighted-fit-v2'}</span>
           {outputs.fit && <span>评分 {outputs.fit.overall}/100</span>}
+          <span>风险 {safeList(outputs.fit?.risks, outputs.fit?.riskSignals).length}</span>
         </div>
       </div>
 
-      <FoldSection id="advisor-trace" title="执行链路" subtitle="每个节点可单独查看" defaultOpen>
-        <div className="workflow-list">
+      <SectionGroup id="advisor-trace" title="执行链路" subtitle="本次完整流程按节点输出，全部可折叠">
+        <div className="workflow-board">
           {asArray(result.workflow).map((step: any, index) => (
-            <div className="workflow-line" key={step.name || index}>
-              <em>{step.step || index + 1}</em>
-              <strong>{toDisplayText(step.name) || 'Step'}</strong>
-              <span>{toDisplayText(step.tool) || '-'}</span>
+            <MiniCard key={step.name || index} title={`${step.step || index + 1}. ${toDisplayText(step.name) || 'Step'}`} subtitle={toDisplayText(step.tool) || '-'}>
               <p>{toDisplayText(step.output || step.status || 'done')}</p>
-            </div>
+            </MiniCard>
           ))}
         </div>
-      </FoldSection>
+      </SectionGroup>
 
-      {outputs.fit && <FoldSection id="advisor-score" title="适配评分" subtitle="算法权重和风险点" defaultOpen><ScoreView result={outputs.fit} /></FoldSection>}
-      {outputs.schools && <FoldSection id="advisor-schools" title="选校分层" subtitle="冲刺 / 匹配 / 保底"><SchoolBands data={outputs.schools} /></FoldSection>}
-      {outputs.application && <FoldSection id="advisor-application" title="申请案卷" subtitle="PS、CV、推荐信、流程"><ApplicationView result={outputs.application} /></FoldSection>}
-      {outputs.sales && <FoldSection id="advisor-sales" title="销售跟进" subtitle="微信、电话、异议处理"><CopywritingView result={outputs.sales} /></FoldSection>}
-      {outputs.materials && <FoldSection id="advisor-materials" title="材料清单" subtitle="必交、条件、命名"><MaterialView data={outputs.materials} /></FoldSection>}
+      {outputs.fit && <SectionGroup id="advisor-score" title="适配评分" subtitle="算法权重和风险点"><ScoreView result={outputs.fit} /></SectionGroup>}
+      {outputs.schools && <div id="advisor-schools"><SchoolBands data={outputs.schools} /></div>}
+      {outputs.application && <div id="advisor-application"><ApplicationView result={outputs.application} /></div>}
+      {outputs.sales && <div id="advisor-sales"><CopywritingView result={outputs.sales} /></div>}
+      {outputs.materials && <div id="advisor-materials"><MaterialView data={outputs.materials} /></div>}
     </div>
   );
 }
@@ -237,9 +290,7 @@ export default function Tools() {
         message: err?.response?.data?.message || err?.message || '工具调用失败',
         durationMs: Date.now() - started,
       });
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   async function callTool(type: ToolKey, e?: FormEvent) {
@@ -261,6 +312,7 @@ export default function Tools() {
         }
         return next;
       });
+      window.setTimeout(() => document.querySelector('.result-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.message || '工具调用失败';
       setError(message);
@@ -274,7 +326,7 @@ export default function Tools() {
   return (
     <section className="page-stack compact-page">
       <div className="page-title elevated clean-title">
-        <div><span className="eyebrow">方案引擎</span><h1>评分与工具编排</h1><p>先运行完整流程，也可以单独查看每个节点的结果。</p></div>
+        <div><span className="eyebrow">方案引擎</span><h1>评分与工具编排</h1><p>先运行完整流程；结果生成后默认展开，后续可按模块收起。</p></div>
         <div className="title-actions">
           {activeResult && <button className="ghost-button" onClick={() => downloadText(`tool-${active}.md`, exportText)}>导出 Markdown</button>}
           {activeResult && <button className="ghost-button" onClick={() => downloadText(`tool-${active}.json`, JSON.stringify(activeResult, null, 2), 'application/json;charset=utf-8')}>导出 JSON</button>}
@@ -285,11 +337,11 @@ export default function Tools() {
         {toolTabs.map((tool) => <button className={active === tool.key ? 'tab active' : 'tab'} key={tool.key} onClick={() => setActive(tool.key)} type="button"><em>{tool.tag}</em><strong>{tool.name}</strong><span>{tool.desc}</span>{results[tool.key] && <b className="tab-done">已生成</b>}</button>)}
       </div>
 
-      {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p><small>已写入前端失败日志；如果仍看不到，请确认后端已部署本次补丁。</small></div>}
+      {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p><small>已尝试写入前端失败日志；如系统日志没有出现，请重新部署后端。</small></div>}
       {activeResult?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(activeResult.llmFallbackReason)}</div>}
 
-      <div className="two-col wide-right">
-        <section className="panel form-panel sticky-panel">
+      <div className="two-col wide-right tools-workbench-grid">
+        <section className="panel form-panel sticky-panel compact-form-card">
           <div className="panel-title compact"><span className="eyebrow">录入</span><h2>{activeMeta.name}</h2></div>
           <form className="form-stack" onSubmit={(e) => callTool(active, e)}>
             <div className="form-grid two">
@@ -311,7 +363,7 @@ export default function Tools() {
           </form>
         </section>
 
-        <section className="panel result-panel">
+        <section className="panel result-panel generated-result-panel">
           <div className="panel-title"><div><span className="eyebrow">结果</span><h2>{activeMeta.name}</h2></div>{activeResult && <span className="pill success">完成</span>}</div>
           {activeResult ? <><GenericResult result={activeResult} active={active} /><details className="raw-json-details"><summary>查看结构化数据</summary><pre className="json-block compact-json">{JSON.stringify(activeResult, null, 2)}</pre></details></> : <div className="empty-advice compact-empty"><div className="empty-icon">⌘</div><h2>{loadingTool ? '正在运行' : '等待运行'}</h2><p>建议先运行“完整流程”，再查看各节点结果。</p></div>}
         </section>

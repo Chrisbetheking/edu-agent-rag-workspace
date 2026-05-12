@@ -468,11 +468,19 @@ export class ToolsService {
       }
 
       const risks = [] as string[];
-      if (gpaScore < 75) risks.push("成绩不算强，冲刺院校需要用项目和推荐信补强。");
-      if (isUndergrad && student.gaokaoTaken !== "是") risks.push("本科申请未提供高考成绩，需要确认是否可用国际课程或预科路径替代。");
+      const riskSignals = [] as string[];
+      if (gpaScore < 85) riskSignals.push("成绩不属于强冲刺区间，冲刺院校需要项目、推荐信和文书主线一起支撑。");
+      if (gpaScore < 75) risks.push("成绩偏弱，冲刺院校比例需要控制，并准备成绩解释或补充证明。");
+      if (isUndergrad && student.gaokaoTaken !== "是") risks.push("本科申请未提供高考成绩，需要确认是否可用国际课程、预科或其他入学路径替代。");
       if (!hasProject) risks.push("项目材料不足，PS 和 CV 容易空泛。");
+      if (hasProject && projectScore < 92) riskSignals.push("项目经历可以作为优势，但需要补充可验证证据，例如 GitHub、Demo、项目说明或实习证明。");
       if (!hasLanguage) risks.push("语言成绩信息不完整，递交节奏需要预留补分时间。");
-      if (budgetScore < 70) risks.push("预算需要区分城市和学制，避免只按排名选校。");
+      if (hasLanguage && langScore > 0 && ((langType === "IELTS" && langScore < 7) || (langType === "TOEFL" && langScore < 95) || (langType === "PTE" && langScore < 70))) {
+        riskSignals.push("语言成绩达到初筛水平，但部分学校或热门专业可能要求更高。");
+      }
+      if (budgetScore < 82) riskSignals.push("预算需要按城市、学制和生活费重新拆分，避免只按排名选校。");
+      if (budgetScore < 70) risks.push("预算偏紧，需要优先设置成本更稳的匹配和保底方案。");
+      riskSignals.push("最终录取要求必须逐校核对官网，系统评分只用于内部初筛和流程编排。");
 
       return {
         student,
@@ -483,7 +491,8 @@ export class ToolsService {
         weights,
         factors,
         tierAdvice,
-        risks,
+        risks: risks.length ? risks : riskSignals,
+        riskSignals,
         nextActions: [
           "整理成绩单、课程列表、项目经历和语言成绩。",
           "按冲刺、匹配、保底三档核对学校官网要求。",

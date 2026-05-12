@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
-import { FoldSection, ListBlock, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
+import { FoldSection, ListBlock, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 
 interface SchoolAdvice {
   name: string;
@@ -126,13 +126,13 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
         { id: 'chat-risk', label: '风险' },
       ]} />
 
-      <FoldSection id="chat-summary" title="总体判断" defaultOpen>
+      <SectionGroup id="chat-summary" title="总体判断" defaultOpen>
         <div className="summary-card inner-summary">
           <h2>{cleanText(data.summary)}</h2>
         </div>
-      </FoldSection>
+      </SectionGroup>
 
-      <FoldSection id="chat-profile" title="背景拆解" subtitle="成绩、国家、专业、预算" defaultOpen>
+      <SectionGroup id="chat-profile" title="背景拆解" subtitle="成绩、国家、专业、预算" defaultOpen>
         <div className="profile-grid">
           <DetailItem label="学生背景" value={data.profile?.education} />
           <DetailItem label="成绩判断" value={data.profile?.gpa} />
@@ -141,16 +141,16 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
           <DetailItem label="预算判断" value={data.profile?.budget} />
           <DetailItem label="竞争力" value={data.profile?.competitiveness} />
         </div>
-      </FoldSection>
+      </SectionGroup>
 
-      <FoldSection id="chat-schools" title="三档选校方案" subtitle="冲刺 / 匹配 / 保底" defaultOpen>
+      <SectionGroup id="chat-schools" title="三档选校方案" subtitle="冲刺 / 匹配 / 保底" defaultOpen>
         <div className="tier-grid">
           {(data.schoolTiers || []).map((tier) => (
-            <FoldSection title={cleanText(tier.tier)} subtitle={cleanText(tier.level)} key={tier.tier} defaultOpen={tier.tier !== '冲刺'}>
+            <FoldSection title={cleanText(tier.tier)} subtitle={cleanText(tier.level)} key={tier.tier} defaultOpen>
               <p className="tier-strategy">{cleanText(tier.strategy)}</p>
               <div className="school-list">
                 {(tier.schools || []).map((school, index) => (
-                  <FoldSection title={cleanText(school.name)} subtitle={cleanText(tier.tier)} key={`${tier.tier}-${school.name}-${index}`}>
+                  <FoldSection title={cleanText(school.name)} subtitle={cleanText(tier.tier)} key={`${tier.tier}-${school.name}-${index}`} defaultOpen className="inner-fold-card">
                     <div className="school-detail"><span>推荐原因</span><p>{cleanText(school.reason)}</p></div>
                     <div className="school-detail"><span>适配点</span><p>{cleanText(school.fit)}</p></div>
                     <div className="school-detail warn"><span>风险点</span><p>{cleanText(school.risk)}</p></div>
@@ -161,25 +161,25 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
             </FoldSection>
           ))}
         </div>
-      </FoldSection>
+      </SectionGroup>
 
       <div className="advice-two-col">
-        <FoldSection id="chat-timeline" title="申请时间规划" defaultOpen>
+        <SectionGroup id="chat-timeline" title="申请时间规划" defaultOpen>
           <div className="timeline-cards">
-            {(data.timeline || []).map((item, index) => (
-              <FoldSection title={`${index + 1}. ${cleanText(item.phase)}`} subtitle={cleanTime(item.time)} key={`${item.phase}-${index}`} defaultOpen={index === 0}>
+            {(data.timeline || []).length ? (data.timeline || []).map((item, index) => (
+              <FoldSection title={`${index + 1}. ${cleanText(item.phase)}`} subtitle={cleanTime(item.time)} key={`${item.phase}-${index}`} defaultOpen className="inner-fold-card">
                 <ListBlock items={item.tasks} />
               </FoldSection>
-            ))}
+            )) : <div className="empty-mini">暂无时间线；可根据学校开放时间补充。</div>}
           </div>
-        </FoldSection>
+        </SectionGroup>
 
-        <FoldSection id="chat-risk" title="风险和下一步" defaultOpen>
+        <SectionGroup id="chat-risk" title="风险和下一步" defaultOpen>
           <h3>风险提醒</h3>
           <div className="tag-list danger">{(data.risks || []).map((risk, index) => <span key={index}>{cleanText(risk)}</span>)}</div>
           <h3>下一步动作</h3>
           <div className="action-list">{(data.nextActions || []).map((action, index) => <div key={index}>{cleanText(action)}</div>)}</div>
-        </FoldSection>
+        </SectionGroup>
       </div>
 
       <div className="disclaimer-card">{cleanText(data.disclaimer) || '最终要求以学校官网和当年招生要求为准。'}</div>
@@ -270,7 +270,7 @@ export default function Chat() {
 
       {result && (
         <div className="meta-grid">
-          <FoldSection title="来源引用" defaultOpen>
+          <SectionGroup title="来源引用" defaultOpen>
             {result.sources?.length ? result.sources.map((s, i) => (
               <div className="source-card" key={s.id || i}>
                 <strong>{cleanText(s.documentTitle || '未命名资料')}</strong>
@@ -278,25 +278,25 @@ export default function Chat() {
                 <p>{cleanText(s.content)}</p>
               </div>
             )) : <p className="muted-text">暂无来源引用。</p>}
-          </FoldSection>
+          </SectionGroup>
 
-          <FoldSection title="工具调用">
+          <SectionGroup title="工具调用" defaultOpen>
             {result.toolCalls?.length ? result.toolCalls.map((t, i) => (
               <div className="tool-card" key={i}>
                 <strong>{cleanText(t.name)}</strong>
                 <pre>{JSON.stringify(t.result, null, 2)}</pre>
               </div>
             )) : <p className="muted-text">本次未触发工具。</p>}
-          </FoldSection>
+          </SectionGroup>
 
-          <FoldSection title="历史会话">
+          <SectionGroup title="历史会话" defaultOpen>
             {conversations.length ? conversations.slice(0, 6).map((c) => (
               <div className="history-row" key={c.id}>
                 <strong>{cleanText(c.title)}</strong>
                 <span>{new Date(c.updatedAt).toLocaleString()}</span>
               </div>
             )) : <p className="muted-text">暂无历史会话。</p>}
-          </FoldSection>
+          </SectionGroup>
         </div>
       )}
     </section>

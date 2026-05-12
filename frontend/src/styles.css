@@ -1085,3 +1085,126 @@ th { color: var(--muted); font-weight: 800; }
   .section-nav a { padding: 7px 10px; font-size: 12px; }
   .fold-body .pre-line { max-height: 44vh; }
 }
+
+/* V8: generated-result workspace polish */
+.generated-output { gap: 16px; }
+.generated-result-panel { min-height: 0; }
+.result-panel { min-height: 0; }
+.section-group-card {
+  border-color: rgba(99, 102, 241, .16);
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(248,251,255,.92));
+}
+.section-group-card > summary {
+  padding: 18px 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.82));
+}
+.section-group-card > summary strong { font-size: 18px; }
+.section-group-card > .fold-body { padding: 0 20px 20px; }
+.inner-fold-card {
+  box-shadow: none;
+  border-color: #e6edf7;
+  background: #fff;
+}
+.inner-fold-card > summary { padding: 14px 16px; }
+.inner-fold-card > .fold-body { padding: 0 16px 16px; }
+.nested-card-grid {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+}
+.nested-card-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.nested-card-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.result-cluster-grid {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+.result-cluster-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mini-result-card {
+  border: 1px solid #e8eef8;
+  background: #fff;
+  border-radius: 18px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .04);
+}
+.mini-result-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.mini-result-head strong { color: #0f172a; line-height: 1.35; }
+.mini-result-head span { color: #3150c8; font-size: 12px; font-weight: 900; }
+.mini-result-body { color: #475569; line-height: 1.65; }
+.mini-result-body p { margin: 0; }
+.workflow-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.advisor-hero-card { background: linear-gradient(135deg, #ffffff, #eef6ff); }
+.ratio-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ratio-row .mini-result-card { text-align: center; }
+.ratio-row strong { display: block; font-size: 28px; color: #3150c8; }
+.ratio-row span { color: #64748b; font-size: 12px; }
+.school-mini-card {
+  background: #f8fbff;
+  border-color: #e6edf7;
+  box-shadow: none;
+}
+.draft-grid-soft .fold-body .pre-line {
+  max-height: 360px;
+  padding-right: 8px;
+}
+.compact-pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.inner-title { margin-bottom: 12px; }
+.tools-workbench-grid { align-items: start; }
+.compact-form-card textarea { min-height: 96px; }
+.fold-card[open] { animation: foldIn .16s ease both; }
+@keyframes foldIn { from { opacity: .92; } to { opacity: 1; } }
+
+.sidebar-resume {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  text-decoration: none;
+  color: #dbeafe;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  padding: 11px 12px;
+  font-weight: 900;
+}
+.sidebar-resume .resume-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 10px; background: rgba(255,255,255,.1); }
+.sidebar-collapsed .sidebar-resume { grid-template-columns: 1fr; width: 58px; padding: 10px; justify-items: center; }
+.guest-resume-link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  padding: 11px 12px;
+  border-radius: 14px;
+  color: #3150c8;
+  background: #eef4ff;
+  font-weight: 900;
+  border: 1px solid #dbeafe;
+}
+
+@media (max-width: 1280px) {
+  .workflow-board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .nested-card-grid.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 960px) {
+  .nested-card-grid.two,
+  .nested-card-grid.three,
+  .result-cluster-grid.two,
+  .workflow-board,
+  .compact-pipeline,
+  .ratio-row { grid-template-columns: 1fr; }
+  .section-group-card > summary strong { font-size: 16px; }
+  .section-group-card > .fold-body { padding: 0 14px 14px; }
+}
+@media (max-width: 620px) {
+  .section-nav { border-radius: 14px; }
+  .section-group-card > summary,
+  .inner-fold-card > summary { align-items: flex-start; }
+  .fold-card > summary::after { flex: 0 0 auto; }
+  .draft-grid-soft .fold-body .pre-line { max-height: 48vh; }
+}

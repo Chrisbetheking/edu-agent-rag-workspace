@@ -33,6 +33,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isGuest = user?.role === 'guest';
+  const resumeUrl = 'https://chrisbetheking.github.io/WANGHONG-s-Resume-Website/';
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-footer">
+          {isGuest && <a className="sidebar-resume" href={resumeUrl} target="_blank" rel="noreferrer"><span className="sidebar-text">查看我的 Resume Web</span><span className="nav-icon resume-icon">↗</span></a>}
           <div className="user-card">
             <div className="avatar">{(user?.displayName || user?.username || 'U').slice(0, 1).toUpperCase()}</div>
             <div className="sidebar-text">
