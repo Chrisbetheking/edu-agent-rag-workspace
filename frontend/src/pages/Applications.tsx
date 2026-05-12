@@ -175,8 +175,8 @@ export default function Applications() {
     }
   }
 
-  const risks = result ? [...asArray(result.riskFlags), ...asArray(result.fit?.risks), ...asArray(result.fit?.riskSignals)] : [];
-  const actions = result ? [...asArray(result.nextBestActions), ...asArray(result.fit?.nextActions)] : [];
+  const risks = result ? Array.from(new Set([...asArray(result.riskFlags), ...asArray(result.fit?.risks), ...asArray(result.fit?.riskSignals)].map(toDisplayText))).filter(Boolean) : [];
+  const actions = result ? Array.from(new Set([...asArray(result.nextBestActions), ...asArray(result.fit?.nextActions)].map(toDisplayText))).filter(Boolean) : [];
 
   return (
     <section className="page-stack compact-page applications-page-v9">
@@ -198,7 +198,7 @@ export default function Applications() {
 
       <div className={`two-col application-workbench-v9 application-workbench-v13 ${result ? 'with-result' : ''}`}>
         <section className={`panel compact-form-card ${result ? 'form-panel-inline' : 'sticky-panel'}`}>
-          <div className="panel-title compact"><span className="eyebrow">录入</span><h2>学生档案</h2></div>
+          <div className="panel-title compact form-action-title"><div><span className="eyebrow">录入</span><h2>学生档案</h2></div><button className="primary compact-run-button" type="button" disabled={loading} onClick={() => run()}>{loading ? '生成中...' : '生成申请案卷'}</button></div>
           <form className="form-stack" onSubmit={run}>
             <div className="form-grid two">
               <label>学生称呼<input value={name} onChange={(e) => setName(e.target.value)} /></label>
@@ -215,7 +215,6 @@ export default function Applications() {
             </div>
             <label>项目 / 实习 / 课程经历<textarea value={experience} onChange={(e) => setExperience(e.target.value)} /></label>
             <label>目标院校<input value={targetSchools} onChange={(e) => setTargetSchools(e.target.value)} /></label>
-            <button className="primary" disabled={loading}>{loading ? '生成中...' : '生成申请案卷'}</button>
           </form>
         </section>
 

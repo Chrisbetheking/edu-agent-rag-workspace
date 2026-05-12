@@ -237,7 +237,7 @@ function CopywritingView({ result }: { result: any }) {
 
 function AdvisorView({ result }: { result: any }) {
   const outputs = result.outputs || {};
-  const risks = safeList(outputs.fit?.risks, outputs.fit?.riskSignals, outputs.application?.riskFlags);
+  const risks = Array.from(new Set(safeList(outputs.fit?.risks, outputs.fit?.riskSignals, outputs.application?.riskFlags).map(toDisplayText))).filter(Boolean);
   return (
     <div className="agent-output-stack generated-output advisor-output-v9">
       <SectionNav items={[
@@ -412,7 +412,12 @@ export default function Tools() {
 
       <div className={`two-col wide-right tools-workbench-grid tools-workbench-v9 tools-workbench-v13 ${activeResult ? 'with-result' : ''}`}>
         <section className={`panel form-panel compact-form-card ${activeResult ? 'form-panel-inline' : 'sticky-panel'}`}>
-          <div className="panel-title compact"><span className="eyebrow">录入</span><h2>{activeMeta.name}</h2></div>
+          <div className="panel-title compact form-action-title">
+            <div><span className="eyebrow">录入</span><h2>{activeMeta.name}</h2></div>
+            <button className="primary compact-run-button" type="button" disabled={!!loadingTool} onClick={() => callTool(active)}>
+              {isLoading ? '运行中...' : active === 'advisor' ? '运行完整流程' : `运行${activeMeta.name}`}
+            </button>
+          </div>
           <form className="form-stack" onSubmit={(e) => callTool(active, e)}>
             <div className="form-grid two">
               <label>学生称呼<input value={name} onChange={(e) => setName(e.target.value)} /></label>
@@ -429,7 +434,6 @@ export default function Tools() {
             </div>
             <label>项目 / 实习 / 课程经历<textarea value={experience} onChange={(e) => setExperience(e.target.value)} /></label>
             <label>主要顾虑<textarea value={concern} onChange={(e) => setConcern(e.target.value)} /></label>
-            <div className="button-grid"><button className="primary" type="button" disabled={!!loadingTool} onClick={() => callTool('advisor')}>{loadingTool === 'advisor' ? '运行中...' : '运行完整流程'}</button><button className="ghost-button" disabled={!!loadingTool}>{isLoading ? '运行中...' : `运行：${activeMeta.name}`}</button></div>
           </form>
         </section>
 

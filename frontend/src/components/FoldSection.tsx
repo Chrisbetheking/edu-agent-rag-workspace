@@ -95,12 +95,17 @@ export function SectionNav({ items }: { items: Array<{ id: string; label: string
   }
 
   return (
-    <nav className="section-nav section-nav-inline" aria-label="页面目录">
-      <span>目录</span>
-      {items.map((item) => (
-        <a key={item.id} href={`#${item.id}`}>{item.label}</a>
-      ))}
-      <button className="section-nav-top" type="button" onClick={backToTop}>顶部</button>
+    <nav className="section-nav section-nav-inline section-nav-v14" aria-label="页面目录">
+      <div className="section-nav-label">
+        <strong>页面导航</strong>
+        <span>快速定位长内容</span>
+      </div>
+      <div className="section-nav-links">
+        {items.map((item) => (
+          <a key={item.id} href={`#${item.id}`}>{item.label}</a>
+        ))}
+      </div>
+      <button className="section-nav-top" type="button" onClick={backToTop}>回到顶部</button>
     </nav>
   );
 }

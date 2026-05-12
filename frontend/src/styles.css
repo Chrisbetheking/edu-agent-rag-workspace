@@ -2032,3 +2032,246 @@ th { color: var(--muted); font-weight: 800; }
   .application-workbench-v13.with-result .form-stack > button,
   .frontdesk-workbench-v13.with-result .form-stack > button { grid-column: auto; }
 }
+
+/* V14: readable enterprise layout pass - no floating directory, no narrow vertical cards */
+.section-nav-v14 {
+  display: grid !important;
+  grid-template-columns: max-content minmax(0, 1fr) max-content !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: rgba(255,255,255,.78) !important;
+  border: 1px solid #e8eef8 !important;
+  border-radius: 18px !important;
+  padding: 10px 12px !important;
+  margin: 0 0 18px !important;
+  box-shadow: 0 10px 28px rgba(15,23,42,.04) !important;
+  position: static !important;
+}
+.section-nav-label { display: grid; gap: 1px; color: #0f172a; min-width: 92px; }
+.section-nav-label strong { font-size: 13px; font-weight: 900; }
+.section-nav-label span { color: #64748b; font-size: 11px; font-weight: 800; }
+.section-nav-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.section-nav-v14 a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px !important;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #3150c8;
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.section-nav-v14 a:hover { background: #dfeaff; transform: translateY(-1px); }
+.section-nav-v14 .section-nav-top {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  border: 0;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.form-action-title { align-items: center !important; gap: 16px; }
+.compact-run-button {
+  width: auto !important;
+  min-width: 132px;
+  height: 42px;
+  padding: 0 18px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 14px 28px rgba(79,70,229,.16) !important;
+  white-space: nowrap;
+}
+.tools-workbench-v13.with-result .form-stack .button-grid,
+.application-workbench-v13.with-result .form-stack > button,
+.frontdesk-workbench-v13.with-result .form-stack > button { display: none !important; }
+
+/* Generated form rows: keep forms compact, but never make text areas tiny. */
+.tools-workbench-v13.with-result .form-stack,
+.application-workbench-v13.with-result .form-stack,
+.frontdesk-workbench-v13.with-result .form-stack {
+  grid-template-columns: repeat(4, minmax(180px, 1fr)) !important;
+}
+.tools-workbench-v13.with-result .form-stack > label:has(textarea),
+.application-workbench-v13.with-result .form-stack > label:has(textarea),
+.frontdesk-workbench-v13.with-result .form-stack > label:has(textarea) { grid-column: span 2 !important; }
+
+/* Frontdesk: horizontal content cards, no raw JSON columns. */
+.frontdesk-result-panel-v13 .copy-grid.two-output-grid {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)) !important;
+  align-items: stretch;
+}
+.frontdesk-result-panel-v13 .copy-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.frontdesk-result-panel-v13 .copy-card p,
+.frontdesk-result-panel-v13 .copy-card li {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  line-height: 1.72;
+}
+.calendar-board-v13 { display: none !important; }
+.calendar-board-v14 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+  gap: 12px;
+}
+.calendar-row-v14 {
+  border: 1px solid #e6edf7;
+  border-radius: 20px;
+  padding: 14px;
+  background: linear-gradient(180deg, #fff, #f8fbff);
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.calendar-row-index {
+  border-radius: 16px;
+  background: #eef4ff;
+  color: #3150c8;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  text-align: center;
+  padding: 12px 8px;
+}
+.calendar-row-index strong { font-size: 24px; line-height: 1; }
+.calendar-row-index span { font-size: 12px; font-weight: 900; color: #64748b; }
+.calendar-row-main { min-width: 0; display: grid; gap: 10px; }
+.calendar-row-main .calendar-card-head { align-items: flex-start; }
+.calendar-row-main .calendar-card-head h4 { margin: 0; font-size: 17px; line-height: 1.4; color: #0f172a; }
+.compact-tags span {
+  background: #eef4ff;
+  color: #3150c8;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+}
+.calendar-row-main p { margin: 0; color: #334155; line-height: 1.72; white-space: normal; word-break: normal; overflow-wrap: break-word; }
+
+/* Application dossier: make writing and pipeline readable instead of narrow columns. */
+.application-output-grid-v13 .app-grid-score { grid-column: span 4 !important; }
+.application-output-grid-v13 .app-grid-brief { grid-column: span 8 !important; }
+.application-output-grid-v13 .app-grid-pipeline { grid-column: 1 / -1 !important; }
+.application-output-grid-v13 .app-grid-materials { grid-column: 1 / -1 !important; }
+.application-output-grid-v13 .app-brief-board-v10 {
+  grid-template-columns: minmax(320px, .8fr) minmax(0, 1.2fr) !important;
+  align-items: stretch;
+}
+.application-output-grid-v13 .app-brief-side-v10 {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  align-items: stretch;
+}
+.application-output-grid-v13 .app-brief-side-v10 > .fold-card:first-child { grid-row: auto !important; }
+.application-output-grid-v13 .app-brief-main .pre-line,
+.application-output-grid-v13 .app-brief-side-v10 .pre-line,
+.application-output-grid-v13 .app-draft-side-v10 .pre-line {
+  max-height: 320px;
+  overflow: auto;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.application-output-grid-v13 .tag-row {
+  align-items: flex-start;
+}
+.application-output-grid-v13 .tag-row span {
+  white-space: normal;
+  word-break: normal;
+  text-align: left;
+  border-radius: 16px;
+}
+.application-output-grid-v13 .app-pipeline-grid-v10 {
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr) !important;
+  align-items: start;
+}
+.application-output-grid-v13 .compact-pipeline {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+}
+.stage-card-v9,
+.stage-card-v9 * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  word-break: normal !important;
+}
+.stage-card-v9 summary span { min-width: 0; }
+.stage-card-v9 summary strong { white-space: normal; line-height: 1.35; }
+.stage-card-v9 .fold-body { line-height: 1.65; }
+
+/* Advisor engine: wider result boards, less wasted space. */
+.advisor-grid-v13 .advisor-score-module { grid-column: span 4 !important; }
+.advisor-grid-v13 .advisor-schools-module { grid-column: span 8 !important; }
+.advisor-grid-v13 .advisor-application-module,
+.advisor-grid-v13 .advisor-sales-module { grid-column: span 6 !important; }
+.advisor-grid-v13 .advisor-materials-module { grid-column: 1 / -1 !important; }
+.advisor-grid-v13 .advisor-score-module .result-shell-grid,
+.advisor-grid-v13 .advisor-application-module .result-shell-grid,
+.advisor-grid-v13 .advisor-sales-module .result-shell-grid { grid-template-columns: 1fr !important; }
+.advisor-grid-v13 .comfort-tier-grid,
+.school-bands-grid.comfort-tier-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+}
+.advisor-grid-v13 .workflow-board-v11 {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
+}
+.advisor-grid-v13 .workflow-board-v11 .mini-result-card,
+.advisor-grid-v13 .comfort-tier-grid .fold-card,
+.advisor-grid-v13 .app-brief-side-v10 .fold-card {
+  min-width: 0;
+}
+.advisor-grid-v13 .mini-result-body,
+.advisor-grid-v13 .mini-result-body p,
+.advisor-grid-v13 li,
+.advisor-grid-v13 .pre-line {
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  white-space: normal;
+}
+.advisor-grid-v13 .pre-line { max-height: 320px; overflow: auto; }
+
+/* General fold/card typography: title on top, content below, not vertical. */
+.fold-card,
+.mini-result-card,
+.copy-card,
+.school-row,
+.smart-object-cell,
+.material-item { word-break: normal !important; overflow-wrap: break-word !important; }
+.fold-card > summary { grid-template-columns: minmax(0, 1fr) max-content; align-items: start; }
+.fold-card > summary span strong { line-height: 1.35; }
+.fold-card > summary span em { line-height: 1.45; }
+
+@media (max-width: 1500px) {
+  .application-output-grid-v13 .app-grid-score,
+  .application-output-grid-v13 .app-grid-brief,
+  .advisor-grid-v13 .advisor-score-module,
+  .advisor-grid-v13 .advisor-schools-module,
+  .advisor-grid-v13 .advisor-application-module,
+  .advisor-grid-v13 .advisor-sales-module { grid-column: 1 / -1 !important; }
+  .application-output-grid-v13 .app-brief-board-v10 { grid-template-columns: 1fr !important; }
+  .calendar-board-v14 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .section-nav-v14 { grid-template-columns: 1fr; }
+  .section-nav-top { width: 100%; }
+  .tools-workbench-v13.with-result .form-stack,
+  .application-workbench-v13.with-result .form-stack,
+  .frontdesk-workbench-v13.with-result .form-stack { grid-template-columns: 1fr !important; }
+  .tools-workbench-v13.with-result .form-stack > label:has(textarea),
+  .application-workbench-v13.with-result .form-stack > label:has(textarea),
+  .frontdesk-workbench-v13.with-result .form-stack > label:has(textarea) { grid-column: auto !important; }
+  .calendar-row-v14 { grid-template-columns: 1fr; }
+  .calendar-row-index { grid-template-columns: auto auto; justify-content: start; place-items: center; }
+  .application-output-grid-v13 .app-pipeline-grid-v10 { grid-template-columns: 1fr !important; }
+}
