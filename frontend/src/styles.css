@@ -1782,3 +1782,253 @@ th { color: var(--muted); font-weight: 800; }
   .tools-workbench-v9,
   .application-workbench-v9 { grid-template-columns: 1fr !important; }
 }
+
+/* V12: fixed directory, full-width result workbench, two-column long-result boards, logs filters */
+.section-nav-v12 {
+  position: fixed !important;
+  top: 142px !important;
+  left: calc(292px + 32px) !important;
+  right: 40px !important;
+  z-index: 300 !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 9px 12px !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(49, 80, 200, .18) !important;
+  background: rgba(255,255,255,.94) !important;
+  backdrop-filter: blur(18px) saturate(130%);
+  box-shadow: 0 18px 48px rgba(15,23,42,.14) !important;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+}
+.app-shell.sidebar-collapsed .section-nav-v12 { left: calc(86px + 32px) !important; }
+.section-nav-v12 span { color: #64748b; font-size: 12px; font-weight: 950; white-space: nowrap; }
+.section-nav-v12 button:not(.section-nav-top) {
+  flex: 0 0 auto;
+  border: 0;
+  background: #eef4ff;
+  color: #3150c8;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 950;
+  cursor: pointer;
+  transition: transform .16s ease, background .16s ease;
+}
+.section-nav-v12 button:not(.section-nav-top):hover { transform: translateY(-1px); background: #dbeafe; }
+.section-nav-v12 + * { margin-top: 58px; }
+.section-nav-top { cursor: pointer; }
+.section-fold, .section-group-card, .advisor-module, .app-grid-item { scroll-margin-top: 210px !important; }
+
+/* Use top input + full result workspace after generation to remove the large empty left rail. */
+.tools-workbench-v9:has(.agent-output-stack),
+.application-workbench-v9:has(.application-output-grid-v11),
+.lead-workbench-generated {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 22px !important;
+}
+.tools-workbench-v9:has(.agent-output-stack) > .form-panel,
+.application-workbench-v9:has(.application-output-grid-v11) > .form-panel,
+.lead-workbench-generated > .lead-input-panel {
+  position: static !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+.tools-workbench-v9:has(.agent-output-stack) .form-stack,
+.application-workbench-v9:has(.application-output-grid-v11) .form-stack,
+.lead-workbench-generated .lead-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, .32fr);
+  gap: 14px;
+  align-items: end;
+}
+.tools-workbench-v9:has(.agent-output-stack) .form-grid.two,
+.application-workbench-v9:has(.application-output-grid-v11) .form-grid.two,
+.lead-workbench-generated .lead-inline-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) !important;
+}
+.tools-workbench-v9:has(.agent-output-stack) textarea,
+.application-workbench-v9:has(.application-output-grid-v11) textarea,
+.lead-workbench-generated textarea {
+  min-height: 72px !important;
+}
+.tools-workbench-v9:has(.agent-output-stack) .button-grid,
+.application-workbench-v9:has(.application-output-grid-v11) .button-grid,
+.lead-workbench-generated .primary { align-self: stretch; }
+
+/* Result workspace becomes the primary canvas. */
+.generated-result-panel,
+.application-result-panel-v10,
+.lead-result-panel {
+  position: relative;
+  overflow: visible !important;
+  min-width: 0;
+}
+.advisor-grid-v11,
+.application-output-grid-v11,
+.lead-output-stack {
+  padding-top: 4px;
+}
+
+/* Advisor: strong left/right rhythm inside modules. */
+.advisor-grid-v11 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 20px !important;
+}
+.advisor-trace-module,
+.advisor-materials-module { grid-column: 1 / -1 !important; }
+.advisor-grid-v11 .advisor-module > .agent-output-stack,
+.advisor-grid-v11 .advisor-module > .generated-output,
+.advisor-grid-v11 .score-view-v10 {
+  display: grid;
+  gap: 16px;
+}
+.advisor-grid-v11 .advisor-score-module .score-view-v10 {
+  grid-template-columns: minmax(0, .58fr) minmax(0, .42fr);
+}
+.advisor-grid-v11 .advisor-score-module .score-view-v10 > .section-group-card:first-child { grid-column: 1 / -1; }
+.advisor-grid-v11 .advisor-score-module .score-view-v10 > .section-group-card:nth-child(2),
+.advisor-grid-v11 .advisor-score-module .score-view-v10 > .section-group-card:nth-child(3) { min-height: 100%; }
+.advisor-grid-v11 .advisor-application-module .result-cluster-grid.two,
+.advisor-grid-v11 .advisor-sales-module .nested-card-grid.two,
+.advisor-grid-v11 .advisor-materials-module .material-board-comfort {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+.advisor-grid-v11 .advisor-application-module .draft-grid-comfort {
+  grid-template-columns: minmax(0, .58fr) minmax(0, .42fr) !important;
+}
+.advisor-grid-v11 .advisor-application-module .draft-main-card { grid-row: span 2; }
+.advisor-grid-v11 .workflow-board-v11 {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+}
+.advisor-grid-v11 .comfort-tier-grid,
+.chat-page-v2 .tier-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch;
+}
+
+/* Application page: two-column business board, no dead blank area. */
+.application-output-grid-v11 {
+  grid-template-columns: minmax(0, .52fr) minmax(0, .48fr) !important;
+  gap: 20px !important;
+}
+.application-output-grid-v11 > .section-nav { grid-column: 1 / -1; }
+.app-grid-score,
+.app-grid-drafts { grid-column: 1 / -1 !important; }
+.app-grid-brief,
+.app-grid-pipeline,
+.app-grid-materials { min-width: 0; }
+.app-grid-brief .app-brief-board-v10,
+.app-grid-pipeline .nested-card-grid.two,
+.app-grid-materials .compact-material-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.app-grid-drafts .app-draft-grid-v10 {
+  grid-template-columns: minmax(0, .6fr) minmax(0, .4fr) !important;
+}
+.app-grid-drafts .draft-main-card { grid-row: span 2; }
+.app-grid-drafts .draft-main-card .pre-line { max-height: 520px; }
+.app-grid-drafts .app-draft-side-v10 .pre-line { max-height: 240px; }
+
+/* Lead/frontdesk: compact input, full-width output, grouped cards. */
+.lead-output-stack { display: grid; gap: 16px; }
+.lead-output-grid {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.lead-output-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lead-span { grid-column: 1 / -1; }
+.lead-result-card .pre-line,
+.lead-result-card ul {
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 6px;
+}
+.lead-calendar-table { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+
+/* Chat lower blocks stay balanced in columns. */
+.chat-page-v2 .advice-two-col,
+.chat-page-v2 .meta-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, .58fr) minmax(0, .42fr) !important;
+  gap: 20px !important;
+  align-items: start;
+}
+.chat-page-v2 .advice-two-col > .section-group-card,
+.chat-page-v2 .meta-grid > .section-group-card { min-width: 0; height: fit-content; }
+.chat-page-v2 .timeline-cards { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.chat-page-v2 .summary-card h2 { line-height: 1.45; }
+
+/* Logs: filters + observability dashboard. */
+.logs-filter-panel { padding: 20px; }
+.log-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+.log-filter-grid label { display: grid; gap: 8px; color: #334155; font-weight: 850; }
+.log-filter-grid select,
+.log-filter-grid input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #dbe5f1;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 800;
+  background: #fff;
+}
+.log-search { grid-column: span 2; }
+.logs-stats-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.trace-list-v12 { display: grid; gap: 14px; }
+.trace-card-error { border-color: #fecaca !important; background: linear-gradient(180deg, #fff, #fff7f7) !important; }
+.trace-metrics-v12 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.trace-card .error-card.slim { background: #fff1f2; }
+
+/* General compactness and enterprise polish. */
+.result-shell-main > .section-group-card,
+.result-shell-main > .fold-card,
+.generated-output > .section-group-card,
+.lead-output-stack > .section-group-card { min-width: 0; }
+.fold-card > summary { gap: 16px; }
+.fold-card > summary b { white-space: nowrap; }
+.fold-body .pre-line { line-height: 1.72; }
+.mini-result-card, .inner-fold-card { overflow: hidden; }
+
+@media (max-width: 1320px) {
+  .tools-workbench-v9:has(.agent-output-stack) .form-stack,
+  .application-workbench-v9:has(.application-output-grid-v11) .form-stack,
+  .lead-workbench-generated .lead-form-grid { grid-template-columns: 1fr; }
+  .tools-workbench-v9:has(.agent-output-stack) .form-grid.two,
+  .application-workbench-v9:has(.application-output-grid-v11) .form-grid.two,
+  .lead-workbench-generated .lead-inline-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)) !important; }
+  .advisor-grid-v11,
+  .application-output-grid-v11,
+  .advisor-grid-v11 .advisor-score-module .score-view-v10,
+  .app-grid-drafts .app-draft-grid-v10,
+  .chat-page-v2 .advice-two-col,
+  .chat-page-v2 .meta-grid { grid-template-columns: 1fr !important; }
+  .app-grid-brief .app-brief-board-v10,
+  .app-grid-pipeline .nested-card-grid.two,
+  .app-grid-materials .compact-material-list,
+  .advisor-grid-v11 .advisor-sales-module .nested-card-grid.two,
+  .advisor-grid-v11 .advisor-materials-module .material-board-comfort { grid-template-columns: 1fr !important; }
+  .logs-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 920px) {
+  .section-nav-v12 { left: 14px !important; right: 14px !important; top: 14px !important; max-width: none !important; }
+  .section-nav-v12 span { display: none; }
+  .section-nav-v12 + * { margin-top: 54px; }
+  .section-fold, .section-group-card, .advisor-module, .app-grid-item { scroll-margin-top: 92px !important; }
+  .log-filter-grid,
+  .logs-stats-grid,
+  .lead-output-grid.two,
+  .advisor-grid-v11 .comfort-tier-grid,
+  .chat-page-v2 .tier-grid { grid-template-columns: 1fr !important; }
+  .log-search { grid-column: auto; }
+  .trace-metrics-v12 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

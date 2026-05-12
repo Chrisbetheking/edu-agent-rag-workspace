@@ -85,20 +85,28 @@ export function SectionGroup({
 export function SectionNav({ items }: { items: Array<{ id: string; label: string }> }) {
   if (!items.length) return null;
 
+  function scrollToId(id: string) {
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `#${id}`);
+  }
+
   function backToTop() {
-    const main = document.querySelector('.main');
-    if (main) {
-      main.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const topAnchor = document.querySelector('.page-title, .page-stack, main');
+    if (topAnchor) {
+      topAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.replaceState(null, '', window.location.pathname);
       return;
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   return (
-    <nav className="section-nav section-nav-v11" aria-label="页面目录">
+    <nav className="section-nav section-nav-v12" aria-label="页面目录">
       <span>目录</span>
       {items.map((item) => (
-        <a key={item.id} href={`#${item.id}`}>{item.label}</a>
+        <button key={item.id} type="button" onClick={() => scrollToId(item.id)}>{item.label}</button>
       ))}
       <button className="section-nav-top" type="button" onClick={backToTop}>顶部</button>
     </nav>
