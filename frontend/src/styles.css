@@ -788,3 +788,87 @@ th { color: var(--muted); font-weight: 800; }
 
 @media (max-width: 1320px) { .compact-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); } .large-score-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .score-layout { grid-template-columns: 1fr; } .compact-tabs, .score-factor-grid, .large-score-grid { grid-template-columns: 1fr; } }
+
+/* v5 workflow + responsive refinements */
+.sidebar-toggle {
+  position: fixed;
+  z-index: 80;
+  left: 18px;
+  top: 18px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 16px 42px rgba(15,23,42,.24);
+}
+.app-shell.sidebar-collapsed { grid-template-columns: 86px minmax(0, 1fr); }
+.sidebar-collapsed .sidebar { padding: 18px 14px; align-items: center; }
+.sidebar-collapsed .sidebar-text { display: none !important; }
+.sidebar-collapsed .brand, .sidebar-collapsed .sidebar-status, .sidebar-collapsed .user-card { justify-content: center; width: 58px; padding: 10px; }
+.sidebar-collapsed .sidebar-status { min-height: 54px; }
+.sidebar-collapsed .nav { grid-template-columns: 1fr; justify-items: center; width: 58px; padding: 10px; }
+.sidebar-collapsed .nav-list { align-items: center; }
+.sidebar-collapsed .sidebar-footer { align-items: center; width: 58px; }
+.sidebar-collapsed .avatar { width: 36px; height: 36px; }
+.sidebar-collapsed .ghost-dark { display: none; }
+
+.tab { position: relative; }
+.tab-done { position: absolute; right: 10px; top: 10px; font-size: 11px; color: #166534; background: #dcfce7; padding: 4px 7px; border-radius: 999px; }
+.pre-line { white-space: pre-line; }
+.material-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.material-group { background: #fff; border: 1px solid #e8eef8; border-radius: 22px; padding: 16px; box-shadow: var(--shadow-soft); }
+.material-group h3 { margin: 0 0 12px; }
+.material-list { display: grid; gap: 8px; }
+.material-list.single-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.material-item { display: grid; gap: 4px; padding: 11px 12px; border-radius: 15px; background: #f8fafc; border: 1px solid #edf2f7; }
+.material-item strong { color: #0f172a; line-height: 1.4; }
+.material-item span { color: #64748b; font-size: 12px; line-height: 1.45; }
+.school-bands-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.school-band-card { background: #fff; border: 1px solid #e8eef8; border-radius: 22px; padding: 16px; box-shadow: var(--shadow-soft); }
+.school-band-card h3 { margin: 0 0 8px; }
+
+@media (max-width: 1180px) {
+  .material-board, .material-list.single-list, .school-bands-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .app-shell, .app-shell.sidebar-collapsed { display: block; }
+  .sidebar {
+    position: fixed;
+    z-index: 70;
+    left: 0;
+    top: 0;
+    width: min(82vw, 300px);
+    height: 100vh;
+    transform: translateX(0);
+    transition: transform .2s ease;
+  }
+  .sidebar-collapsed .sidebar { transform: translateX(-110%); align-items: stretch; width: min(82vw, 300px); padding: 24px; }
+  .sidebar-collapsed .sidebar-text { display: block !important; }
+  .sidebar-collapsed .brand, .sidebar-collapsed .sidebar-status, .sidebar-collapsed .user-card { justify-content: flex-start; width: auto; padding: 13px; }
+  .sidebar-collapsed .nav { grid-template-columns: 36px 1fr; justify-items: stretch; width: auto; padding: 11px; }
+  .sidebar-collapsed .ghost-dark { display: block; }
+  .sidebar-toggle { top: 12px; left: 12px; }
+  .main { padding-top: 64px; }
+  .tool-tabs.compact-tabs { display: flex; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+  .tool-tabs.compact-tabs .tab { min-width: 210px; scroll-snap-align: start; }
+  .page-title { gap: 14px; }
+  .title-actions { width: 100%; }
+  .title-actions button { flex: 1; }
+}
+
+@media (max-width: 620px) {
+  input, textarea, select { min-height: 48px; font-size: 16px; }
+  textarea { min-height: 150px; }
+  .button-grid { grid-template-columns: 1fr; }
+  .page-title h1, .page-header h1 { font-size: 30px; }
+  .panel-title { display: grid; }
+  .result-panel { min-height: 320px; }
+  .copy-grid.two-output-grid, .ops-card-grid.two-output-grid { grid-template-columns: 1fr; }
+  .score-circle { width: 112px; height: 112px; }
+}

@@ -1,17 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
-
-const countryOptions = ['英国', '澳洲', '新加坡', '香港', '加拿大'];
-const majorOptions = ['计算机科学', '数据科学', '人工智能', '软件工程', '商业分析', '信息系统'];
-const degreeOptions = ['硕士', '本科', '博士'];
-const platformOptions = ['小红书 + 微信私域', '短视频 + 微信私域', '朋友圈 + 私聊跟进', '小红书 + 短视频 + 微信私域'];
-const angleOptions = [
-  'GPA 不算高，但项目经历可以补强',
-  '预算有限，需要优先考虑性价比',
-  '目标专业热门，需要尽早规划材料',
-  '跨专业申请，需要证明课程和项目匹配',
-];
+import { angleOptions, countryOptions, degreeOptions, majorOptions, platformOptions } from '../constants/options';
 
 function CopyCard({ title, content }: { title: string; content: unknown }) {
   const items = asArray(content).filter(Boolean);
@@ -51,6 +41,8 @@ export default function FrontDesk() {
   const [degree, setDegree] = useState('硕士');
   const [angle, setAngle] = useState(angleOptions[0]);
   const [platform, setPlatform] = useState(platformOptions[0]);
+  const [gaokaoTaken, setGaokaoTaken] = useState('否');
+  const [gaokaoScore, setGaokaoScore] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,7 +59,7 @@ export default function FrontDesk() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/tools/growth-campaign', { name, student, background: student, country, major, degree, angle, concern: angle, platform });
+      const { data } = await api.post('/tools/growth-campaign', { name, student, background: student, country, major, degree, angle, concern: angle, platform, gaokaoTaken, gaokaoScore });
       setResult(data || {});
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || '生成失败');
@@ -100,6 +92,8 @@ export default function FrontDesk() {
             <div className="form-grid two">
               <label>学生称呼<input value={name} onChange={(e) => setName(e.target.value)} /></label>
               <label>申请学位<select value={degree} onChange={(e) => setDegree(e.target.value)}>{degreeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              {degree === '本科' && <label>是否有高考成绩<select value={gaokaoTaken} onChange={(e) => setGaokaoTaken(e.target.value)}><option value="否">否</option><option value="是">是</option></select></label>}
+              {degree === '本科' && gaokaoTaken === '是' && <label>高考分数<input value={gaokaoScore} onChange={(e) => setGaokaoScore(e.target.value)} placeholder="例如 580/750" /></label>}
             </div>
             <label>学生背景<textarea value={student} onChange={(e) => setStudent(e.target.value)} /></label>
             <div className="form-grid two">

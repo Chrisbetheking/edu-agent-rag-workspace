@@ -1,12 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
-
-const countryOptions = ['英国', '澳洲', '新加坡', '香港', '加拿大'];
-const majorOptions = ['计算机科学', '数据科学', '人工智能', '软件工程', '商业分析', '信息系统'];
-const degreeOptions = ['硕士', '本科', '博士'];
-const languageOptions = ['IELTS 6.5', 'IELTS 7.0', 'TOEFL 90', 'PTE 65', '暂未考试'];
-const budgetOptions = ['20万人民币', '25万人民币', '30万人民币', '35万人民币', '40万人民币以上'];
+import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
 
 function StageCard({ stage, index }: { stage: any; index: number }) {
   return (
@@ -23,7 +18,7 @@ function TextPanel({ title, content }: { title: string; content: unknown }) {
   return (
     <article className="ops-card enhanced-card">
       <div className="row-between top-align"><h3>{title}</h3><button className="ghost-button" type="button" onClick={() => navigator.clipboard?.writeText(text)}>复制</button></div>
-      <p>{text || '暂无内容'}</p>
+      <p className="pre-line">{text || '暂无内容'}</p>
     </article>
   );
 }
@@ -50,6 +45,14 @@ function ScorePanel({ fit }: { fit: any }) {
   );
 }
 
+function MaterialPanel({ items }: { items: any[] }) {
+  return (
+    <div className="material-list single-list">
+      {asArray(items).map((item, i) => <div className="material-item" key={i}><strong>{stringifySafe(item)}</strong></div>)}
+    </div>
+  );
+}
+
 export default function Applications() {
   const [name, setName] = useState('Chris');
   const [country, setCountry] = useState('英国');
@@ -57,7 +60,10 @@ export default function Applications() {
   const [degree, setDegree] = useState('硕士');
   const [gpa, setGpa] = useState('3.2');
   const [scale, setScale] = useState('4');
-  const [language, setLanguage] = useState('IELTS 6.5');
+  const [languageType, setLanguageType] = useState('IELTS');
+  const [languageScore, setLanguageScore] = useState('6.5');
+  const [gaokaoTaken, setGaokaoTaken] = useState('否');
+  const [gaokaoScore, setGaokaoScore] = useState('');
   const [budget, setBudget] = useState('30万人民币');
   const [experience, setExperience] = useState('马来西亚 APU 计算机本科，有软件项目、AI/数据项目、实习和 GitHub 作品集');
   const [targetSchools, setTargetSchools] = useState('暂未确定');
@@ -65,6 +71,7 @@ export default function Applications() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const language = useMemo(() => buildLanguage(languageType, languageScore), [languageType, languageScore]);
   const exportMarkdown = useMemo(() => {
     if (!result) return '';
     if (result.exportMarkdown) return result.exportMarkdown;
@@ -78,7 +85,7 @@ export default function Applications() {
     setLoading(true);
     setError('');
     try {
-      const payload = { name, country, major, degree, gpa, cgpa: gpa, scale, language, budget, experience, background: experience, targetSchools };
+      const payload = { name, country, major, degree, gpa, cgpa: gpa, scale, language, languageType, languageScore, gaokaoTaken, gaokaoScore, budget, experience, background: experience, targetSchools };
       const [fitRes, planRes] = await Promise.all([
         api.post('/tools/profile-fit', payload),
         api.post('/tools/application-plan', payload),
@@ -97,7 +104,7 @@ export default function Applications() {
         <div>
           <span className="eyebrow">申请案卷</span>
           <h1>文书与材料流程</h1>
-          <p>录入学生信息后，生成适配评分、文书方向、材料清单和递交流程。</p>
+          <p>生成评分、文书方向、材料清单和递交流程。</p>
         </div>
         <div className="title-actions">
           {result && <button className="ghost-button" onClick={() => downloadText(`application-${name || 'student'}.md`, exportMarkdown)}>导出 Markdown</button>}
@@ -119,7 +126,10 @@ export default function Applications() {
               <label>申请学位<select value={degree} onChange={(e) => setDegree(e.target.value)}>{degreeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               <label>GPA / CGPA<input value={gpa} onChange={(e) => setGpa(e.target.value)} /></label>
               <label>满分制<select value={scale} onChange={(e) => setScale(e.target.value)}><option value="4">4.0</option><option value="5">5.0</option><option value="100">100</option></select></label>
-              <label>语言成绩<select value={language} onChange={(e) => setLanguage(e.target.value)}>{languageOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label>语言类型<select value={languageType} onChange={(e) => setLanguageType(e.target.value)}>{languageTypeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label>语言分数<input value={languageScore} onChange={(e) => setLanguageScore(e.target.value)} placeholder="例如 6.5 / 90 / 65" disabled={languageType === '暂无'} /></label>
+              {degree === '本科' && <label>是否有高考成绩<select value={gaokaoTaken} onChange={(e) => setGaokaoTaken(e.target.value)}><option value="否">否</option><option value="是">是</option></select></label>}
+              {degree === '本科' && gaokaoTaken === '是' && <label>高考分数<input value={gaokaoScore} onChange={(e) => setGaokaoScore(e.target.value)} placeholder="例如 580/750" /></label>}
               <label>预算<select value={budget} onChange={(e) => setBudget(e.target.value)}>{budgetOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
             </div>
             <label>项目 / 实习 / 课程经历<textarea value={experience} onChange={(e) => setExperience(e.target.value)} /></label>
@@ -130,7 +140,7 @@ export default function Applications() {
 
         <section className="panel">
           <div className="panel-title compact"><span className="eyebrow">结果</span><h2>文书方向</h2></div>
-          {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成一个申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
+          {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
             <div className="ops-card-grid">
               <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} />
               <div className="ops-card enhanced-card"><h3>PS 大纲</h3><ul>{asArray(result.writingBrief?.psOutline).map((x, i) => <li key={i}>{stringifySafe(x)}</li>)}</ul></div>
@@ -161,7 +171,7 @@ export default function Applications() {
 
       {result && (
         <div className="two-col">
-          <section className="panel"><div className="panel-title compact"><span className="eyebrow">材料</span><h2>清单</h2></div><div className="tag-row large-tags">{asArray(result.materialChecklist).map((item, i) => <span key={i}>{stringifySafe(item)}</span>)}</div></section>
+          <section className="panel"><div className="panel-title compact"><span className="eyebrow">材料</span><h2>清单</h2></div><MaterialPanel items={asArray(result.materialChecklist)} /></section>
           <section className="panel"><div className="panel-title compact"><span className="eyebrow">风险</span><h2>下一步</h2></div><ul className="check-list">{[...asArray(result.riskFlags), ...asArray(result.nextBestActions)].map((item, i) => <li key={i}>{stringifySafe(item)}</li>)}</ul></section>
         </div>
       )}

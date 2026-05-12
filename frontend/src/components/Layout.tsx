@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { api } from '../api/client';
@@ -19,6 +19,13 @@ function pageLabel(pathname: string) {
   return current?.label || 'EduAgent';
 }
 
+function defaultCollapsed() {
+  if (typeof window === 'undefined') return false;
+  const stored = window.localStorage.getItem('eduagent-sidebar-collapsed');
+  if (stored) return stored === 'true';
+  return window.innerWidth < 900;
+}
+
 export default function Layout() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
@@ -26,6 +33,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isGuest = user?.role === 'guest';
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   useEffect(() => {
     api.get('/auth/profile')
@@ -33,12 +41,21 @@ export default function Layout() {
       .catch(() => undefined);
   }, [location.pathname, setUser]);
 
+  function toggleSidebar() {
+    setCollapsed((value) => {
+      const next = !value;
+      window.localStorage.setItem('eduagent-sidebar-collapsed', String(next));
+      return next;
+    });
+  }
+
   return (
-    <div className="app-shell">
+    <div className={collapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
+      <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label="切换侧边栏">{collapsed ? '☰' : '‹'}</button>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-icon">E</div>
-          <div>
+          <div className="sidebar-text">
             <strong>EduAgent</strong>
             <span>留学咨询工作台</span>
           </div>
@@ -46,7 +63,7 @@ export default function Layout() {
 
         <div className="sidebar-status">
           <span className="pulse-dot" />
-          <div>
+          <div className="sidebar-text">
             <strong>{isGuest ? '访客体验' : '管理员'}</strong>
             <small>{isGuest ? `今日剩余 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端服务在线'}</small>
           </div>
@@ -57,11 +74,13 @@ export default function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
+              title={item.label}
               className={({ isActive }) => (isActive ? 'nav active' : 'nav')}
               end={item.to === '/workspace'}
+              onClick={() => { if (window.innerWidth < 900) setCollapsed(true); }}
             >
               <span className="nav-icon">{item.icon}</span>
-              <span>
+              <span className="sidebar-text">
                 <strong>{item.label}</strong>
                 <small>{item.desc}</small>
               </span>
@@ -72,12 +91,12 @@ export default function Layout() {
         <div className="sidebar-footer">
           <div className="user-card">
             <div className="avatar">{(user?.displayName || user?.username || 'U').slice(0, 1).toUpperCase()}</div>
-            <div>
+            <div className="sidebar-text">
               <strong>{user?.displayName || '用户'}</strong>
               <small>{isGuest ? '访客 · 部分操作受限' : `${user?.role || 'admin'} · ${pageLabel(location.pathname)}`}</small>
             </div>
           </div>
-          <button className="ghost-dark" onClick={() => { logout(); navigate('/login'); }}>退出</button>
+          <button className="ghost-dark sidebar-text" onClick={() => { logout(); navigate('/login'); }}>退出</button>
         </div>
       </aside>
 

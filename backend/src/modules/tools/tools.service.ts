@@ -20,6 +20,10 @@ type StudentInput = {
   budget?: string;
   language?: string;
   englishScore?: string;
+  languageType?: string;
+  languageScore?: string;
+  gaokaoTaken?: string;
+  gaokaoScore?: string;
   concern?: string;
   angle?: string;
   platform?: string;
@@ -50,7 +54,12 @@ export class ToolsService {
     const cgpa = String(input.cgpa || input.gpa || "3.2");
     const scale = Number(input.scale || 4);
     const budget = input.budget || "30万人民币";
-    const language = input.language || input.englishScore || "IELTS 6.5";
+    const languageType = input.languageType || "IELTS";
+    const languageScore = input.languageScore || "6.5";
+    const language =
+      input.language ||
+      input.englishScore ||
+      (languageType === "暂无" ? "暂未考试" : `${languageType} ${languageScore}`);
     const concern =
       input.concern ||
       input.angle ||
@@ -62,6 +71,8 @@ export class ToolsService {
       "马来西亚 APU 计算机本科，有软件项目、AI/数据项目和实习经历";
     const platform = input.platform || "小红书 + 短视频 + 微信私域";
     const targetSchools = input.targetSchools || "暂未确定";
+    const gaokaoTaken = input.gaokaoTaken || "否";
+    const gaokaoScore = input.gaokaoScore || "";
 
     return {
       name,
@@ -72,6 +83,10 @@ export class ToolsService {
       scale,
       budget,
       language,
+      languageType,
+      languageScore,
+      gaokaoTaken,
+      gaokaoScore,
       concern,
       experience,
       platform,
@@ -189,9 +204,13 @@ export class ToolsService {
   private markdownList(items: any[] = []) {
     return items
       .filter(Boolean)
-      .map(
-        (item) => `- ${typeof item === "string" ? item : JSON.stringify(item)}`,
-      )
+      .map((item) => {
+        if (typeof item === "string") return `- ${item}`;
+        if (item?.name) return `- ${item.name}${item.note ? `：${item.note}` : ""}`;
+        if (item?.file) return `- ${item.file}${item.note ? `：${item.note}` : ""}`;
+        if (item?.stage || item?.item) return `- ${item.stage || ""} ${item.item || ""}`.trim();
+        return `- ${JSON.stringify(item)}`;
+      })
       .join("\n");
   }
 
@@ -234,24 +253,21 @@ export class ToolsService {
     return this.trackAsync("院校推荐工具", input, async () => {
       const s = this.normalizeStudent(input);
       const gpa = Number(s.cgpa) || 3.2;
+      const schoolPool: Record<string, string[][]> = {
+        英国: [["Manchester", "Bristol", "Glasgow"], ["Sheffield", "Nottingham", "Queen Mary"], ["Cardiff", "Liverpool", "Sussex"]],
+        澳洲: [["University of Sydney", "UNSW", "Monash"], ["University of Adelaide", "UTS", "RMIT"], ["Deakin", "Swinburne", "Macquarie"]],
+        新加坡: [["NUS", "NTU"], ["SMU", "SUTD"], ["SIM / Kaplan 合作项目", "PSB Academy"]],
+        香港: [["HKU", "CUHK", "HKUST"], ["CityU", "PolyU", "HKBU"], ["Lingnan", "HSUHK"]],
+        加拿大: [["UBC", "Toronto", "Waterloo"], ["McMaster", "Ottawa", "Simon Fraser"], ["York", "Concordia", "Windsor"]],
+        美国: [["Northeastern", "USC", "NYU Tandon"], ["Stevens", "Syracuse", "George Washington"], ["Pace", "Illinois Tech", "University of Dayton"]],
+      };
+      const pool = schoolPool[s.country] || schoolPool["英国"];
       const fallbackBands =
         gpa >= 3.4
-          ? {
-              reach: ["Manchester", "Bristol"],
-              match: ["Sheffield", "Nottingham"],
-              safe: ["Cardiff", "Liverpool"],
-            }
+          ? { reach: pool[0].slice(0, 2), match: pool[1].slice(0, 2), safe: pool[2].slice(0, 2) }
           : gpa >= 3.0
-            ? {
-                reach: ["Sheffield", "Nottingham"],
-                match: ["Cardiff", "Liverpool"],
-                safe: ["Sussex", "Essex"],
-              }
-            : {
-                reach: ["Cardiff", "Liverpool"],
-                match: ["Sussex", "Essex"],
-                safe: ["Swansea", "部分预科/语言班/合作项目"],
-              };
+            ? { reach: pool[1].slice(0, 2), match: pool[2].slice(0, 2), safe: [pool[2][2] || pool[2][0], "合作项目/预科/桥梁课程"] }
+            : { reach: pool[2].slice(0, 1), match: [pool[2][1] || pool[2][0], "合作项目"], safe: ["预科/桥梁课程", "语言班后补方案"] };
 
       const fallback = {
         profile: s,
@@ -373,19 +389,37 @@ export class ToolsService {
         `${student.experience} ${student.concern} ${student.major} ${student.language} ${student.budget}`.toLowerCase();
 
       const hasCsBackground =
-        /计算机|软件|computer|software|it|数据|data|ai|人工智能|信息/.test(
+        /计算机|软件|computer|software|it|数据|data|ai|人工智能|信息|工程|business|analytics|金融|fintech/.test(
           text,
         );
       const hasProject =
-        /项目|project|github|作品集|系统|web|开发|ai|rag|数据|实习|intern/.test(
+        /项目|project|github|作品集|系统|web|开发|ai|rag|数据|实习|intern|科研|竞赛|论文/.test(
           text,
         );
-      const hasInternship = /实习|intern|工作|项目交付|团队/.test(text);
+      const hasInternship = /实习|intern|工作|项目交付|团队|公司|research/.test(text);
+      const langType = String(student.languageType || "").toUpperCase();
+      const langScore = Number(
+        String(student.languageScore || student.language || "").match(/\d+(\.\d+)?/)?.[0] || 0,
+      );
       const hasLanguage =
-        /ielts\s*6\.5|雅思\s*6\.5|toefl|pte|英语|英文|6\.5|7/.test(text);
+        langType === "IELTS"
+          ? langScore >= 6
+          : langType === "TOEFL"
+            ? langScore >= 80
+            : langType === "PTE"
+              ? langScore >= 58
+              : /ielts\s*6|雅思\s*6|toefl|pte|duolingo|英语|英文/.test(text);
       const budgetNum = Number(
         String(student.budget || "").match(/\d+(\.\d+)?/)?.[0] || 0,
       );
+      const isUndergrad = student.degree === "本科";
+      const gaokaoNum = Number(
+        String(student.gaokaoScore || "").match(/\d+(\.\d+)?/)?.[0] || 0,
+      );
+      const gaokaoScore =
+        !isUndergrad ? 0 : student.gaokaoTaken === "是" && gaokaoNum > 0
+          ? Math.max(50, Math.min(95, Math.round((gaokaoNum / 750) * 100)))
+          : 58;
 
       const gpaScore = Math.round(Math.min(100, Math.max(35, percentage)));
       const majorScore = hasCsBackground ? 88 : 62;
@@ -393,110 +427,56 @@ export class ToolsService {
         96,
         (hasProject ? 78 : 48) +
           (hasInternship ? 10 : 0) +
-          (/github|作品集|上线|部署|rag|ai/.test(text) ? 8 : 0),
+          (/github|作品集|上线|部署|rag|ai|论文|竞赛/.test(text) ? 8 : 0),
       );
-      const languageScore = hasLanguage ? 82 : 62;
+      const languageScore = hasLanguage ? 82 : 58;
       const budgetScore =
-        budgetNum >= 35 ? 86 : budgetNum >= 28 ? 76 : budgetNum >= 20 ? 64 : 52;
+        budgetNum >= 40 ? 90 : budgetNum >= 35 ? 84 : budgetNum >= 28 ? 76 : budgetNum >= 20 ? 64 : 52;
 
-      const weights = {
-        gpa: 0.3,
-        major: 0.22,
-        project: 0.24,
-        language: 0.12,
-        budget: 0.12,
-      };
+      const weights = isUndergrad
+        ? { gpa: 0.24, major: 0.16, project: 0.16, language: 0.14, budget: 0.1, entranceExam: 0.2 }
+        : { gpa: 0.3, major: 0.22, project: 0.24, language: 0.12, budget: 0.12 };
       const overall = Math.round(
         gpaScore * weights.gpa +
           majorScore * weights.major +
           projectScore * weights.project +
           languageScore * weights.language +
-          budgetScore * weights.budget,
+          budgetScore * weights.budget +
+          (isUndergrad ? gaokaoScore * (weights as any).entranceExam : 0),
       );
 
       const band =
         overall >= 82 ? "A" : overall >= 72 ? "B" : overall >= 62 ? "C" : "D";
       const tierAdvice =
         band === "A"
-          ? {
-              reach: 3,
-              match: 3,
-              safe: 2,
-              strategy: "可以保留冲刺比例，但仍需设置保底。",
-            }
+          ? { reach: 3, match: 3, safe: 2, strategy: "可以保留冲刺比例，但仍需设置保底。" }
           : band === "B"
-            ? {
-                reach: 2,
-                match: 4,
-                safe: 2,
-                strategy: "以匹配院校为主，冲刺院校需要材料支撑。",
-              }
+            ? { reach: 2, match: 4, safe: 2, strategy: "以匹配院校为主，冲刺院校需要材料支撑。" }
             : band === "C"
-              ? {
-                  reach: 1,
-                  match: 3,
-                  safe: 4,
-                  strategy: "控制申请风险，重点包装项目与课程匹配。",
-                }
-              : {
-                  reach: 0,
-                  match: 3,
-                  safe: 5,
-                  strategy: "先补齐语言、项目证明和材料，再扩大申请范围。",
-                };
+              ? { reach: 1, match: 3, safe: 4, strategy: "控制申请风险，重点包装项目与课程匹配。" }
+              : { reach: 0, match: 3, safe: 5, strategy: "先补齐语言、项目证明和材料，再扩大申请范围。" };
 
-      const factors = [
-        {
-          key: "gpa",
-          label: "成绩表现",
-          score: gpaScore,
-          weight: weights.gpa,
-          evidence: `${student.cgpa}/${student.scale}`,
-        },
-        {
-          key: "major",
-          label: "专业匹配",
-          score: majorScore,
-          weight: weights.major,
-          evidence: hasCsBackground
-            ? "背景与目标专业相关"
-            : "需要补课程或项目说明",
-        },
-        {
-          key: "project",
-          label: "项目经历",
-          score: projectScore,
-          weight: weights.project,
-          evidence: hasProject ? "有项目/实习可包装" : "项目素材不足",
-        },
-        {
-          key: "language",
-          label: "语言准备",
-          score: languageScore,
-          weight: weights.language,
-          evidence: student.language || "待补充",
-        },
-        {
-          key: "budget",
-          label: "预算风险",
-          score: budgetScore,
-          weight: weights.budget,
-          evidence: student.budget || "待确认",
-        },
+      const factors: any[] = [
+        { key: "gpa", label: "成绩表现", score: gpaScore, weight: weights.gpa, evidence: `${student.cgpa}/${student.scale}` },
+        { key: "major", label: "专业匹配", score: majorScore, weight: weights.major, evidence: hasCsBackground ? "背景与目标专业相关" : "需要补课程或项目说明" },
+        { key: "project", label: "项目经历", score: projectScore, weight: weights.project, evidence: hasProject ? "有项目/实习可包装" : "项目素材不足" },
+        { key: "language", label: "语言准备", score: languageScore, weight: weights.language, evidence: student.language || "待补充" },
+        { key: "budget", label: "预算风险", score: budgetScore, weight: weights.budget, evidence: student.budget || "待确认" },
       ];
+      if (isUndergrad) {
+        factors.push({ key: "entranceExam", label: "高考/入学考试", score: gaokaoScore, weight: (weights as any).entranceExam, evidence: student.gaokaoTaken === "是" ? student.gaokaoScore || "已提供" : "未提供高考成绩" });
+      }
 
       const risks = [] as string[];
-      if (gpaScore < 75)
-        risks.push("成绩不算强，冲刺院校需要用项目和推荐信补强。");
+      if (gpaScore < 75) risks.push("成绩不算强，冲刺院校需要用项目和推荐信补强。");
+      if (isUndergrad && student.gaokaoTaken !== "是") risks.push("本科申请未提供高考成绩，需要确认是否可用国际课程或预科路径替代。");
       if (!hasProject) risks.push("项目材料不足，PS 和 CV 容易空泛。");
-      if (!hasLanguage)
-        risks.push("语言成绩信息不完整，递交节奏需要预留补分时间。");
-      if (budgetScore < 70)
-        risks.push("预算需要区分城市和学制，避免只按排名选校。");
+      if (!hasLanguage) risks.push("语言成绩信息不完整，递交节奏需要预留补分时间。");
+      if (budgetScore < 70) risks.push("预算需要区分城市和学制，避免只按排名选校。");
 
       return {
         student,
-        algorithm: "weighted-fit-v1",
+        algorithm: "weighted-fit-v2",
         overall,
         band,
         percentage: Number(percentage.toFixed(1)),
@@ -505,9 +485,9 @@ export class ToolsService {
         tierAdvice,
         risks,
         nextActions: [
-          "把成绩单、课程列表和项目经历整理成结构化材料。",
+          "整理成绩单、课程列表、项目经历和语言成绩。",
           "按冲刺、匹配、保底三档核对学校官网要求。",
-          "优先补充能证明工程能力或数据能力的项目证据。",
+          isUndergrad ? "确认高考/国际课程/预科路径是否适用。" : "优先补充能证明工程能力或数据能力的项目证据。",
         ],
       };
     });
@@ -516,36 +496,57 @@ export class ToolsService {
   materialList(input: StudentInput) {
     return this.track("申请材料清单工具", input, () => {
       const s = this.normalizeStudent(input);
+      const isUndergrad = s.degree === "本科";
+      const isPostgrad = s.degree === "硕士" || s.degree === "博士";
+      const needsPortfolio = /设计|建筑|艺术|传媒|作品|github|计算机|软件|数据|ai|人工智能/i.test(
+        `${s.major} ${s.experience}`,
+      );
+      const required = [
+        { name: "护照", note: "信息页清晰扫描" },
+        { name: "成绩单", note: "中英文版本；如未毕业，提供最新成绩单" },
+        { name: isUndergrad ? "高中在读/毕业证明" : "在读证明/毕业证学位证", note: "与成绩单姓名保持一致" },
+        { name: "语言成绩", note: s.language || "未考试时标记为待补" },
+        { name: isUndergrad ? "个人陈述/动机信" : "Personal Statement", note: "按目标专业改写，不建议通用一版" },
+        { name: "简历 CV", note: "项目、实习、课程经历按申请方向排序" },
+      ];
+      if (isPostgrad) required.push({ name: "推荐信", note: "通常 1-2 封，优先学术推荐" });
+      if (isUndergrad && s.gaokaoTaken === "是") required.push({ name: "高考成绩", note: s.gaokaoScore || "需补充总分与省份" });
+
+      const conditional = [
+        { name: "课程描述", note: "跨专业或课程匹配不明显时建议准备" },
+        { name: "均分/GPA 说明", note: "不同评分制、转学或交换经历时使用" },
+        { name: "资金证明", note: "签证或个别学校阶段需要" },
+        { name: "作品集/项目集", note: needsPortfolio ? "建议准备" : "如专业要求再准备" },
+      ];
+      if (isUndergrad && s.gaokaoTaken !== "是") conditional.unshift({ name: "国际课程/预科替代材料", note: "没有高考成绩时确认替代路径" });
+
       return {
         country: s.country,
         degree: s.degree,
-        required: [
-          "成绩单",
-          "在读证明/毕业证",
-          "个人陈述 PS",
-          "简历 CV",
-          "推荐信",
-          "护照",
-          "语言成绩",
-        ],
+        required,
+        conditional,
         optional: [
-          "课程描述",
-          "作品集",
-          "实习证明",
-          "项目证明",
-          "获奖证明",
-          "GitHub/作品集链接",
+          { name: "实习证明", note: "有岗位职责和时间更好" },
+          { name: "项目证明", note: "项目说明、截图、Demo、GitHub 链接" },
+          { name: "获奖/证书", note: "只放和申请相关的内容" },
+          { name: "研究计划", note: "博士或研究型项目需要" },
         ],
         namingRules: [
-          "01_transcript.pdf",
-          "02_cv.pdf",
-          "03_ps.docx",
-          "04_reference_1.pdf",
+          { file: "01_passport.pdf", note: "护照" },
+          { file: "02_transcript.pdf", note: "成绩单" },
+          { file: "03_cv.pdf", note: "简历" },
+          { file: "04_ps.docx", note: "个人陈述" },
+          { file: "05_reference_1.pdf", note: "推荐信" },
+        ],
+        timeline: [
+          { stage: "本周", item: "补齐成绩单、语言成绩、项目经历" },
+          { stage: "1-2 周", item: "完成 CV、PS 大纲和推荐信素材" },
+          { stage: "递交前", item: "逐校核对材料要求、命名和文件格式" },
         ],
         reminders: [
-          "不同学校材料要求可能不同。",
-          "语言成绩未达标时可查询语言班或后补政策。",
-          "所有材料建议统一命名并备份。",
+          "材料清单是内部初筛版本，递交前仍需逐校核对官网。",
+          "同一份材料不要反复复制，建议统一命名并维护版本号。",
+          "语言未达标时，把后补语言或语言班方案单独标记。",
         ],
       };
     });
