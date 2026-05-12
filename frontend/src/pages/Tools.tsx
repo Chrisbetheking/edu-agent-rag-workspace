@@ -259,22 +259,23 @@ function AdvisorView({ result }: { result: any }) {
         </div>
       </div>
 
-      <ResultShell id="advisor-trace" title="执行链路" subtitle="一次录入，多节点复用">
-        <div className="workflow-board workflow-board-v9">
-          {asArray(result.workflow).map((step: any, index) => (
-            <MiniCard key={step.name || index} title={`${step.step || index + 1}. ${toDisplayText(step.name) || 'Step'}`} subtitle={toDisplayText(step.tool) || '-'}>
-              <p>{toDisplayText(step.output || step.status || 'done')}</p>
-            </MiniCard>
-          ))}
+      <div className="advisor-grid-v11">
+        <div id="advisor-trace" className="advisor-module advisor-trace-module">
+          <ResultShell title="执行链路" subtitle="一次录入，多节点复用">
+            <div className="workflow-board workflow-board-v9 workflow-board-v11">
+              {asArray(result.workflow).map((step: any, index) => (
+                <MiniCard key={step.name || index} title={`${step.step || index + 1}. ${toDisplayText(step.name) || 'Step'}`} subtitle={toDisplayText(step.tool) || '-'}>
+                  <p>{toDisplayText(step.output || step.status || 'done')}</p>
+                </MiniCard>
+              ))}
+            </div>
+          </ResultShell>
         </div>
-      </ResultShell>
-
-      <div className="advisor-main-grid">
-        {outputs.fit && <div id="advisor-score"><ScoreView result={outputs.fit} /></div>}
-        {outputs.schools && <div id="advisor-schools"><SchoolBands data={outputs.schools} /></div>}
-        {outputs.application && <div id="advisor-application"><ApplicationView result={outputs.application} /></div>}
-        {outputs.sales && <div id="advisor-sales"><CopywritingView result={outputs.sales} /></div>}
-        {outputs.materials && <div id="advisor-materials"><MaterialView data={outputs.materials} /></div>}
+        {outputs.fit && <div id="advisor-score" className="advisor-module advisor-score-module"><ScoreView result={outputs.fit} /></div>}
+        {outputs.schools && <div id="advisor-schools" className="advisor-module advisor-schools-module"><SchoolBands data={outputs.schools} /></div>}
+        {outputs.application && <div id="advisor-application" className="advisor-module advisor-application-module"><ApplicationView result={outputs.application} /></div>}
+        {outputs.sales && <div id="advisor-sales" className="advisor-module advisor-sales-module"><CopywritingView result={outputs.sales} /></div>}
+        {outputs.materials && <div id="advisor-materials" className="advisor-module advisor-materials-module"><MaterialView data={outputs.materials} /></div>}
       </div>
     </div>
   );

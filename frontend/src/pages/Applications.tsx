@@ -225,7 +225,7 @@ export default function Applications() {
             {result && <span className="pill success">已生成</span>}
           </div>
           {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
-            <div className="application-output-stack-v10">
+            <div className="application-output-stack-v10 application-output-grid-v11">
               <SectionNav items={[
                 { id: 'app-score', label: '评分' },
                 { id: 'app-brief', label: '方向' },
@@ -234,9 +234,9 @@ export default function Applications() {
                 { id: 'app-materials', label: '材料' },
               ]} />
 
-              <ScorePanel fit={result.fit} />
+              <div className="app-grid-item app-grid-score"><ScorePanel fit={result.fit} /></div>
 
-              <ResultShell id="app-brief" title="文书方向" subtitle="PS、CV、推荐信">
+              <div className="app-grid-item app-grid-brief"><ResultShell id="app-brief" title="文书方向" subtitle="PS、CV、推荐信">
                 <div className="app-brief-board-v10">
                   <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} className="app-brief-main" />
                   <div className="app-brief-side-v10">
@@ -245,9 +245,9 @@ export default function Applications() {
                     <FoldSection title="推荐信角度" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.recommendationAngles} /></FoldSection>
                   </div>
                 </div>
-              </ResultShell>
+              </ResultShell></div>
 
-              <ResultShell id="app-drafts" title="可编辑初稿" subtitle="左侧长文，右侧摘要与推荐信">
+              <div className="app-grid-item app-grid-drafts"><ResultShell id="app-drafts" title="可编辑初稿" subtitle="左侧长文，右侧摘要与推荐信">
                 <div className="panel-title inner-title"><span className="eyebrow">文书</span><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(exportMarkdown)}>复制全部</button></div>
                 <div className="app-draft-grid-v10">
                   <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} className="draft-main-card" />
@@ -256,16 +256,16 @@ export default function Applications() {
                     <TextPanel title="推荐信素材" content={result.drafts?.recommendationSeed} />
                   </div>
                 </div>
-              </ResultShell>
+              </ResultShell></div>
 
-              <div id="app-pipeline" className="result-cluster-grid two balanced-blocks app-pipeline-grid-v10">
+              <div id="app-pipeline" className="app-grid-item app-grid-pipeline result-cluster-grid two balanced-blocks app-pipeline-grid-v10">
                 <ResultShell title="申请执行" subtitle="按任务节点推进"><div className="pipeline-list compact-pipeline">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div></ResultShell>
                 <ResultShell title="风险与下一步" subtitle="人工确认"><div className="nested-card-grid two"><FoldSection title="风险点" defaultOpen className="inner-fold-card"><ListBlock items={risks} /></FoldSection><FoldSection title="下一步" defaultOpen className="inner-fold-card"><ListBlock items={actions} /></FoldSection></div></ResultShell>
               </div>
 
-              <ResultShell id="app-materials" title="材料清单" subtitle="递交前逐校核对">
+              <div className="app-grid-item app-grid-materials"><ResultShell id="app-materials" title="材料清单" subtitle="递交前逐校核对">
                 <MaterialPanel items={asArray(result.materialChecklist)} />
-              </ResultShell>
+              </ResultShell></div>
             </div>
           )}
         </section>

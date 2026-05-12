@@ -84,12 +84,23 @@ export function SectionGroup({
 
 export function SectionNav({ items }: { items: Array<{ id: string; label: string }> }) {
   if (!items.length) return null;
+
+  function backToTop() {
+    const main = document.querySelector('.main');
+    if (main) {
+      main.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   return (
-    <nav className="section-nav" aria-label="页面目录">
+    <nav className="section-nav section-nav-v11" aria-label="页面目录">
       <span>目录</span>
       {items.map((item) => (
         <a key={item.id} href={`#${item.id}`}>{item.label}</a>
       ))}
+      <button className="section-nav-top" type="button" onClick={backToTop}>顶部</button>
     </nav>
   );
 }

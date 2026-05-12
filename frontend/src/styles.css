@@ -1634,3 +1634,151 @@ th { color: var(--muted); font-weight: 800; }
   .button-grid { grid-template-columns: 1fr; }
   .application-result-panel-v10 .section-nav { top: 56px; }
 }
+
+/* V11: sticky directory, top shortcut, and true two-column result workspace */
+.section-nav-v11 {
+  position: sticky !important;
+  top: 14px !important;
+  z-index: 90 !important;
+  margin: 0 0 14px !important;
+  border-radius: 20px;
+  border-color: rgba(49, 80, 200, .18);
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 14px 38px rgba(15, 23, 42, .10);
+}
+.section-nav-v11 a { transition: transform .16s ease, background .16s ease; }
+.section-nav-v11 a:hover { transform: translateY(-1px); }
+.section-nav-top {
+  margin-left: auto;
+  flex: 0 0 auto;
+  border: 1px solid #dbe5ff;
+  background: linear-gradient(135deg, #3150c8, #06b6d4);
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 950;
+  box-shadow: 0 10px 24px rgba(49, 80, 200, .18);
+}
+.section-fold, .section-group-card, .advisor-module, .app-grid-item { scroll-margin-top: 96px; }
+
+/* Advisor result layout: large modules stay readable, lower modules use left/right pairs. */
+.advisor-grid-v11 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.advisor-grid-v11 .advisor-module { min-width: 0; }
+.advisor-trace-module,
+.advisor-materials-module { grid-column: 1 / -1; }
+.advisor-grid-v11 .result-shell-grid { grid-template-columns: 1fr !important; }
+.advisor-grid-v11 .result-shell-aside { display: block; }
+.advisor-grid-v11 .score-aside-card,
+.advisor-grid-v11 .result-aside-note { position: static; }
+.advisor-grid-v11 .score-factor-grid-v10,
+.advisor-grid-v11 .comfort-score-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important; }
+.advisor-grid-v11 .decision-grid-v10,
+.advisor-grid-v11 .risk-board-v10,
+.advisor-grid-v11 .app-brief-board-v10,
+.advisor-grid-v11 .app-draft-grid-v10,
+.advisor-grid-v11 .draft-grid-comfort,
+.advisor-grid-v11 .nested-card-grid.two,
+.advisor-grid-v11 .result-cluster-grid.two { grid-template-columns: 1fr !important; }
+.advisor-grid-v11 .comfort-tier-grid { grid-template-columns: 1fr !important; }
+.advisor-grid-v11 .workflow-board-v11 { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+.advisor-grid-v11 .section-group-card { height: 100%; }
+.advisor-grid-v11 .advisor-score-module .section-group-card,
+.advisor-grid-v11 .advisor-schools-module .section-group-card,
+.advisor-grid-v11 .advisor-application-module .section-group-card,
+.advisor-grid-v11 .advisor-sales-module .section-group-card { min-height: 100%; }
+.advisor-grid-v11 .pre-line { max-height: 420px; overflow: auto; }
+.advisor-grid-v11 .material-board-comfort { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Make the form/result split less wasteful on desktop. */
+.tools-workbench-v9,
+.application-workbench-v9 {
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) !important;
+  gap: 22px;
+}
+.generated-result-panel,
+.application-result-panel-v10 {
+  align-content: start;
+}
+
+/* Application page: score + brief side-by-side; drafts full width; pipeline + materials side-by-side. */
+.application-output-grid-v11 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.application-output-grid-v11 > .section-nav { grid-column: 1 / -1; }
+.app-grid-item { min-width: 0; }
+.app-grid-drafts { grid-column: 1 / -1; }
+.app-grid-score .result-shell-grid,
+.app-grid-brief .result-shell-grid,
+.app-grid-pipeline .result-shell-grid,
+.app-grid-materials .result-shell-grid { grid-template-columns: 1fr !important; }
+.app-grid-score .score-aside-card { position: static; }
+.app-grid-score .score-factor-grid { grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)) !important; }
+.app-grid-score .result-cluster-grid.two,
+.app-grid-brief .app-brief-board-v10,
+.app-grid-pipeline.app-pipeline-grid-v10,
+.app-grid-pipeline .nested-card-grid.two,
+.app-grid-materials .compact-material-list { grid-template-columns: 1fr !important; }
+.app-grid-pipeline { display: grid; gap: 18px; align-items: start; }
+.app-grid-materials .material-list.single-list { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important; }
+.app-grid-drafts .app-draft-grid-v10 { grid-template-columns: minmax(0, .64fr) minmax(320px, .36fr) !important; }
+.app-grid-drafts .draft-main-card .pre-line { max-height: 58vh; overflow: auto; }
+.app-grid-drafts .app-draft-side-v10 .pre-line { max-height: 260px; overflow: auto; }
+
+/* Tighter cards: less vertical dead space, better readable blocks. */
+.section-group-card > summary { min-height: 58px; }
+.section-group-card > .fold-body { padding-bottom: 18px; }
+.fold-card > summary::after { align-self: center; }
+.result-shell-main .fold-card + .fold-card { margin-top: 0; }
+.pipeline-list.compact-pipeline { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important; }
+.mini-result-card { min-height: 0; }
+.mini-result-body ul { margin: 0; }
+
+/* Chat result: keep lower content in two columns where screen allows. */
+.chat-page-v2 .advice-result > .advice-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, .72fr) !important;
+  gap: 18px;
+  align-items: start;
+}
+.chat-page-v2 .meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 18px;
+}
+.chat-page-v2 .meta-grid > .section-group-card:last-child { grid-column: 1 / -1; }
+.chat-page-v2 .tier-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+
+@media (max-width: 1480px) {
+  .advisor-grid-v11 .workflow-board-v11 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 1180px) {
+  .advisor-grid-v11,
+  .application-output-grid-v11,
+  .app-grid-drafts .app-draft-grid-v10,
+  .chat-page-v2 .advice-result > .advice-two-col,
+  .chat-page-v2 .meta-grid,
+  .chat-page-v2 .tier-grid { grid-template-columns: 1fr !important; }
+  .advisor-trace-module,
+  .advisor-materials-module,
+  .app-grid-drafts { grid-column: auto; }
+  .advisor-grid-v11 .workflow-board-v11 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .section-nav-v11 { top: 10px !important; }
+}
+@media (max-width: 760px) {
+  .section-nav-v11 { top: 60px !important; border-radius: 16px; padding: 8px; }
+  .section-nav-v11 span { display: none; }
+  .section-nav-top { padding: 7px 10px; font-size: 12px; }
+  .advisor-grid-v11 .workflow-board-v11,
+  .advisor-grid-v11 .material-board-comfort { grid-template-columns: 1fr !important; }
+  .tools-workbench-v9,
+  .application-workbench-v9 { grid-template-columns: 1fr !important; }
+}
