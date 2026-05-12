@@ -22,6 +22,10 @@ function safeList(...values: unknown[]) {
   return values.flatMap((value) => asArray(value)).filter(Boolean);
 }
 
+function uniqueList(...values: unknown[]) {
+  return Array.from(new Set(safeList(...values).map((item) => toDisplayText(item)).filter(Boolean)));
+}
+
 function MiniCard({ title, children, subtitle, className = '' }: { title: string; subtitle?: string; children: ReactNode; className?: string }) {
   return (
     <div className={`mini-result-card ${className}`.trim()}>
@@ -51,25 +55,28 @@ function TextPanel({ title, value, className = '' }: { title: string; value: unk
 }
 
 function ScoreView({ result }: { result: any }) {
-  const risks = safeList(result.risks, result.riskSignals, result.riskFlags);
-  const nextActions = safeList(result.nextActions, result.nextBestActions);
+  const risks = uniqueList(result.hardRisks, result.softRisks, result.risks, result.riskSignals, result.riskFlags);
+  const hardRisks = uniqueList(result.hardRisks);
+  const softRisks = uniqueList(result.softRisks, result.riskSignals).filter((item) => !hardRisks.includes(item));
+  const nextActions = uniqueList(result.nextActions, result.nextBestActions);
+  const factors = asArray(result.factors);
   const aside = (
-    <div className="score-aside-card">
+    <div className="score-aside-card score-aside-v10">
       <span className="eyebrow">weighted-fit-v2</span>
       <h2>{result.overall ?? '-'}/100</h2>
       <p>{result.band || '-'} 档 · {toDisplayText(result.tierAdvice?.strategy) || '完成初筛'}</p>
       <div className="compact-metric-grid two">
-        <CompactMetric label="风险" value={risks.length} />
-        <CompactMetric label="动作" value={nextActions.length} />
+        <CompactMetric label="硬风险" value={hardRisks.length} />
+        <CompactMetric label="待确认" value={softRisks.length || risks.length} />
       </div>
     </div>
   );
 
   return (
-    <div className="agent-output-stack generated-output">
-      <ResultShell id="score-detail" title="适配评分" subtitle="算法权重、证据和风险点" aside={aside}>
-        <div className="score-factor-grid large-score-grid comfort-score-grid">
-          {asArray(result.factors).map((factor: any) => (
+    <div className="agent-output-stack generated-output score-view-v10">
+      <ResultShell id="score-detail" title="适配评分" subtitle="左侧结论，右侧评分证据" aside={aside}>
+        <div className="score-factor-grid large-score-grid comfort-score-grid score-factor-grid-v10">
+          {factors.map((factor: any) => (
             <div className="score-factor" key={factor.key || factor.label}>
               <div><strong>{toDisplayText(factor.label)}</strong><em>{toDisplayText(factor.score)}</em></div>
               <div className="usage-bar"><i style={{ width: `${Math.max(8, Math.min(100, Number(factor.score || 0)))}%` }} /></div>
@@ -79,21 +86,28 @@ function ScoreView({ result }: { result: any }) {
         </div>
       </ResultShell>
 
-      <div className="result-cluster-grid two balanced-blocks">
-        <ResultShell title="选校配比" subtitle="冲刺 / 匹配 / 保底">
-          <div className="ratio-row horizontal-ratio-row">
-            <MiniCard title="冲刺"><strong>{result.tierAdvice?.reach ?? '-'}</strong><span>所</span></MiniCard>
-            <MiniCard title="匹配"><strong>{result.tierAdvice?.match ?? '-'}</strong><span>所</span></MiniCard>
-            <MiniCard title="保底"><strong>{result.tierAdvice?.safe ?? '-'}</strong><span>所</span></MiniCard>
+      <ResultShell title="选校配比与风险" subtitle="同一模块内左右查看">
+        <div className="decision-grid-v10">
+          <div className="ratio-board-v10">
+            <div><span>冲刺</span><strong>{result.tierAdvice?.reach ?? '-'}</strong><em>所</em></div>
+            <div><span>匹配</span><strong>{result.tierAdvice?.match ?? '-'}</strong><em>所</em></div>
+            <div><span>保底</span><strong>{result.tierAdvice?.safe ?? '-'}</strong><em>所</em></div>
           </div>
-        </ResultShell>
-        <ResultShell title="风险点" subtitle="系统初筛 + 人工确认">
-          <ListBlock items={risks} />
-        </ResultShell>
-      </div>
+          <div className="risk-board-v10">
+            <FoldSection title="硬风险" subtitle="需要优先处理" defaultOpen className="inner-fold-card">
+              <ListBlock items={hardRisks.length ? hardRisks : ['暂无硬风险，仍需逐校核对官网要求。']} />
+            </FoldSection>
+            <FoldSection title="待人工确认" subtitle="官网、预算、材料证据" defaultOpen className="inner-fold-card">
+              <ListBlock items={softRisks.length ? softRisks : risks} />
+            </FoldSection>
+          </div>
+        </div>
+      </ResultShell>
 
       <ResultShell title="下一步动作" subtitle="按优先级处理">
-        <div className="action-board">{nextActions.length ? nextActions.map((item, i) => <MiniCard title={`动作 ${i + 1}`} key={i}>{toDisplayText(item)}</MiniCard>) : <p className="muted">暂无内容</p>}</div>
+        <div className="action-board action-board-v10">
+          {nextActions.length ? nextActions.map((item, i) => <MiniCard title={`动作 ${i + 1}`} key={i}>{item}</MiniCard>) : <p className="muted">暂无内容</p>}
+        </div>
       </ResultShell>
     </div>
   );

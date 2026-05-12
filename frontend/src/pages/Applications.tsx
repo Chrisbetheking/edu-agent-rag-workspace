@@ -195,13 +195,6 @@ export default function Applications() {
       {error && <div className="error-card"><strong>操作失败</strong><p>{error}</p></div>}
       {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(result.llmFallbackReason)}</div>}
 
-      {result && <SectionNav items={[
-        { id: 'app-score', label: '评分' },
-        { id: 'app-brief', label: '方向' },
-        { id: 'app-drafts', label: '初稿' },
-        { id: 'app-pipeline', label: '流程' },
-        { id: 'app-materials', label: '材料' },
-      ]} />}
 
       <div className="two-col application-workbench-v9">
         <section className="panel sticky-panel compact-form-card">
@@ -226,46 +219,57 @@ export default function Applications() {
           </form>
         </section>
 
-        <section className="panel generated-result-panel application-result-panel-v9">
-          <div className="panel-title compact"><span className="eyebrow">结果</span><h2>文书方向</h2></div>
+        <section className="panel generated-result-panel application-result-panel-v9 application-result-panel-v10">
+          <div className="panel-title compact">
+            <div><span className="eyebrow">结果</span><h2>申请案卷</h2></div>
+            {result && <span className="pill success">已生成</span>}
+          </div>
           {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
-            <ResultShell id="app-brief" title="文书方向" subtitle="PS、CV、推荐信">
-              <div className="app-brief-board-v9">
-                <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} className="app-brief-main" />
-                <FoldSection title="PS 大纲" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
-                <FoldSection title="CV 重点" defaultOpen className="inner-fold-card"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></FoldSection>
-                <FoldSection title="推荐信角度" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.recommendationAngles} /></FoldSection>
+            <div className="application-output-stack-v10">
+              <SectionNav items={[
+                { id: 'app-score', label: '评分' },
+                { id: 'app-brief', label: '方向' },
+                { id: 'app-drafts', label: '初稿' },
+                { id: 'app-pipeline', label: '流程' },
+                { id: 'app-materials', label: '材料' },
+              ]} />
+
+              <ScorePanel fit={result.fit} />
+
+              <ResultShell id="app-brief" title="文书方向" subtitle="PS、CV、推荐信">
+                <div className="app-brief-board-v10">
+                  <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} className="app-brief-main" />
+                  <div className="app-brief-side-v10">
+                    <FoldSection title="PS 大纲" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
+                    <FoldSection title="CV 重点" defaultOpen className="inner-fold-card"><div className="tag-row">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></FoldSection>
+                    <FoldSection title="推荐信角度" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.recommendationAngles} /></FoldSection>
+                  </div>
+                </div>
+              </ResultShell>
+
+              <ResultShell id="app-drafts" title="可编辑初稿" subtitle="左侧长文，右侧摘要与推荐信">
+                <div className="panel-title inner-title"><span className="eyebrow">文书</span><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(exportMarkdown)}>复制全部</button></div>
+                <div className="app-draft-grid-v10">
+                  <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} className="draft-main-card" />
+                  <div className="app-draft-side-v10">
+                    <TextPanel title="CV Summary" content={result.drafts?.cvSummary} />
+                    <TextPanel title="推荐信素材" content={result.drafts?.recommendationSeed} />
+                  </div>
+                </div>
+              </ResultShell>
+
+              <div id="app-pipeline" className="result-cluster-grid two balanced-blocks app-pipeline-grid-v10">
+                <ResultShell title="申请执行" subtitle="按任务节点推进"><div className="pipeline-list compact-pipeline">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div></ResultShell>
+                <ResultShell title="风险与下一步" subtitle="人工确认"><div className="nested-card-grid two"><FoldSection title="风险点" defaultOpen className="inner-fold-card"><ListBlock items={risks} /></FoldSection><FoldSection title="下一步" defaultOpen className="inner-fold-card"><ListBlock items={actions} /></FoldSection></div></ResultShell>
               </div>
-            </ResultShell>
+
+              <ResultShell id="app-materials" title="材料清单" subtitle="递交前逐校核对">
+                <MaterialPanel items={asArray(result.materialChecklist)} />
+              </ResultShell>
+            </div>
           )}
         </section>
       </div>
-
-      {result && <ScorePanel fit={result.fit} />}
-
-      {result && (
-        <ResultShell id="app-drafts" title="可编辑初稿" subtitle="左侧长文，右侧摘要与推荐信">
-          <div className="panel-title inner-title"><span className="eyebrow">文书</span><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(exportMarkdown)}>复制全部</button></div>
-          <div className="draft-grid-comfort app-draft-grid-v9">
-            <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} className="draft-main-card" />
-            <TextPanel title="CV Summary" content={result.drafts?.cvSummary} />
-            <TextPanel title="推荐信素材" content={result.drafts?.recommendationSeed} />
-          </div>
-        </ResultShell>
-      )}
-
-      {result && (
-        <div id="app-pipeline" className="result-cluster-grid two balanced-blocks">
-          <ResultShell title="申请执行" subtitle="按任务节点推进"><div className="pipeline-list compact-pipeline">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div></ResultShell>
-          <ResultShell title="风险与下一步" subtitle="人工确认"><div className="nested-card-grid two"><FoldSection title="风险点" defaultOpen className="inner-fold-card"><ListBlock items={risks} /></FoldSection><FoldSection title="下一步" defaultOpen className="inner-fold-card"><ListBlock items={actions} /></FoldSection></div></ResultShell>
-        </div>
-      )}
-
-      {result && (
-        <ResultShell id="app-materials" title="材料清单" subtitle="递交前逐校核对">
-          <MaterialPanel items={asArray(result.materialChecklist)} />
-        </ResultShell>
-      )}
     </section>
   );
 }

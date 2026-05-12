@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 import { readSessionState, writeSessionState } from '../utils/sessionState';
+import { mergeToolsDraft, runAdvisorInBackground } from '../utils/workspaceBridge';
 
 interface SchoolAdvice {
   name: string;
@@ -104,6 +105,32 @@ function tryParseStructuredAnswer(text?: string): StructuredAdvice | null {
       return null;
     }
   }
+}
+
+
+function profileFromChat(question: string, data: ChatResult) {
+  const structured = data.structured || tryParseStructuredAnswer(data.rawAnswer) || tryParseStructuredAnswer(data.answer);
+  const profile = structured?.profile;
+  const text = `${question}\n${data.answer || ''}`;
+  const countryMatch = text.match(/(英国|澳洲|澳大利亚|新加坡|香港|加拿大|美国|新西兰|爱尔兰|荷兰|德国|法国|日本|韩国|马来西亚)/);
+  const majorMatch = text.match(/(计算机科学|计算机|数据科学|人工智能|AI|软件工程|网络安全|金融科技|商科|传媒|教育|心理|法律|设计)/i);
+  const gpaMatch = text.match(/(?:CGPA|GPA|均分)\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const budgetMatch = text.match(/预算\s*([0-9]+\s*万[^，。\s]*)/);
+  const languageMatch = text.match(/(IELTS|雅思|TOEFL|托福|PTE|Duolingo)\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const languageType = languageMatch?.[1]?.replace('雅思', 'IELTS').replace('托福', 'TOEFL') || 'IELTS';
+  return {
+    name: 'Chris',
+    country: cleanText(profile?.targetCountry) || countryMatch?.[1] || '英国',
+    major: cleanText(profile?.targetMajor) || (majorMatch?.[1]?.toUpperCase() === 'AI' ? '人工智能' : majorMatch?.[1]) || '计算机科学',
+    degree: text.includes('本科') && !text.includes('硕士') ? '本科' : '硕士',
+    cgpa: gpaMatch?.[1] || '3.2',
+    scale: text.includes('/5') ? '5' : (text.includes('均分') ? '100' : '4'),
+    budget: cleanText(profile?.budget) || budgetMatch?.[1] || '30万人民币',
+    languageType,
+    languageScore: languageMatch?.[2] || '6.5',
+    experience: cleanText(profile?.education) || question,
+    concern: cleanText(profile?.competitiveness) || '希望用项目经历提升申请竞争力',
+  };
 }
 
 function DetailItem({ label, value }: { label: string; value?: unknown }) {
@@ -274,6 +301,11 @@ export default function Chat() {
     try {
       const { data, conversations: convData } = await pendingChatRequest;
       setResult(data);
+      const bridgedProfile = profileFromChat(currentQuestion, data);
+      mergeToolsDraft(bridgedProfile, { active: 'advisor' });
+      if (!isGuest) {
+        runAdvisorInBackground(api, bridgedProfile);
+      }
       if (data.quota && isGuest && user) {
         setUser({ ...user, quotaLimit: data.quota.limit, quotaRemaining: data.quota.remaining });
       }
