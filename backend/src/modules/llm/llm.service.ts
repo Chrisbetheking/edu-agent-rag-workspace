@@ -102,4 +102,74 @@ export class LlmService {
       clearTimeout(timer);
     }
   }
+
+  async *streamChat(messages: LlmMessage[]): AsyncGenerator<string> {
+    if (!this.apiKey) {
+      throw new Error('缺少 LLM_API_KEY。请在环境变量中添加 LLM_API_KEY。');
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const response = await fetch(this.buildUrl(), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          temperature: 0.4,
+          max_tokens: this.maxTokens,
+          stream: true,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        const rawText = await response.text().catch(() => '');
+        throw new Error(`DeepSeek stream 请求失败：HTTP ${response.status}，${rawText.slice(0, 500)}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+
+          const data = trimmed.replace(/^data:\s*/, '').trim();
+          if (!data || data === '[DONE]') return;
+
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.text || '';
+            if (delta) yield String(delta);
+          } catch {
+            // Ignore malformed SSE heartbeat fragments.
+          }
+        }
+      }
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        throw new Error(`DeepSeek stream 请求超时，已超过 ${this.timeoutMs}ms。`);
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
 }

@@ -17,6 +17,7 @@ export class MemoryStore {
   prompts: PromptTemplate[] = [];
   evalQuestions: EvalQuestion[] = [];
   evalResults: EvalResult[] = [];
+  callLogs: any[] = [];
 
   constructor() {
     this.seed();
@@ -101,6 +102,13 @@ export class MemoryStore {
   addEvalResult(result: Omit<EvalResult, 'id' | 'createdAt'>) {
     const item: EvalResult = { id: uuid(), createdAt: new Date().toISOString(), ...result };
     this.evalResults.unshift(item);
+    return item;
+  }
+
+  addCallLog(log: any) {
+    const item = { id: uuid(), createdAt: new Date().toISOString(), ...log };
+    this.callLogs.unshift(item);
+    this.callLogs = this.callLogs.slice(0, 200);
     return item;
   }
 }

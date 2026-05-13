@@ -923,7 +923,7 @@ export class ToolsService {
   }
 
   async logs(limit = 50) {
-    const memoryLogs = this.store.toolLogs.slice(0, limit).map((log: any) => ({
+    const memoryToolLogs = this.store.toolLogs.slice(0, limit).map((log: any) => ({
       id: log.id,
       type: "tool_call",
       question: log.toolName,
@@ -933,12 +933,41 @@ export class ToolsService {
       success: log.status === "success",
       status: log.status,
       durationMs: log.duration,
+      retrievalLatencyMs: 0,
+      llmLatencyMs: 0,
       ragHitCount: 0,
+      ragScores: [],
+      cacheHit: false,
+      fallbackTriggered: false,
+      fallbackReason: "",
       toolNames: [log.toolName],
+      errorType: "",
       error: log.status === "success" ? "" : (log.output?.message || log.output?.error || "工具调用失败"),
       createdAt: log.createdAt,
       input: log.input,
       output: log.output,
+    }));
+
+    const memoryAiLogs = (this.store.callLogs || []).slice(0, limit).map((log: any) => ({
+      id: log.id,
+      type: log.type || "ai_call",
+      conversationId: log.conversationId,
+      question: log.question,
+      model: log.model || "deepseek-chat",
+      success: Boolean(log.success),
+      status: log.success ? "success" : "failed",
+      durationMs: log.durationMs || 0,
+      retrievalLatencyMs: log.retrievalLatencyMs || 0,
+      llmLatencyMs: log.llmLatencyMs || 0,
+      ragHitCount: log.ragHitCount || 0,
+      ragScores: log.ragScores || [],
+      cacheHit: Boolean(log.cacheHit),
+      fallbackTriggered: Boolean(log.fallbackTriggered),
+      fallbackReason: log.fallbackReason || "",
+      toolNames: log.toolNames || [],
+      errorType: log.errorType || "",
+      error: log.error || "",
+      createdAt: log.createdAt,
     }));
 
     let dbLogs: any[] = [];
@@ -953,8 +982,15 @@ export class ToolsService {
             model,
             success,
             duration_ms,
+            retrieval_latency_ms,
+            llm_latency_ms,
             rag_hit_count,
+            rag_scores,
+            cache_hit,
+            fallback_triggered,
+            fallback_reason,
             tool_names,
+            error_type,
             error,
             created_at
           from call_logs
@@ -973,8 +1009,15 @@ export class ToolsService {
           success: Boolean(row.success),
           status: row.success ? "success" : "failed",
           durationMs: row.duration_ms || 0,
+          retrievalLatencyMs: row.retrieval_latency_ms || 0,
+          llmLatencyMs: row.llm_latency_ms || 0,
           ragHitCount: row.rag_hit_count || 0,
+          ragScores: row.rag_scores || [],
+          cacheHit: Boolean(row.cache_hit),
+          fallbackTriggered: Boolean(row.fallback_triggered),
+          fallbackReason: row.fallback_reason || "",
           toolNames: row.tool_names || [],
+          errorType: row.error_type || "",
           error: row.error || "",
           createdAt: row.created_at,
         }));
@@ -983,7 +1026,7 @@ export class ToolsService {
       }
     }
 
-    return [...memoryLogs, ...dbLogs]
+    return [...memoryToolLogs, ...memoryAiLogs, ...dbLogs]
       .sort(
         (a: any, b: any) =>
           new Date(b.createdAt || 0).getTime() -

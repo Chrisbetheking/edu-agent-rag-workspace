@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { v4 as uuid } from 'uuid';
 import { Response } from 'express';
 import { MemoryStore } from '../../shared/memory-store';
 import { keywordScore } from '../../shared/text-utils';
 import { DatabaseService } from '../../shared/database.service';
 import { AuthContextService } from '../../shared/auth-context.service';
+import { CacheService } from '../../shared/cache.service';
 import { RequestUser } from '../../shared/types';
 import { ToolsService } from '../tools/tools.service';
 import { LlmService } from '../llm/llm.service';
@@ -48,12 +50,15 @@ export interface StructuredAdvice {
 
 @Injectable()
 export class ChatService {
+  private callLogSchemaReady = false;
+
   constructor(
     private readonly store: MemoryStore,
     private readonly tools: ToolsService,
     private readonly llmService: LlmService,
     private readonly db: DatabaseService,
     private readonly authContext: AuthContextService,
+    private readonly cache: CacheService,
   ) {}
 
   async conversations(user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
@@ -128,6 +133,20 @@ export class ChatService {
   }
 
   async retrieve(query: string, topK = 3, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
+    const cacheKey = this.cache.makeKey('rag:v2', {
+      query: String(query || '').trim().toLowerCase(),
+      topK,
+      userId: user.id,
+      role: user.role,
+    });
+
+    const cached = await this.cache.get<any[]>(cacheKey);
+    if (cached) {
+      return cached.map((item, index) => ({ ...item, cacheHit: true, rank: index + 1 }));
+    }
+
+    let results: any[] = [];
+
     if (this.db.enabled) {
       try {
         const result = await this.db.query(
@@ -142,7 +161,7 @@ export class ChatService {
           [user.role, user.id],
         );
 
-        const scored = result.rows
+        results = result.rows
           .map((row: any) => ({
             id: row.id,
             documentId: row.document_id,
@@ -151,26 +170,35 @@ export class ChatService {
             chunkIndex: row.chunk_index,
             keywords: row.keywords || [],
             score: keywordScore(query, row.content || ''),
+            retrievalMode: 'keyword',
+            cacheHit: false,
           }))
           .filter((chunk: any) => chunk.score > 0)
           .sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
           .slice(0, topK);
-
-        if (scored.length > 0) {
-          return scored;
-        }
       } catch (error) {
         console.error('从 Supabase 检索 chunks 失败，回退到 MemoryStore：', error);
       }
     }
 
-    const visibleDocIds = new Set(this.store.documents.filter((doc) => user.role === 'admin' || doc.visibility === 'public' || doc.ownerId === user.id).map((doc) => doc.id));
-    return this.store.chunks
-      .filter((chunk) => visibleDocIds.has(chunk.documentId))
-      .map((chunk) => ({ ...chunk, score: keywordScore(query, chunk.content) }))
-      .filter((chunk) => chunk.score > 0)
-      .sort((a, b) => (b.score || 0) - (a.score || 0))
-      .slice(0, topK);
+    if (!results.length) {
+      const visibleDocIds = new Set(this.store.documents.filter((doc) => user.role === 'admin' || doc.visibility === 'public' || doc.ownerId === user.id).map((doc) => doc.id));
+      results = this.store.chunks
+        .filter((chunk) => visibleDocIds.has(chunk.documentId))
+        .map((chunk) => ({
+          ...chunk,
+          score: keywordScore(query, chunk.content),
+          retrievalMode: 'keyword-memory',
+          cacheHit: false,
+        }))
+        .filter((chunk) => chunk.score > 0)
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, topK);
+    }
+
+    const ranked = results.map((item, index) => ({ ...item, rank: index + 1 }));
+    await this.cache.set(cacheKey, ranked, Number(process.env.RAG_CACHE_TTL_SECONDS || 300));
+    return ranked;
   }
 
   private async persistConversation(conversationId: string, title: string, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }) {
@@ -219,41 +247,127 @@ export class ChatService {
     }
   }
 
+  private async ensureCallLogSchema() {
+    if (!this.db.enabled || this.callLogSchemaReady) return;
+
+    try {
+      await this.db.query('create extension if not exists "pgcrypto";');
+      await this.db.query(`
+        create table if not exists call_logs (
+          id uuid primary key default gen_random_uuid(),
+          conversation_id uuid,
+          question text not null default '',
+          model text not null default 'unknown',
+          success boolean not null default true,
+          duration_ms integer not null default 0,
+          rag_hit_count integer not null default 0,
+          tool_names text[] not null default '{}',
+          error text,
+          created_at timestamptz not null default now()
+        );
+      `);
+      await this.db.query(`
+        alter table if exists call_logs
+          add column if not exists request_id text,
+          add column if not exists user_id text,
+          add column if not exists retrieval_latency_ms integer not null default 0,
+          add column if not exists llm_latency_ms integer not null default 0,
+          add column if not exists cache_hit boolean not null default false,
+          add column if not exists fallback_triggered boolean not null default false,
+          add column if not exists fallback_reason text,
+          add column if not exists rag_scores jsonb not null default '[]'::jsonb,
+          add column if not exists error_type text;
+      `);
+      this.callLogSchemaReady = true;
+    } catch (error) {
+      console.error('初始化 call_logs schema 失败：', error);
+    }
+  }
+
   private async persistCallLog(payload: {
+    requestId: string;
+    userId: string;
     conversationId: string;
     question: string;
     model: string;
     success: boolean;
     durationMs: number;
+    retrievalLatencyMs: number;
+    llmLatencyMs: number;
     ragHitCount: number;
+    ragScores: number[];
+    cacheHit: boolean;
+    fallbackTriggered: boolean;
+    fallbackReason?: string;
     toolNames: string[];
+    errorType?: string;
     error?: string;
   }) {
+    this.store.addCallLog({
+      type: 'ai_call',
+      conversationId: payload.conversationId,
+      question: payload.question,
+      model: payload.model,
+      success: payload.success,
+      status: payload.success ? 'success' : 'failed',
+      durationMs: payload.durationMs,
+      retrievalLatencyMs: payload.retrievalLatencyMs,
+      llmLatencyMs: payload.llmLatencyMs,
+      ragHitCount: payload.ragHitCount,
+      ragScores: payload.ragScores,
+      cacheHit: payload.cacheHit,
+      fallbackTriggered: payload.fallbackTriggered,
+      fallbackReason: payload.fallbackReason || '',
+      toolNames: payload.toolNames,
+      errorType: payload.errorType || '',
+      error: payload.error || '',
+    });
+
     if (!this.db.enabled) return;
+
+    await this.ensureCallLogSchema();
 
     try {
       await this.db.query(
         `
         insert into call_logs (
+          request_id,
+          user_id,
           conversation_id,
           question,
           model,
           success,
           duration_ms,
+          retrieval_latency_ms,
+          llm_latency_ms,
           rag_hit_count,
+          rag_scores,
+          cache_hit,
+          fallback_triggered,
+          fallback_reason,
           tool_names,
+          error_type,
           error
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14, $15, $16, $17)
         `,
         [
+          payload.requestId,
+          payload.userId,
           payload.conversationId,
           payload.question,
           payload.model,
           payload.success,
           payload.durationMs,
+          payload.retrievalLatencyMs,
+          payload.llmLatencyMs,
           payload.ragHitCount,
+          JSON.stringify(payload.ragScores || []),
+          payload.cacheHit,
+          payload.fallbackTriggered,
+          payload.fallbackReason || null,
           payload.toolNames,
+          payload.errorType || null,
           payload.error || null,
         ],
       );
@@ -535,6 +649,7 @@ ${toolText}
   }
 
   async ask(body: { conversationId?: string; question: string; topK?: number }, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any> {
+    const requestId = uuid();
     const startedAt = Date.now();
 
     const question = (body.question || '').slice(
@@ -556,7 +671,12 @@ ${toolText}
     this.store.addMessage(conversationId, 'user', question);
     await this.persistMessage(conversationId, 'user', question);
 
+    const retrievalStartedAt = Date.now();
     const sources = await this.retrieve(question, body.topK || 3, user);
+    const retrievalLatencyMs = Date.now() - retrievalStartedAt;
+    const cacheHit = sources.some((source) => Boolean(source.cacheHit));
+    const ragScores = sources.map((source) => Number(source.score || 0));
+
     const toolCalls = await this.detectTools(question);
 
     let answer = '';
@@ -564,19 +684,35 @@ ${toolText}
     let rawAnswer = '';
     let success = true;
     let errorMessage = '';
+    let errorType = '';
+    let llmLatencyMs = 0;
+    let fallbackTriggered = false;
+    let fallbackReason = '';
 
     if (this.isDemoMode()) {
+      fallbackTriggered = true;
+      fallbackReason = 'demo_mode_or_missing_llm_key';
       structured = this.fallbackStructured(question, sources, toolCalls);
       answer = this.structuredToPlainText(structured);
       rawAnswer = JSON.stringify(structured, null, 2);
     } else {
+      const llmStartedAt = Date.now();
       try {
         const result = await this.buildRealAnswer(question, sources, toolCalls);
+        llmLatencyMs = Date.now() - llmStartedAt;
         answer = result.answer;
         structured = result.structured;
         rawAnswer = result.raw;
+        if (!structured) {
+          fallbackTriggered = true;
+          fallbackReason = 'structured_json_parse_failed';
+        }
       } catch (error: any) {
+        llmLatencyMs = Date.now() - llmStartedAt;
         success = false;
+        fallbackTriggered = true;
+        fallbackReason = 'llm_call_failed';
+        errorType = error?.name || 'LLMError';
         errorMessage = error?.message || String(error);
         answer = `真实大模型调用失败。错误信息：${errorMessage}`;
         rawAnswer = answer;
@@ -587,13 +723,22 @@ ${toolText}
     await this.persistMessage(conversationId, 'assistant', answer, sources, toolCalls);
 
     await this.persistCallLog({
+      requestId,
+      userId: user.id,
       conversationId,
       question,
       model: process.env.LLM_MODEL || 'deepseek-chat',
       success,
       durationMs: Date.now() - startedAt,
+      retrievalLatencyMs,
+      llmLatencyMs,
       ragHitCount: sources.length,
+      ragScores,
+      cacheHit,
+      fallbackTriggered,
+      fallbackReason,
       toolNames: toolCalls.map((tool) => tool.name),
+      errorType,
       error: errorMessage,
     });
 
@@ -605,6 +750,17 @@ ${toolText}
       sources,
       toolCalls,
       quota,
+      observability: {
+        requestId,
+        retrievalLatencyMs,
+        llmLatencyMs,
+        totalLatencyMs: Date.now() - startedAt,
+        ragHitCount: sources.length,
+        ragScores,
+        cacheHit,
+        fallbackTriggered,
+        fallbackReason,
+      },
     };
   }
 
@@ -612,23 +768,110 @@ ${toolText}
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
 
-    const result = await this.ask({ question }, user);
-    const pieces = result.answer.split('');
-
-    for (const ch of pieces) {
-      res.write(`data: ${JSON.stringify({ delta: ch })}\n\n`);
-      await new Promise((r) => setTimeout(r, 8));
+    if (this.isDemoMode()) {
+      const result = await this.ask({ question }, user);
+      for (const ch of result.answer.split('')) {
+        res.write(`data: ${JSON.stringify({ delta: ch })}\n\n`);
+        await new Promise((r) => setTimeout(r, 8));
+      }
+      res.write(`data: ${JSON.stringify({ done: true, sources: result.sources, toolCalls: result.toolCalls, observability: result.observability })}\n\n`);
+      res.end();
+      return;
     }
 
-    res.write(
-      `data: ${JSON.stringify({
-        done: true,
-        sources: result.sources,
-        toolCalls: result.toolCalls,
-      })}\n\n`,
-    );
+    const requestId = uuid();
+    const startedAt = Date.now();
+    const normalizedQuestion = (question || '请介绍英国硕士申请材料').slice(0, Number(process.env.MAX_INPUT_LENGTH || 2000));
+    const quota = this.authContext.consumeGuestQuota(user);
+    const conversation = this.store.createConversation(normalizedQuestion.slice(0, 20) || '新的流式咨询', user.id);
+    await this.persistConversation(conversation.id, conversation.title, user);
+    this.store.addMessage(conversation.id, 'user', normalizedQuestion);
+    await this.persistMessage(conversation.id, 'user', normalizedQuestion);
 
-    res.end();
+    const retrievalStartedAt = Date.now();
+    const sources = await this.retrieve(normalizedQuestion, 3, user);
+    const retrievalLatencyMs = Date.now() - retrievalStartedAt;
+    const cacheHit = sources.some((source) => Boolean(source.cacheHit));
+    const ragScores = sources.map((source) => Number(source.score || 0));
+    const toolCalls = await this.detectTools(normalizedQuestion);
+
+    let answer = '';
+    let llmLatencyMs = 0;
+    let success = true;
+    let errorMessage = '';
+    let errorType = '';
+
+    try {
+      const sourceText = this.buildSourceText(sources);
+      const toolText = this.buildToolText(toolCalls);
+      const llmStartedAt = Date.now();
+
+      for await (const delta of this.llmService.streamChat([
+        {
+          role: 'system',
+          content: '你是 EduAgent 留学咨询助手。请基于知识库来源和工具结果回答；不确定时说明需以学校官网为准。回答要结构清晰、专业、具体。',
+        },
+        {
+          role: 'user',
+          content: `用户问题：\n${normalizedQuestion}\n\n知识库检索结果：\n${sourceText}\n\n工具结果：\n${toolText}`,
+        },
+      ])) {
+        answer += delta;
+        res.write(`data: ${JSON.stringify({ delta })}\n\n`);
+      }
+
+      llmLatencyMs = Date.now() - llmStartedAt;
+    } catch (error: any) {
+      success = false;
+      errorType = error?.name || 'LLMStreamError';
+      errorMessage = error?.message || String(error);
+      res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
+    } finally {
+      if (answer) {
+        this.store.addMessage(conversation.id, 'assistant', answer, sources, toolCalls);
+        await this.persistMessage(conversation.id, 'assistant', answer, sources, toolCalls);
+      }
+
+      await this.persistCallLog({
+        requestId,
+        userId: user.id,
+        conversationId: conversation.id,
+        question: normalizedQuestion,
+        model: process.env.LLM_MODEL || 'deepseek-chat',
+        success,
+        durationMs: Date.now() - startedAt,
+        retrievalLatencyMs,
+        llmLatencyMs,
+        ragHitCount: sources.length,
+        ragScores,
+        cacheHit,
+        fallbackTriggered: !success,
+        fallbackReason: success ? '' : 'stream_failed',
+        toolNames: toolCalls.map((tool) => tool.name),
+        errorType,
+        error: errorMessage,
+      });
+
+      res.write(`data: ${JSON.stringify({
+        done: true,
+        conversationId: conversation.id,
+        sources,
+        toolCalls,
+        quota,
+        observability: {
+          requestId,
+          retrievalLatencyMs,
+          llmLatencyMs,
+          totalLatencyMs: Date.now() - startedAt,
+          ragHitCount: sources.length,
+          ragScores,
+          cacheHit,
+        },
+      })}\n\n`);
+      res.end();
+    }
   }
+
 }

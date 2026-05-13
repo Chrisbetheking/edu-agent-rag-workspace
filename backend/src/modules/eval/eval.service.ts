@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { MemoryStore } from '../../shared/memory-store';
-import { keywordScore } from '../../shared/text-utils';
+import { ChatService } from '../chat/chat.service';
 
 @Injectable()
 export class EvalService {
-  constructor(private readonly store: MemoryStore) {}
+  constructor(
+    private readonly store: MemoryStore,
+    private readonly chat: ChatService,
+  ) {}
 
   questions() {
     return this.store.evalQuestions;
@@ -27,27 +30,33 @@ export class EvalService {
     };
   }
 
-  run(body: { topK?: number }) {
+  async run(body: { topK?: number }) {
     const topK = Number(body.topK || 3);
     const batch: any[] = [];
+
     for (const q of this.store.evalQuestions) {
       const start = Date.now();
-      const retrieved = this.store.chunks
-        .map((chunk) => ({ documentTitle: chunk.documentTitle, content: chunk.content, score: keywordScore(q.question, chunk.content) }))
-        .filter((item) => item.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, topK);
-      const hit = retrieved.some((item) => item.documentTitle.includes(q.expectedSource));
+      const retrieved = await this.chat.retrieve(q.question, topK);
+      const hit = retrieved.some((item) => String(item.documentTitle || '').includes(q.expectedSource));
       const result = this.store.addEvalResult({
         question: q.question,
         expectedSource: q.expectedSource,
         hit,
         recallAtK: hit ? 1 : 0,
         latency: Date.now() - start,
-        retrieved,
+        retrieved: retrieved.map((item) => ({
+          documentTitle: item.documentTitle,
+          chunkIndex: item.chunkIndex,
+          score: item.score,
+          rank: item.rank,
+          cacheHit: item.cacheHit,
+          retrievalMode: item.retrievalMode,
+          content: String(item.content || '').slice(0, 180),
+        })),
       });
       batch.push(result);
     }
+
     return { message: '评测完成', topK, results: batch };
   }
 }
