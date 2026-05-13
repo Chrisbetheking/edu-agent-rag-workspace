@@ -136,14 +136,14 @@ export class ChatService {
 
   async retrieve(query: string, topK = 3, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
     const normalizedQuery = String(query || '').trim().toLowerCase();
-    const cacheKey = this.cache.makeKey('rag:v5-hybrid-rerank', {
+    const cacheKey = this.cache.makeKey('rag:v6-hybrid-recall-rerank', {
       query: normalizedQuery,
       topK,
       userId: user.id,
       role: user.role,
       embeddingConfigured: this.embeddingService.isConfigured(),
       embeddingModel: this.embeddingService.modelName(),
-      hybridVersion: 'clean-kb-v1-title-keyword-rerank',
+      hybridVersion: 'clean-kb-v2-keyword-supplement-rerank',
     });
 
     const cached = await this.cache.get<any[]>(cacheKey);
@@ -166,7 +166,10 @@ export class ChatService {
     if (!this.db.enabled || !this.embeddingService.isConfigured()) return [];
 
     try {
-      const candidateLimit = Math.max(topK * 12, Number(process.env.RAG_VECTOR_CANDIDATE_LIMIT || 60));
+      // For small/medium demo KBs, retrieve a broad candidate pool first.
+      // Pure vector top-3 can rank semantically related but intent-wrong docs above exact material docs.
+      const candidateLimit = Math.max(topK * 40, Number(process.env.RAG_VECTOR_CANDIDATE_LIMIT || 300));
+      const keywordCandidateLimit = Number(process.env.RAG_KEYWORD_CANDIDATE_LIMIT || 1200);
       const embedding = await this.embeddingService.embed(query);
       const vector = this.embeddingService.toSqlVector(embedding);
       const result = await this.db.query(
@@ -190,7 +193,7 @@ export class ChatService {
         [vector, user.role, user.id, candidateLimit],
       );
 
-      const candidates = result.rows.map((row: any) => ({
+      const vectorCandidates = result.rows.map((row: any) => ({
         id: row.id,
         documentId: row.document_id,
         documentTitle: row.document_title,
@@ -200,9 +203,74 @@ export class ChatService {
         score: Number(Number(row.score || 0).toFixed(4)),
         retrievalMode: 'pgvector',
         cacheHit: false,
+        candidateSource: 'vector',
       }));
 
-      return this.rerankRetrieved(query, candidates, topK);
+      // Add keyword recall candidates so exact intent docs can be rescued even if vector recall ranks them too low.
+      // Final ranking is still hybrid and observable; pgvector remains the primary retrieval path.
+      let keywordCandidates: any[] = [];
+      try {
+        const keywordResult = await this.db.query(
+          `
+          select
+            c.id,
+            c.document_id,
+            c.document_title,
+            c.content,
+            c.chunk_index,
+            c.keywords,
+            coalesce(c.owner_id, d.owner_id, 'u_chris') as owner_id
+          from chunks c
+          left join documents d on d.id = c.document_id
+          where (($1 = 'admin') or coalesce(d.visibility, 'public') = 'public' or coalesce(c.owner_id, d.owner_id, 'u_chris') = $2)
+          order by c.created_at desc
+          limit $3
+          `,
+          [user.role, user.id, keywordCandidateLimit],
+        );
+
+        keywordCandidates = keywordResult.rows
+          .map((row: any) => {
+            const signal = keywordScore(query, `${row.document_title || ''}\n${(row.keywords || []).join(' ')}\n${row.content || ''}`);
+            return {
+              id: row.id,
+              documentId: row.document_id,
+              documentTitle: row.document_title,
+              content: row.content,
+              chunkIndex: row.chunk_index,
+              keywords: row.keywords || [],
+              score: 0,
+              keywordSignal: signal,
+              retrievalMode: 'pgvector',
+              cacheHit: false,
+              candidateSource: 'keyword-supplement',
+            };
+          })
+          .filter((candidate: any) => candidate.keywordSignal > 0 || this.hybridBoost(query, candidate) > 0.2);
+      } catch (keywordError: any) {
+        console.error('keyword supplement recall failed, continue with vector candidates:', keywordError?.message || keywordError);
+      }
+
+      const merged = new Map<string, any>();
+      for (const candidate of [...vectorCandidates, ...keywordCandidates]) {
+        const key = candidate.id || `${candidate.documentId}:${candidate.chunkIndex}`;
+        const existing = merged.get(key);
+        if (!existing) {
+          merged.set(key, candidate);
+          continue;
+        }
+
+        merged.set(key, {
+          ...existing,
+          ...candidate,
+          score: Math.max(Number(existing.score || 0), Number(candidate.score || 0)),
+          keywordSignal: Math.max(Number(existing.keywordSignal || 0), Number(candidate.keywordSignal || 0)),
+          candidateSource: existing.candidateSource === 'vector' ? 'vector+keyword' : candidate.candidateSource,
+          retrievalMode: 'pgvector',
+        });
+      }
+
+      return this.rerankRetrieved(query, Array.from(merged.values()), topK);
     } catch (error: any) {
       console.error('pgvector 语义检索失败，回退 keyword RAG：', error?.message || error);
       return [];
@@ -274,12 +342,13 @@ export class ChatService {
           `${candidate.documentTitle || ''}\n${(candidate.keywords || []).join(' ')}\n${candidate.content || ''}`,
         );
         const hybridBoost = this.hybridBoost(query, candidate);
-        const score = Math.max(0, Math.min(1, vectorScore * 0.68 + keywordMatchScore * 0.22 + hybridBoost));
+        const keywordSignal = Math.max(keywordMatchScore, Number(candidate.keywordSignal || 0));
+        const score = Math.max(0, Math.min(1, vectorScore * 0.42 + keywordSignal * 0.34 + hybridBoost));
 
         return {
           ...candidate,
           vectorScore: Number(vectorScore.toFixed(4)),
-          keywordScore: Number(keywordMatchScore.toFixed(4)),
+          keywordScore: Number(keywordSignal.toFixed(4)),
           hybridBoost: Number(hybridBoost.toFixed(4)),
           score: Number(score.toFixed(4)),
         };
@@ -332,14 +401,14 @@ export class ChatService {
     const importantQueryTerms = ['英国', '计算机', '硕士', '申请', '材料', 'gpa', 'cgpa', '均分', 'ps', 'cv', '推荐信', '预算', '选校', '项目'];
     boost += importantQueryTerms.filter((term) => q.includes(term) && title.includes(term)).length * 0.025;
 
-    const isMaterialIntent = queryHas(['申请材料', '材料清单', '提交哪些材料', '哪些材料', '需要提交', '准备哪些', '成绩单', '在读证明', '毕业证', '推荐信', '语言成绩'])
-      || (q.includes('材料') && q.includes('申请'));
+    const isMaterialIntent = queryHas(['申请材料', '材料清单', '提交哪些材料', '哪些材料', '需要提交', '提交什么', '准备哪些', '材料包括', '材料类型', '成绩单', '在读证明', '毕业证', '推荐信', '语言成绩'])
+      || (q.includes('材料') && this.includesAny(q, ['申请', '提交', '准备', '需要', '哪些', '清单', '包括']));
     if (isMaterialIntent) {
-      if (titleHas(['申请材料清单', '硕士申请材料', '英国硕士申请材料', '材料清单'])) boost += 0.62;
-      if (titleHas(['英国计算机硕士申请总览', '申请总览'])) boost += 0.22;
-      if (titleHas(['推荐信准备', 'cv简历', 'personalstatement', 'personal_statement', '文书写作'])) boost += 0.08;
+      if (titleHas(['申请材料清单', '硕士申请材料', '英国硕士申请材料', '材料清单'])) boost += 0.95;
+      if (titleHas(['英国计算机硕士申请总览', '申请总览'])) boost += 0.36;
+      if (titleHas(['推荐信准备', 'cv简历', 'personalstatement', 'personal_statement', '文书写作'])) boost += 0.16;
       boost += Math.min(0.24, contentHitCount(['成绩单', '在读证明', '毕业证', '学位证', 'personal statement', '个人陈述', '推荐信', '语言成绩', 'cv', 'resume', '护照', '作品集']) * 0.035);
-      if (titleHas(['前端ai工作台', 'rag项目申请素材', '项目申请素材', '选校分层', 'offer选择', '预算与城市', '面试', '安全边界'])) boost -= 0.36;
+      if (titleHas(['前端ai工作台', 'rag项目申请素材', '项目申请素材', '选校分层', 'offer选择', '预算与城市', '面试', '安全边界'])) boost -= 0.72;
     }
 
     const isGpaIntent = queryHas(['cgpa', 'gpa', '均分', '绩点', '低gpa', '成绩不高']) && !q.includes('成绩单');
