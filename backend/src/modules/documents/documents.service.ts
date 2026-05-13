@@ -126,11 +126,26 @@ export class DocumentsService {
     try {
       await this.db.query('create extension if not exists vector;');
       await this.db.query(`alter table if exists chunks add column if not exists embedding vector(${dimension});`);
-      await this.db.query(`
-        create index if not exists idx_chunks_embedding_ivfflat
-        on chunks using ivfflat (embedding vector_cosine_ops)
-        with (lists = 100);
-      `);
+
+      // pgvector ivfflat indexes only support vectors up to 2000 dimensions.
+      // SiliconFlow Qwen/Qwen3-Embedding-4B returns 2560 dimensions, so we skip
+      // the approximate index for that model and still allow exact vector search.
+      // For the current demo-scale knowledge base this is fast enough, and it
+      // keeps rebuildEmbeddings available instead of failing schema initialization.
+      if (dimension <= 2000) {
+        try {
+          await this.db.query(`
+            create index if not exists idx_chunks_embedding_ivfflat
+            on chunks using ivfflat (embedding vector_cosine_ops)
+            with (lists = 100);
+          `);
+        } catch (indexError: any) {
+          console.warn('pgvector ivfflat 索引创建失败，继续使用精确向量检索：', indexError?.message || indexError);
+        }
+      } else {
+        console.warn(`Embedding 维度 ${dimension} 超过 ivfflat 2000 维限制，跳过索引，使用精确向量检索。`);
+      }
+
       this.vectorSchemaReady = true;
     } catch (error: any) {
       console.error('pgvector schema 初始化失败，当前仍可使用 keyword RAG：', error?.message || error);
