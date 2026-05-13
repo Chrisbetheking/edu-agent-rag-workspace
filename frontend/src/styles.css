@@ -2898,3 +2898,357 @@ th { color: var(--muted); font-weight: 800; }
   .risk-action-grid-v15 { grid-template-columns: 1fr !important; }
   .calendar-row-v14 { grid-template-columns: 1fr !important; }
 }
+
+/* V17: final readable one-row workflow layout + working in-page navigation */
+.section-nav-clean {
+  position: static !important;
+  top: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  margin: 0 0 18px !important;
+  padding: 12px 14px !important;
+  border: 1px solid rgba(49, 80, 200, .14) !important;
+  border-radius: 20px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,251,255,.92)) !important;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .06) !important;
+  backdrop-filter: none !important;
+}
+.section-nav-clean .section-nav-label {
+  display: grid !important;
+  gap: 0 !important;
+  min-width: 94px !important;
+  color: #0f172a !important;
+}
+.section-nav-clean .section-nav-label strong { font-size: 14px !important; line-height: 1.1 !important; }
+.section-nav-clean .section-nav-label span { font-size: 12px !important; color: #64748b !important; }
+.section-nav-clean .section-nav-links {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+.section-nav-clean .section-nav-links button,
+.section-nav-clean a {
+  appearance: none !important;
+  border: 1px solid #e3ebff !important;
+  background: #eef4ff !important;
+  color: #3150c8 !important;
+  border-radius: 999px !important;
+  padding: 8px 14px !important;
+  font-weight: 950 !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+  text-decoration: none !important;
+}
+.section-nav-clean .section-nav-links button:hover { background: #dfeaff !important; transform: translateY(-1px); }
+.section-nav-clean .section-nav-top {
+  margin-left: auto !important;
+  flex: 0 0 auto !important;
+  border: 0 !important;
+  background: linear-gradient(135deg, #3150c8, #06b6d4) !important;
+  color: #fff !important;
+  border-radius: 999px !important;
+  padding: 9px 14px !important;
+  font-weight: 950 !important;
+  box-shadow: 0 10px 22px rgba(49, 80, 200, .18) !important;
+}
+.section-flash {
+  outline: 3px solid rgba(59, 130, 246, .28) !important;
+  box-shadow: 0 0 0 8px rgba(59, 130, 246, .08), 0 18px 50px rgba(15,23,42,.10) !important;
+  transition: box-shadow .25s ease, outline-color .25s ease !important;
+}
+
+/* Once result exists, stop wasting the left column. Form becomes a compact full-width control panel, results get the whole canvas. */
+.application-workbench-generated,
+.tools-workbench-v17.with-result,
+.tools-workbench-v17.generated {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 22px !important;
+  width: 100% !important;
+}
+.application-workbench-generated > .compact-form-card,
+.tools-workbench-v17.with-result > .form-panel,
+.tools-workbench-v17.generated > .form-panel {
+  position: static !important;
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 20px 22px !important;
+}
+.application-workbench-generated .form-stack,
+.tools-workbench-v17.with-result .form-stack,
+.tools-workbench-v17.generated .form-stack {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 14px !important;
+  align-items: end !important;
+}
+.application-workbench-generated .form-stack > .form-grid,
+.tools-workbench-v17.with-result .form-stack > .form-grid,
+.tools-workbench-v17.generated .form-stack > .form-grid {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(170px, 1fr)) !important;
+  gap: 12px !important;
+}
+.application-workbench-generated .form-stack > label,
+.tools-workbench-v17.with-result .form-stack > label,
+.tools-workbench-v17.generated .form-stack > label {
+  min-width: 0 !important;
+}
+.application-workbench-generated .form-stack > label:has(textarea),
+.tools-workbench-v17.with-result .form-stack > label:has(textarea),
+.tools-workbench-v17.generated .form-stack > label:has(textarea) {
+  grid-column: span 1 !important;
+}
+.application-workbench-generated textarea,
+.tools-workbench-v17.with-result textarea,
+.tools-workbench-v17.generated textarea {
+  min-height: 72px !important;
+  max-height: 120px !important;
+}
+.application-workbench-generated .form-stack > button.primary,
+.tools-workbench-v17.with-result .compact-run-button,
+.tools-workbench-v17.generated .compact-run-button {
+  width: 220px !important;
+  min-height: 54px !important;
+  justify-self: end !important;
+}
+.application-result-panel-v17,
+.result-panel-v17 {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+/* Application dossier: one major section per row. No left blank canvas, no skinny vertical cards. */
+.application-output-grid-v17 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 20px !important;
+  width: 100% !important;
+}
+.application-output-grid-v17 > * {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+.application-output-grid-v17 .result-shell-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+}
+.application-output-grid-v17 #app-score .result-shell-grid,
+.application-output-grid-v17 .app-grid-score .result-shell-grid {
+  grid-template-columns: minmax(320px, .32fr) minmax(0, .68fr) !important;
+}
+.application-output-grid-v17 .score-aside-card {
+  position: static !important;
+  height: 100% !important;
+  min-height: 220px !important;
+}
+.application-output-grid-v17 .score-factor-grid,
+.application-output-grid-v17 .comfort-score-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
+}
+.application-output-grid-v17 .result-cluster-grid.two,
+.application-output-grid-v17 .nested-card-grid.two {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+}
+.app-brief-board-v17,
+.application-output-grid-v17 .app-brief-board-v10 {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(220px, 1fr)) !important;
+  gap: 14px !important;
+  align-items: stretch !important;
+}
+.app-brief-board-v17 > .app-brief-main,
+.application-output-grid-v17 .app-brief-main {
+  grid-column: span 1 !important;
+  height: auto !important;
+}
+.application-output-grid-v17 .app-brief-side-v10 {
+  display: contents !important;
+}
+.application-output-grid-v17 .app-brief-side-v10 > * {
+  min-width: 0 !important;
+}
+.app-draft-grid-v17,
+.application-output-grid-v17 .app-draft-grid-v10 {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, .65fr) !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+.application-output-grid-v17 .draft-main-card .pre-line {
+  max-height: 58vh !important;
+  overflow: auto !important;
+}
+.application-output-grid-v17 .app-draft-side-v10,
+.application-output-grid-v17 .app-draft-side-v16 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+}
+.application-output-grid-v17 .app-draft-side-v10 .pre-line {
+  max-height: 260px !important;
+  overflow: auto !important;
+}
+.app-pipeline-grid-v17,
+.application-output-grid-v17 .app-pipeline-grid-v10,
+.application-output-grid-v17 .app-pipeline-grid-v16 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 18px !important;
+}
+.pipeline-board-v17,
+.application-output-grid-v17 .compact-pipeline {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+  gap: 14px !important;
+}
+.application-output-grid-v17 .compact-material-list,
+.application-output-grid-v17 .material-list.single-list {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+/* Tools / advisor: with a result, use the full width and stack major modules by business flow. */
+.tools-workbench-v17.with-result .result-panel,
+.tools-workbench-v17.generated .result-panel {
+  width: 100% !important;
+  max-width: none !important;
+}
+.advisor-output-v17,
+.advisor-output-v16 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 20px !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+.advisor-output-v17 > *,
+.advisor-output-v16 > * {
+  width: 100% !important;
+  max-width: none !important;
+  grid-column: 1 / -1 !important;
+}
+.advisor-output-v17 .result-shell-grid,
+.advisor-output-v16 .result-shell-grid {
+  grid-template-columns: 1fr !important;
+}
+.advisor-output-v17 .score-output-v15,
+.advisor-output-v16 .score-output-v15,
+.advisor-output-v17 .score-output-v16,
+.advisor-output-v16 .score-output-v16 {
+  grid-template-columns: 1fr !important;
+}
+.advisor-output-v17 .score-board-v15,
+.advisor-output-v16 .score-board-v15 {
+  grid-template-columns: minmax(320px, .32fr) minmax(0, .68fr) !important;
+}
+.advisor-output-v17 .school-board-v15,
+.advisor-output-v17 .school-board-v16,
+.advisor-output-v16 .school-board-v15,
+.advisor-output-v16 .school-board-v16 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+}
+.advisor-output-v17 .school-card-list-v15,
+.advisor-output-v16 .school-card-list-v15,
+.school-card-list-v15 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+.advisor-output-v17 .school-band-v15,
+.advisor-output-v16 .school-band-v15 {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+.advisor-output-v17 .app-brief-grid-v15,
+.advisor-output-v17 .app-brief-grid-v16,
+.advisor-output-v17 .sales-board-v15,
+.advisor-output-v17 .sales-board-v16,
+.advisor-output-v17 .material-board-v15,
+.advisor-output-v17 .material-board-v16 {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+}
+
+/* Universal readability guard: never allow narrow cards to create one-character vertical text. */
+.page-stack,
+.panel,
+.fold-card,
+.fold-card *,
+.result-shell-grid,
+.result-shell-aside,
+.result-shell-main,
+.fold-body,
+.mini-result-card,
+.material-item,
+.school-row,
+.school-row-v15,
+.tag-row,
+.tag-row span,
+.pipeline-list,
+.pipeline-list *,
+.pre-line {
+  min-width: 0 !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  white-space: normal;
+}
+.pre-line { white-space: pre-wrap !important; }
+.fold-card > summary {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+}
+.fold-card > summary > span { min-width: 0 !important; }
+
+@media (max-width: 1320px) {
+  .application-output-grid-v17 #app-score .result-shell-grid,
+  .application-output-grid-v17 .app-grid-score .result-shell-grid,
+  .app-draft-grid-v17,
+  .application-output-grid-v17 .app-draft-grid-v10,
+  .advisor-output-v17 .score-board-v15,
+  .advisor-output-v16 .score-board-v15 {
+    grid-template-columns: 1fr !important;
+  }
+  .app-brief-board-v17,
+  .application-output-grid-v17 .app-brief-board-v10 {
+    grid-template-columns: repeat(2, minmax(260px, 1fr)) !important;
+  }
+}
+@media (max-width: 920px) {
+  .application-workbench-generated .form-stack,
+  .tools-workbench-v17.with-result .form-stack,
+  .tools-workbench-v17.generated .form-stack,
+  .application-workbench-generated .form-stack > .form-grid,
+  .tools-workbench-v17.with-result .form-stack > .form-grid,
+  .tools-workbench-v17.generated .form-stack > .form-grid,
+  .app-brief-board-v17,
+  .application-output-grid-v17 .app-brief-board-v10 {
+    grid-template-columns: 1fr !important;
+  }
+  .application-workbench-generated .form-stack > button.primary,
+  .tools-workbench-v17.with-result .compact-run-button,
+  .tools-workbench-v17.generated .compact-run-button {
+    width: 100% !important;
+  }
+  .section-nav-clean { display: grid !important; grid-template-columns: 1fr !important; }
+  .section-nav-clean .section-nav-top { width: 100% !important; }
+}

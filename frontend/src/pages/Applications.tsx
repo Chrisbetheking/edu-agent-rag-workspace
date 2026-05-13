@@ -218,13 +218,13 @@ export default function Applications() {
           </form>
         </section>
 
-        <section className="panel generated-result-panel application-result-panel-v9 application-result-panel-v10 application-result-panel-v15 application-result-panel-v13">
+        <section className="panel generated-result-panel application-result-panel-v9 application-result-panel-v10 application-result-panel-v15 application-result-panel-v13 application-result-panel-v17">
           <div className="panel-title compact">
             <div><span className="eyebrow">结果</span><h2>申请案卷</h2></div>
             {result && <span className="pill success">已生成</span>}
           </div>
           {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
-            <div className="application-output-stack-v10 application-output-grid-v11 application-output-grid-v13 application-output-grid-v15 application-output-grid-v16">
+            <div className="application-output-stack-v10 application-output-grid-v11 application-output-grid-v13 application-output-grid-v15 application-output-grid-v16 application-output-grid-v17">
               <SectionNav items={[
                 { id: 'app-score', label: '评分' },
                 { id: 'app-brief', label: '方向' },
@@ -236,7 +236,7 @@ export default function Applications() {
               <div className="app-grid-item app-grid-score"><ScorePanel fit={result.fit} /></div>
 
               <div className="app-grid-item app-grid-brief"><ResultShell id="app-brief" title="文书方向" subtitle="PS、CV、推荐信">
-                <div className="app-brief-board-v10 app-brief-board-v16">
+                <div className="app-brief-board-v10 app-brief-board-v16 app-brief-board-v17">
                   <TextPanel title="PS 主题" content={result.writingBrief?.psTheme} className="app-brief-main" />
                   <div className="app-brief-side-v10">
                     <FoldSection title="PS 大纲" defaultOpen className="inner-fold-card"><ListBlock items={result.writingBrief?.psOutline} /></FoldSection>
@@ -248,7 +248,7 @@ export default function Applications() {
 
               <div className="app-grid-item app-grid-drafts"><ResultShell id="app-drafts" title="可编辑初稿" subtitle="左侧长文，右侧摘要与推荐信">
                 <div className="panel-title inner-title"><span className="eyebrow">文书</span><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(exportMarkdown)}>复制全部</button></div>
-                <div className="app-draft-grid-v10 app-draft-grid-v16">
+                <div className="app-draft-grid-v10 app-draft-grid-v16 app-draft-grid-v17">
                   <TextPanel title="Personal Statement 初稿" content={result.drafts?.personalStatement} className="draft-main-card" />
                   <div className="app-draft-side-v10 app-draft-side-v16">
                     <TextPanel title="CV Summary" content={result.drafts?.cvSummary} />
@@ -257,8 +257,8 @@ export default function Applications() {
                 </div>
               </ResultShell></div>
 
-              <div id="app-pipeline" className="app-grid-item app-grid-pipeline result-cluster-grid balanced-blocks app-pipeline-grid-v10 app-pipeline-grid-v16">
-                <ResultShell title="申请执行" subtitle="按任务节点推进"><div className="pipeline-list compact-pipeline pipeline-board-v16">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div></ResultShell>
+              <div id="app-pipeline" className="app-grid-item app-grid-pipeline result-cluster-grid balanced-blocks app-pipeline-grid-v10 app-pipeline-grid-v16 app-pipeline-grid-v17">
+                <ResultShell title="申请执行" subtitle="按任务节点推进"><div className="pipeline-list compact-pipeline pipeline-board-v16 pipeline-board-v17">{(asArray(result.pipeline).length ? asArray(result.pipeline) : defaultStages).map((stage: any, index) => <StageCard key={stage.stage || index} stage={stage} index={index} />)}</div></ResultShell>
                 <ResultShell title="风险与下一步" subtitle="人工确认"><div className="nested-card-grid two risk-action-grid-v16"><FoldSection title="风险点" defaultOpen className="inner-fold-card"><ListBlock items={risks} /></FoldSection><FoldSection title="下一步" defaultOpen className="inner-fold-card"><ListBlock items={actions} /></FoldSection></div></ResultShell>
               </div>
 

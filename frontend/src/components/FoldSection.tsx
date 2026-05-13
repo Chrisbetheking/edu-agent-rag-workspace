@@ -85,10 +85,12 @@ export function SectionGroup({
 export function SectionNav({ items }: { items: Array<{ id: string; label: string }> }) {
   if (!items.length) return null;
 
-  function getScrollRoot(): HTMLElement | null {
-    return (document.querySelector('.main') as HTMLElement | null)
-      || (document.querySelector('[data-scroll-root="true"]') as HTMLElement | null)
-      || document.scrollingElement as HTMLElement | null;
+  function getScrollRoot(target?: HTMLElement): HTMLElement | Window {
+    const main = target?.closest('.main') as HTMLElement | null;
+    if (main && main.scrollHeight > main.clientHeight) return main;
+    const fallback = document.querySelector('.main') as HTMLElement | null;
+    if (fallback && fallback.scrollHeight > fallback.clientHeight) return fallback;
+    return window;
   }
 
   function openAncestorDetails(target: HTMLElement) {
@@ -99,45 +101,52 @@ export function SectionNav({ items }: { items: Array<{ id: string; label: string
     }
   }
 
-  function scrollToId(id: string) {
-    const target = document.getElementById(id);
-    if (!target) return;
+  function scrollToElement(target: HTMLElement) {
     openAncestorDetails(target);
+    target.classList.add('section-flash');
+    window.setTimeout(() => target.classList.remove('section-flash'), 1200);
+
     requestAnimationFrame(() => {
-      const root = getScrollRoot();
-      const offset = 18;
-      if (root && root !== document.body && root !== document.documentElement) {
-        const rootRect = root.getBoundingClientRect();
-        const targetRect = target.getBoundingClientRect();
-        const top = targetRect.top - rootRect.top + root.scrollTop - offset;
-        root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-      } else {
-        const top = target.getBoundingClientRect().top + window.scrollY - offset;
-        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-      }
-      window.history.replaceState(null, '', `#${id}`);
+      requestAnimationFrame(() => {
+        const root = getScrollRoot(target);
+        const offset = 18;
+        if (root instanceof Window) {
+          const top = target.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        } else {
+          const rootRect = root.getBoundingClientRect();
+          const targetRect = target.getBoundingClientRect();
+          const top = root.scrollTop + targetRect.top - rootRect.top - offset;
+          root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        }
+      });
     });
   }
 
+  function scrollToId(id: string) {
+    const target = document.getElementById(id);
+    if (!target) return;
+    scrollToElement(target);
+  }
+
   function backToTop() {
-    const root = getScrollRoot();
-    if (root && root !== document.body && root !== document.documentElement) root.scrollTo({ top: 0, behavior: 'smooth' });
+    const main = document.querySelector('.main') as HTMLElement | null;
+    if (main && main.scrollHeight > main.clientHeight) main.scrollTo({ top: 0, behavior: 'smooth' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    window.history.replaceState(null, '', window.location.pathname);
   }
 
   return (
-    <nav className="section-nav section-nav-inline section-nav-v15 section-nav-v16" aria-label="页面目录">
+    <nav className="section-nav section-nav-inline section-nav-clean" aria-label="页面目录">
       <div className="section-nav-label">
         <strong>目录</strong>
-        <span>点一下直接到模块</span>
+        <span>跳到结果模块</span>
       </div>
       <div className="section-nav-links">
         {items.map((item) => (
           <button key={item.id} type="button" onClick={() => scrollToId(item.id)}>{item.label}</button>
         ))}
       </div>
-      <button className="section-nav-top" type="button" onClick={backToTop}>回到顶部</button>
+      <button className="section-nav-top" type="button" onClick={backToTop}>顶部</button>
     </nav>
   );
 }
