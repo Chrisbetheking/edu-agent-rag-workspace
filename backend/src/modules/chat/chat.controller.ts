@@ -2,6 +2,8 @@ import { Body, Controller, Get, Headers, Param, Post, Query, Res } from '@nestjs
 import { Response } from 'express';
 import { ChatService } from './chat.service';
 import { AuthContextService } from '../../shared/auth-context.service';
+import { AskChatDto } from './dto/ask-chat.dto';
+import { CreateConversationDto } from './dto/create-conversation.dto';
 
 @Controller('chat')
 export class ChatController {
@@ -20,7 +22,7 @@ export class ChatController {
   }
 
   @Post('conversations')
-  async create(@Body() body: { title: string }, @Headers('authorization') authorization?: string): Promise<any> {
+  async create(@Body() body: CreateConversationDto, @Headers('authorization') authorization?: string): Promise<any> {
     return this.chat.createConversation(body.title, this.user(authorization));
   }
 
@@ -30,7 +32,7 @@ export class ChatController {
   }
 
   @Post()
-  async ask(@Body() body: any, @Headers('authorization') authorization?: string): Promise<any> {
+  async ask(@Body() body: AskChatDto, @Headers('authorization') authorization?: string): Promise<any> {
     return this.chat.ask(body, this.user(authorization));
   }
 

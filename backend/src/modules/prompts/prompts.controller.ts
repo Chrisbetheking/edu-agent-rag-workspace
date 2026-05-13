@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { PromptsService } from './prompts.service';
+import { CreatePromptDto, UpdatePromptDto } from './dto/prompt.dto';
 
 @Controller('prompts')
 export class PromptsController {
@@ -11,12 +12,12 @@ export class PromptsController {
   }
 
   @Post()
-  create(@Body() body: any) {
+  create(@Body() body: CreatePromptDto) {
     return this.prompts.create(body);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: UpdatePromptDto) {
     return this.prompts.update(id, body);
   }
 

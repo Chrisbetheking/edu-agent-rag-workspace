@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { EvalService } from './eval.service';
+import { CreateEvalQuestionDto } from './dto/create-eval-question.dto';
+import { RunEvalDto } from './dto/run-eval.dto';
 
 @Controller('eval')
 export class EvalController {
@@ -11,12 +13,12 @@ export class EvalController {
   }
 
   @Post('questions')
-  createQuestion(@Body() body: any) {
+  createQuestion(@Body() body: CreateEvalQuestionDto) {
     return this.evalService.createQuestion(body);
   }
 
   @Post('run')
-  run(@Body() body: any) {
+  run(@Body() body: RunEvalDto) {
     return this.evalService.run(body);
   }
 

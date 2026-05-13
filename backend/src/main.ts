@@ -1,3 +1,4 @@
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
@@ -22,6 +23,23 @@ function allowedOrigins() {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: false,
+      transformOptions: { enableImplicitConversion: true },
+      exceptionFactory: (errors) =>
+        new BadRequestException({
+          message: '请求参数校验失败',
+          errors: errors.map((error) => ({
+            field: error.property,
+            constraints: error.constraints || {},
+          })),
+        }),
+    }),
+  );
 
   app.enableCors({
     origin: allowedOrigins(),

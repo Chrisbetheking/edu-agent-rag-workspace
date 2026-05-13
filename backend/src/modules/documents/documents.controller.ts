@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Headers, Param, Post, UploadedFile, UseI
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentsService } from './documents.service';
 import { AuthContextService } from '../../shared/auth-context.service';
+import { BulkDocumentsDto } from './dto/bulk-documents.dto';
+import { UploadDocumentDto } from './dto/upload-document.dto';
 
 @Controller('documents')
 export class DocumentsController {
@@ -26,12 +28,12 @@ export class DocumentsController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  upload(@UploadedFile() file: Express.Multer.File, @Body() body: any, @Headers('authorization') authorization?: string) {
+  upload(@UploadedFile() file: Express.Multer.File, @Body() body: UploadDocumentDto, @Headers('authorization') authorization?: string) {
     return this.documents.upload(file, body, this.user(authorization));
   }
 
   @Post('bulk')
-  bulk(@Body() body: any, @Headers('authorization') authorization?: string) {
+  bulk(@Body() body: BulkDocumentsDto, @Headers('authorization') authorization?: string) {
     return this.documents.bulk(body, this.user(authorization));
   }
 
