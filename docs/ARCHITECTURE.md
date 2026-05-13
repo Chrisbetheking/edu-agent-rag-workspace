@@ -1,43 +1,89 @@
-# 项目架构说明
+# EduAgent 架构说明
 
-## 总体架构
+## 目标
+
+EduAgent 的目标是模拟真实留学咨询公司的 AI 应用工作台，而不是只做一个聊天框。系统把 AI 对话、知识库、业务工具、评测、日志和权限整合在一起，展示 AI 应用工程落地能力。
+
+## 请求链路
 
 ```txt
-用户浏览器
-   ↓
-React + TypeScript 前端
-   ↓
-NestJS 后端 API
-   ↓
-认证 / 限流 / 日志 / Agent 工具 / RAG 检索
-   ↓
-PostgreSQL / Redis / Vector Store / LLM API
+React / TypeScript Frontend
+        ↓
+NestJS API
+        ↓
+Auth / Quota / Rate Control
+        ↓
+RAG Retrieval + Agent Tools
+        ↓
+LLM Service / Safe Fallback
+        ↓
+PostgreSQL Logs + Redis Cache
 ```
 
-## 模块划分
+## 前端模块
 
-### 前端
+- Dashboard：业务概览和关键指标。
+- Chat：AI 咨询、多轮对话、来源引用、工具调用展示。
+- Knowledge：文档导入、知识库管理、chunk 统计。
+- Tools：CGPA、选校、材料清单、增长内容、申请计划等 Agent 工具。
+- Evaluation：RAG 测试集、Top-K 命中、来源覆盖与耗时。
+- Logs：AI 调用日志、慢请求、RAG 未命中、cache hit、fallback 筛选。
+- Applications / FrontDesk：模拟咨询业务前后台流程。
 
-- 登录模块
-- Dashboard 工作台
-- AI 对话模块
-- 知识库管理模块
-- Agent 工具模块
-- Prompt 模板模块
-- RAG 评测模块
-- 日志模块
+## 后端模块
 
-### 后端
+- AuthModule：登录、访客模式、JWT、额度控制。
+- DocumentsModule：文档上传、文本抽取、chunk 切分、入库。
+- ChatModule：RAG 检索、上下文拼接、LLM 调用、SSE 输出、日志落库。
+- ToolsModule：业务工具和 Agent 编排。
+- PromptsModule：Prompt 模板管理。
+- EvalModule：复用真实检索链路做 RAG 评测。
+- LlmModule：OpenAI-compatible LLM 调用与 fallback。
 
-- AuthModule：登录与用户信息
-- DocumentsModule：文档上传、解析、切片
-- RagModule：检索、相似度计算、来源引用
-- ChatModule：多轮会话与 SSE 流式输出
-- ToolsModule：CGPA、院校推荐、话术、材料清单
-- PromptsModule：Prompt 模板管理
-- EvalModule：RAG 评测
-- LogsModule：工具调用日志和请求日志
+## RAG 链路
 
-## 为什么这样设计
+```txt
+用户问题
+  ↓
+query normalize
+  ↓
+RAG cache lookup
+  ↓
+keyword retrieval / memory fallback
+  ↓
+Top-K ranking
+  ↓
+context truncation + source citation
+  ↓
+LLM answer / safe fallback
+  ↓
+call log + eval metrics
+```
 
-本项目的目标不是做一个简单聊天框，而是模拟真实企业 AI 应用平台。系统将业务工具、知识库、对话、日志、评测和权限组合在一起，体现 AI 应用研发中的工程化能力。
+当前版本使用增强版 keyword RAG：包含领域词、中文 n-gram、国家词权重和国家不匹配惩罚。下一步可接入 embedding + pgvector，把检索升级为语义检索，并保留 keyword fallback。
+
+## 缓存设计
+
+`CacheService` 会优先使用 Redis：
+
+```txt
+REDIS_URL configured → Redis cache
+REDIS unavailable    → memory cache fallback
+REDIS_URL empty      → memory cache
+```
+
+缓存对象主要是 RAG 检索结果。日志中记录 `cacheHit`，便于观察重复问题的命中情况。
+
+## 可观测性
+
+调用日志包含：
+
+- requestId / conversationId / userId
+- total latency / retrieval latency / LLM latency
+- ragHitCount / ragScores
+- cacheHit
+- fallbackTriggered / fallbackReason
+- errorType / error
+- toolNames
+
+这些字段用于定位慢请求、RAG 未命中、LLM 失败和 fallback 触发原因。
