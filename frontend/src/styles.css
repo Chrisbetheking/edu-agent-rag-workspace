@@ -2619,3 +2619,282 @@ th { color: var(--muted); font-weight: 800; }
   .calendar-row-v14 { grid-template-columns: 1fr !important; }
   .score-mini-grid-v15 { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* V16: final readability reset - one section per row, working in-container navigation */
+.section-nav-v16 {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  position: static !important;
+  margin: 0 0 18px !important;
+  padding: 12px 14px !important;
+  border: 1px solid #e4ecf8 !important;
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: 0 10px 24px rgba(15,23,42,.04) !important;
+  overflow: visible !important;
+}
+.section-nav-v16 .section-nav-label { min-width: 96px; }
+.section-nav-v16 .section-nav-label strong { font-size: 13px; }
+.section-nav-v16 .section-nav-label span { font-size: 11px; color: #64748b; }
+.section-nav-v16 .section-nav-links {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.section-nav-v16 .section-nav-links button {
+  appearance: none;
+  border: 1px solid #dce7ff;
+  background: #eef4ff;
+  color: #3150c8;
+  border-radius: 999px;
+  height: 34px;
+  padding: 0 14px;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.section-nav-v16 .section-nav-links button:hover { background: #dbeafe; transform: translateY(-1px); }
+.section-nav-v16 .section-nav-top {
+  margin-left: auto !important;
+  flex: 0 0 auto;
+  min-width: 96px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #3150c8, #06b6d4);
+  color: #fff;
+  font-weight: 950;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(49,80,200,.18) !important;
+}
+.section-fold, .section-group-card, .result-shell-single, .result-shell-grid { scroll-margin-top: 24px !important; }
+
+/* Tools result: every business module becomes a full-width row. No paired skinny columns. */
+.advisor-output-v16,
+.advisor-output-v15 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 18px !important;
+  width: 100% !important;
+}
+.advisor-output-v16 > *,
+.advisor-output-v15 > * {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+.advisor-output-v16 .advisor-pair-v15,
+.advisor-output-v15 .advisor-pair-v15,
+.pair-board-v15 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 18px !important;
+}
+.advisor-output-v16 .result-shell-grid,
+.advisor-output-v15 .result-shell-grid,
+.application-output-grid-v16 .result-shell-grid,
+.application-output-grid-v15 .result-shell-grid {
+  grid-template-columns: 1fr !important;
+}
+.score-output-v16,
+.score-output-v15 {
+  display: grid !important;
+  gap: 16px !important;
+}
+.score-board-v15 {
+  grid-template-columns: minmax(280px, .32fr) minmax(0, .68fr) !important;
+  align-items: stretch !important;
+}
+.score-factors-v15 {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
+}
+.risk-action-grid-v16,
+.risk-action-grid-v15 {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+}
+
+/* School section: summary row first, then each band is a full-width row with horizontal school cards inside. */
+.school-board-v16,
+.school-board-v15 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+  align-items: start !important;
+  width: 100% !important;
+}
+.school-summary-v15 {
+  min-height: 0 !important;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 18px;
+  align-items: center;
+}
+.school-summary-v15 span { grid-column: 1; }
+.school-summary-v15 strong { grid-column: 1; margin: 0 !important; }
+.school-summary-v15 p { grid-column: 2; grid-row: 1 / span 2; }
+.school-band-v15 { width: 100% !important; height: auto !important; }
+.school-band-v15 > .fold-body { padding-top: 0 !important; }
+.school-card-list-v15 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+.school-row-v15 {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  white-space: normal !important;
+}
+.school-row-v15 * { writing-mode: horizontal-tb !important; word-break: normal !important; overflow-wrap: break-word !important; }
+
+/* Application / dossier: one major section per row, with readable horizontal cards inside each row. */
+.application-output-grid-v16,
+.application-output-grid-v15 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 18px !important;
+  width: 100% !important;
+}
+.application-output-grid-v16 > *,
+.application-output-grid-v15 > * {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+.app-brief-board-v16,
+.application-output-grid-v16 .app-brief-board-v10,
+.application-output-grid-v15 .app-brief-board-v10 {
+  display: grid !important;
+  grid-template-columns: minmax(300px, .78fr) minmax(0, 1.22fr) !important;
+  gap: 14px !important;
+  align-items: stretch !important;
+}
+.application-output-grid-v16 .app-brief-side-v10,
+.application-output-grid-v15 .app-brief-side-v10 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 14px !important;
+}
+.app-draft-grid-v16,
+.application-output-grid-v16 .app-draft-grid-v10,
+.application-output-grid-v15 .app-draft-grid-v10 {
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr) !important;
+  align-items: start !important;
+}
+.app-pipeline-grid-v16,
+.application-output-grid-v16 .app-pipeline-grid-v10,
+.application-output-grid-v15 .app-pipeline-grid-v10 {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 18px !important;
+}
+.pipeline-board-v16,
+.application-output-grid-v16 .compact-pipeline,
+.application-output-grid-v15 .compact-pipeline {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 12px !important;
+}
+.stage-card-v9,
+.stage-card-readable-v15,
+.stage-card-v9 *,
+.stage-card-readable-v15 * {
+  writing-mode: horizontal-tb !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+}
+.stage-card-v9 > summary,
+.stage-card-readable-v15 > summary {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+}
+.stage-card-v9 > summary span,
+.stage-card-readable-v15 > summary span { min-width: 0 !important; }
+.stage-card-v9 li,
+.stage-card-readable-v15 li { line-height: 1.65; }
+.material-board-v16,
+.material-board-v15 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+  gap: 14px !important;
+}
+.app-brief-grid-v16,
+.app-brief-grid-v15,
+.sales-board-v16,
+.sales-board-v15 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+  gap: 14px !important;
+}
+.draft-board-v15 {
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr) !important;
+}
+.pair-board-v15,
+.pair-board-v16 { grid-template-columns: 1fr !important; }
+
+/* Front desk schedule: horizontal rows, never JSON columns. */
+.calendar-board-v14 {
+  grid-template-columns: 1fr !important;
+}
+.calendar-row-v14 {
+  grid-template-columns: 96px minmax(0, 1fr) !important;
+  min-width: 0 !important;
+}
+.calendar-row-main p,
+.copy-card p,
+.copy-card li { writing-mode: horizontal-tb !important; white-space: normal !important; word-break: normal !important; overflow-wrap: break-word !important; }
+
+/* Kill any legacy narrow-card behavior that caused one-character-per-line text. */
+.result-shell-aside,
+.result-shell-main,
+.fold-body,
+.mini-result-body,
+.tag-row,
+.material-list,
+.pipeline-list,
+.school-card-list-v15,
+.smart-object-grid {
+  min-width: 0 !important;
+}
+.fold-card, .fold-card *, .mini-result-card, .mini-result-card *, .material-item, .material-item *, .tag-row span {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+.fold-card > summary strong,
+.fold-card > summary em { white-space: normal !important; }
+.pre-line { white-space: pre-wrap !important; word-break: normal !important; overflow-wrap: break-word !important; }
+
+@media (max-width: 1280px) {
+  .score-board-v15,
+  .app-brief-board-v16,
+  .application-output-grid-v16 .app-brief-board-v10,
+  .application-output-grid-v15 .app-brief-board-v10,
+  .app-draft-grid-v16,
+  .application-output-grid-v16 .app-draft-grid-v10,
+  .application-output-grid-v15 .app-draft-grid-v10,
+  .draft-board-v15 { grid-template-columns: 1fr !important; }
+  .school-summary-v15 { grid-template-columns: 1fr !important; }
+  .school-summary-v15 p { grid-column: auto; grid-row: auto; }
+}
+@media (max-width: 780px) {
+  .section-nav-v16 { display: grid !important; grid-template-columns: 1fr !important; }
+  .section-nav-v16 .section-nav-top { width: 100%; }
+  .school-card-list-v15,
+  .pipeline-board-v16,
+  .application-output-grid-v16 .compact-pipeline,
+  .application-output-grid-v15 .compact-pipeline,
+  .material-board-v16,
+  .material-board-v15,
+  .app-brief-grid-v16,
+  .app-brief-grid-v15,
+  .sales-board-v16,
+  .sales-board-v15,
+  .risk-action-grid-v16,
+  .risk-action-grid-v15 { grid-template-columns: 1fr !important; }
+  .calendar-row-v14 { grid-template-columns: 1fr !important; }
+}

@@ -64,7 +64,7 @@ function ScoreView({ result, id = 'score-detail' }: { result: any; id?: string }
   const tier = result.tierAdvice || {};
 
   return (
-    <div className="agent-output-stack generated-output score-output-v15">
+    <div className="agent-output-stack generated-output score-output-v15 score-output-v16">
       <ResultShell id={id} title="适配评分" subtitle="算法结论、评分证据和风险点">
         <div className="score-board-v15">
           <div className="score-hero-v15">
@@ -106,7 +106,7 @@ function SchoolBands({ data, id = 'schools' }: { data: any; id?: string }) {
   const total = bands.reduce((sum, [, items]: any) => sum + asArray(items).length, 0);
   return (
     <ResultShell id={id} title="三档选校" subtitle="候选学校横向展示，便于对比">
-      <div className="school-board-v15">
+      <div className="school-board-v15 school-board-v16">
         <div className="school-summary-v15">
           <span>候选学校</span>
           <strong>{total}</strong>
@@ -144,7 +144,7 @@ function MaterialView({ data, id = 'materials' }: { data: any; id?: string }) {
 
   return (
     <ResultShell id={id} title="材料清单" subtitle="按递交优先级分组">
-      <div className="material-board-v15">
+      <div className="material-board-v15 material-board-v16">
         {groups.map(([title, items]) => (
           <FoldSection title={String(title)} key={String(title)} defaultOpen badge={`${asArray(items).length} 项`} className="inner-fold-card material-group-v15">
             <div className="material-list-v15">
@@ -172,7 +172,7 @@ function ApplicationView({ result, id = 'application-brief' }: { result: any; id
   return (
     <div className="agent-output-stack generated-output application-output-v15">
       <ResultShell id={id} title="申请案卷" subtitle="文书方向、执行流程和材料">
-        <div className="app-brief-grid-v15">
+        <div className="app-brief-grid-v15 app-brief-grid-v16">
           <TextPanel title="PS 主题" value={result.writingBrief?.psTheme} />
           <ResultCard title="PS 大纲"><ListBlock items={result.writingBrief?.psOutline} /></ResultCard>
           <ResultCard title="CV 重点"><div className="tag-row tag-row-readable-v15">{asArray(result.writingBrief?.cvHighlights).map((x, i) => <span key={i}>{toDisplayText(x)}</span>)}</div></ResultCard>
@@ -190,17 +190,15 @@ function ApplicationView({ result, id = 'application-brief' }: { result: any; id
         </div>
       </ResultShell>
 
-      <div className="pair-board-v15">
-        <ResultShell title="申请执行" subtitle="按任务节点推进">
-          <div className="pipeline-board-v15">{pipeline.map((stage: any, index) => <FoldSection title={`${index + 1}. ${toDisplayText(stage.stage || stage.name || '任务')}`} subtitle={toDisplayText(stage.owner)} badge={toDisplayText(stage.status || '待开始')} key={index} defaultOpen className="inner-fold-card stage-card-readable-v15"><ListBlock items={stage.tasks || stage.items || stage.action} /></FoldSection>)}</div>
-        </ResultShell>
-        <ResultShell title="风险与下一步" subtitle="人工确认">
-          <div className="risk-action-grid-v15 two-only">
-            <MiniCard title="风险点"><ListBlock items={risks} /></MiniCard>
-            <MiniCard title="下一步"><ListBlock items={actions} /></MiniCard>
-          </div>
-        </ResultShell>
-      </div>
+      <ResultShell title="申请执行" subtitle="按任务节点推进">
+        <div className="pipeline-board-v15 pipeline-board-v16">{pipeline.map((stage: any, index) => <FoldSection title={`${index + 1}. ${toDisplayText(stage.stage || stage.name || '任务')}`} subtitle={toDisplayText(stage.owner)} badge={toDisplayText(stage.status || '待开始')} key={index} defaultOpen className="inner-fold-card stage-card-readable-v15"><ListBlock items={stage.tasks || stage.items || stage.action} /></FoldSection>)}</div>
+      </ResultShell>
+      <ResultShell title="风险与下一步" subtitle="人工确认">
+        <div className="risk-action-grid-v15 risk-action-grid-v16 two-only">
+          <MiniCard title="风险点"><ListBlock items={risks} /></MiniCard>
+          <MiniCard title="下一步"><ListBlock items={actions} /></MiniCard>
+        </div>
+      </ResultShell>
     </div>
   );
 }
@@ -208,7 +206,7 @@ function ApplicationView({ result, id = 'application-brief' }: { result: any; id
 function CopywritingView({ result, id = 'sales' }: { result: any; id?: string }) {
   return (
     <ResultShell id={id} title="销售跟进" subtitle="微信、电话、异议处理">
-      <div className="sales-board-v15">
+      <div className="sales-board-v15 sales-board-v16">
         <TextPanel title="微信跟进" value={result.wechat} />
         <TextPanel title="短视频脚本" value={result.shortVideoScript || result.videoScript} />
         <ResultCard title="异议处理"><ListBlock items={result.objectionHandling} /></ResultCard>
@@ -223,7 +221,7 @@ function AdvisorView({ result }: { result: any }) {
   const outputs = result.outputs || {};
   const risks = safeList(outputs.fit?.risks, outputs.fit?.riskSignals, outputs.application?.riskFlags);
   return (
-    <div className="agent-output-stack generated-output advisor-output-v15">
+    <div className="agent-output-stack generated-output advisor-output-v15 advisor-output-v16">
       <SectionNav items={[
         { id: 'advisor-trace', label: '链路' },
         { id: 'advisor-score', label: '评分' },
@@ -253,14 +251,10 @@ function AdvisorView({ result }: { result: any }) {
         </div>
       </ResultShell>
 
-      <div className="advisor-pair-v15">
-        {outputs.fit && <ScoreView result={outputs.fit} id="advisor-score" />}
-        {outputs.schools && <SchoolBands data={outputs.schools} id="advisor-schools" />}
-      </div>
-      <div className="advisor-pair-v15">
-        {outputs.application && <ApplicationView result={outputs.application} id="advisor-application" />}
-        {outputs.sales && <CopywritingView result={outputs.sales} id="advisor-sales" />}
-      </div>
+      {outputs.fit && <ScoreView result={outputs.fit} id="advisor-score" />}
+      {outputs.schools && <SchoolBands data={outputs.schools} id="advisor-schools" />}
+      {outputs.application && <ApplicationView result={outputs.application} id="advisor-application" />}
+      {outputs.sales && <CopywritingView result={outputs.sales} id="advisor-sales" />}
       {outputs.materials && <MaterialView data={outputs.materials} id="advisor-materials" />}
     </div>
   );
