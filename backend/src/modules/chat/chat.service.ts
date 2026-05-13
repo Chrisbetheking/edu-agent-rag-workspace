@@ -136,14 +136,14 @@ export class ChatService {
 
   async retrieve(query: string, topK = 3, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
     const normalizedQuery = String(query || '').trim().toLowerCase();
-    const cacheKey = this.cache.makeKey('rag:v6-hybrid-recall-rerank', {
+    const cacheKey = this.cache.makeKey('rag:v7-intent-locked-hybrid-rerank', {
       query: normalizedQuery,
       topK,
       userId: user.id,
       role: user.role,
       embeddingConfigured: this.embeddingService.isConfigured(),
       embeddingModel: this.embeddingService.modelName(),
-      hybridVersion: 'clean-kb-v2-keyword-supplement-rerank',
+      hybridVersion: 'clean-kb-v3-intent-locked-keyword-supplement-rerank',
     });
 
     const cached = await this.cache.get<any[]>(cacheKey);
@@ -206,6 +206,10 @@ export class ChatService {
         candidateSource: 'vector',
       }));
 
+      // Add intent-locked candidates by document title. This protects high-intent queries such as
+      // "申请材料" from being dominated by semantically related project/portfolio documents.
+      const intentCandidates = await this.retrieveIntentCandidates(query, user);
+
       // Add keyword recall candidates so exact intent docs can be rescued even if vector recall ranks them too low.
       // Final ranking is still hybrid and observable; pgvector remains the primary retrieval path.
       let keywordCandidates: any[] = [];
@@ -252,7 +256,7 @@ export class ChatService {
       }
 
       const merged = new Map<string, any>();
-      for (const candidate of [...vectorCandidates, ...keywordCandidates]) {
+      for (const candidate of [...intentCandidates, ...vectorCandidates, ...keywordCandidates]) {
         const key = candidate.id || `${candidate.documentId}:${candidate.chunkIndex}`;
         const existing = merged.get(key);
         if (!existing) {
@@ -265,6 +269,7 @@ export class ChatService {
           ...candidate,
           score: Math.max(Number(existing.score || 0), Number(candidate.score || 0)),
           keywordSignal: Math.max(Number(existing.keywordSignal || 0), Number(candidate.keywordSignal || 0)),
+          intentPriority: Math.max(Number(existing.intentPriority || 0), Number(candidate.intentPriority || 0)),
           candidateSource: existing.candidateSource === 'vector' ? 'vector+keyword' : candidate.candidateSource,
           retrievalMode: 'pgvector',
         });
@@ -332,6 +337,140 @@ export class ChatService {
     return results;
   }
 
+  private detectIntentTitlePatterns(query: string): { patterns: string[]; priority: Record<string, number> } {
+    const q = this.normalizeForRerank(query);
+    const hasAny = (terms: string[]) => terms.some((term) => q.includes(this.normalizeForRerank(term)));
+    const result = { patterns: [] as string[], priority: {} as Record<string, number> };
+    const add = (pattern: string, priority: number) => {
+      result.patterns.push(pattern);
+      result.priority[pattern.replace(/%/g, '').toLowerCase()] = priority;
+    };
+
+    const materialIntent = hasAny(['申请材料', '材料清单', '提交哪些材料', '哪些材料', '需要提交', '材料包括', '材料类型', '成绩单', '在读证明', '毕业证', '学位证', '推荐信', '语言成绩', '护照'])
+      || (q.includes('材料') && hasAny(['申请', '提交', '准备', '需要', '哪些', '清单', '包括']));
+    if (materialIntent) {
+      add('%申请材料清单%', 0.82);
+      add('%英国硕士申请材料%', 0.82);
+      add('%材料清单%', 0.82);
+      add('%申请总览%', 0.38);
+      add('%CV简历%', 0.2);
+      add('%推荐信准备%', 0.2);
+      add('%语言成绩%', 0.12);
+      return result;
+    }
+
+    if (hasAny(['cgpa', 'gpa', '均分', '绩点', '低gpa', '成绩不高'])) {
+      add('%CGPA_GPA%', 0.7);
+      add('%均分换算%', 0.7);
+      add('%马来西亚本科背景%', 0.28);
+      add('%选校分层%', 0.18);
+      return result;
+    }
+
+    if (hasAny(['ps', 'personalstatement', 'personal statement', '个人陈述', '文书怎么写', '文书主线', '低gpa文书'])) {
+      add('%Personal_Statement%', 0.7);
+      add('%文书写作%', 0.7);
+      add('%CV简历%', 0.12);
+      return result;
+    }
+
+    if (hasAny(['cv', 'resume', '简历'])) {
+      add('%CV简历%', 0.72);
+      add('%项目作品集%', 0.2);
+      add('%申请材料清单%', 0.12);
+      return result;
+    }
+
+    if (hasAny(['推荐信', '推荐人', '老师推荐', '实习主管'])) {
+      add('%推荐信准备%', 0.72);
+      add('%申请材料清单%', 0.16);
+      return result;
+    }
+
+    if (hasAny(['时间线', '什么时候', '申请时间', '网申', '任务拆解'])) {
+      add('%申请时间线%', 0.72);
+      add('%时间线%', 0.72);
+      return result;
+    }
+
+    if (hasAny(['预算', '费用', '学费', '生活费', '30万', '城市', '伦敦'])) {
+      add('%预算与城市%', 0.72);
+      add('%留学预算%', 0.72);
+      return result;
+    }
+
+    if (hasAny(['rag项目', 'embedding', 'pgvector', '向量检索', 'rag怎么写'])) {
+      add('%RAG项目申请素材%', 0.74);
+      add('%项目作品集%', 0.16);
+      return result;
+    }
+
+    if (hasAny(['前端ai', 'ai工作台', 'react项目', 'sse', '前端项目'])) {
+      add('%前端AI工作台%', 0.74);
+      add('%软件工程与全栈%', 0.16);
+      return result;
+    }
+
+    if (hasAny(['选校', '定位', '冲刺', '匹配', '保底', '学校推荐', '院校推荐'])) {
+      add('%选校分层%', 0.64);
+      add('%申请总览%', 0.28);
+      add('%马来西亚本科背景%', 0.22);
+      return result;
+    }
+
+    return result;
+  }
+
+  private async retrieveIntentCandidates(query: string, user: RequestUser): Promise<any[]> {
+    if (!this.db.enabled) return [];
+    const intent = this.detectIntentTitlePatterns(query);
+    if (!intent.patterns.length) return [];
+
+    try {
+      const result = await this.db.query(
+        `
+        select
+          c.id,
+          c.document_id,
+          c.document_title,
+          c.content,
+          c.chunk_index,
+          c.keywords,
+          coalesce(c.owner_id, d.owner_id, 'u_chris') as owner_id
+        from chunks c
+        left join documents d on d.id = c.document_id
+        where (($1 = 'admin') or coalesce(d.visibility, 'public') = 'public' or coalesce(c.owner_id, d.owner_id, 'u_chris') = $2)
+          and d.title ilike any($3::text[])
+        order by d.title asc, c.chunk_index asc
+        limit 80
+        `,
+        [user.role, user.id, intent.patterns],
+      );
+
+      return result.rows.map((row: any) => {
+        const title = String(row.document_title || '').toLowerCase();
+        const matched = Object.entries(intent.priority).find(([term]) => title.includes(term));
+        return {
+          id: row.id,
+          documentId: row.document_id,
+          documentTitle: row.document_title,
+          content: row.content,
+          chunkIndex: row.chunk_index,
+          keywords: row.keywords || [],
+          score: 0,
+          keywordSignal: keywordScore(query, `${row.document_title || ''}\n${(row.keywords || []).join(' ')}\n${row.content || ''}`),
+          intentPriority: matched ? matched[1] : 0.2,
+          retrievalMode: 'pgvector',
+          cacheHit: false,
+          candidateSource: 'intent-title',
+        };
+      });
+    } catch (error: any) {
+      console.error('intent title recall failed, continue without intent candidates:', error?.message || error);
+      return [];
+    }
+  }
+
   private rerankRetrieved(query: string, candidates: any[], topK: number): any[] {
     const scored = candidates
       .filter((candidate) => this.isSearchableKnowledge(candidate.documentTitle || ''))
@@ -343,13 +482,15 @@ export class ChatService {
         );
         const hybridBoost = this.hybridBoost(query, candidate);
         const keywordSignal = Math.max(keywordMatchScore, Number(candidate.keywordSignal || 0));
-        const score = Math.max(0, Math.min(1, vectorScore * 0.42 + keywordSignal * 0.34 + hybridBoost));
+        const intentPriority = Number(candidate.intentPriority || 0);
+        const score = Math.max(0, Math.min(1, vectorScore * 0.36 + keywordSignal * 0.28 + hybridBoost + intentPriority));
 
         return {
           ...candidate,
           vectorScore: Number(vectorScore.toFixed(4)),
           keywordScore: Number(keywordSignal.toFixed(4)),
           hybridBoost: Number(hybridBoost.toFixed(4)),
+          intentPriority: Number(intentPriority.toFixed(4)),
           score: Number(score.toFixed(4)),
         };
       })
