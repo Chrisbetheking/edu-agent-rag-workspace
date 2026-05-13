@@ -136,13 +136,14 @@ export class ChatService {
 
   async retrieve(query: string, topK = 3, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
     const normalizedQuery = String(query || '').trim().toLowerCase();
-    const cacheKey = this.cache.makeKey('rag:v3', {
+    const cacheKey = this.cache.makeKey('rag:v5-hybrid-rerank', {
       query: normalizedQuery,
       topK,
       userId: user.id,
       role: user.role,
       embeddingConfigured: this.embeddingService.isConfigured(),
       embeddingModel: this.embeddingService.modelName(),
+      hybridVersion: 'clean-kb-v1-title-keyword-rerank',
     });
 
     const cached = await this.cache.get<any[]>(cacheKey);
@@ -165,6 +166,7 @@ export class ChatService {
     if (!this.db.enabled || !this.embeddingService.isConfigured()) return [];
 
     try {
+      const candidateLimit = Math.max(topK * 12, Number(process.env.RAG_VECTOR_CANDIDATE_LIMIT || 60));
       const embedding = await this.embeddingService.embed(query);
       const vector = this.embeddingService.toSqlVector(embedding);
       const result = await this.db.query(
@@ -185,10 +187,10 @@ export class ChatService {
         order by c.embedding <=> $1::vector
         limit $4
         `,
-        [vector, user.role, user.id, topK],
+        [vector, user.role, user.id, candidateLimit],
       );
 
-      return result.rows.map((row: any) => ({
+      const candidates = result.rows.map((row: any) => ({
         id: row.id,
         documentId: row.document_id,
         documentTitle: row.document_title,
@@ -199,6 +201,8 @@ export class ChatService {
         retrievalMode: 'pgvector',
         cacheHit: false,
       }));
+
+      return this.rerankRetrieved(query, candidates, topK);
     } catch (error: any) {
       console.error('pgvector 语义检索失败，回退 keyword RAG：', error?.message || error);
       return [];
@@ -222,7 +226,7 @@ export class ChatService {
           [user.role, user.id],
         );
 
-        results = result.rows
+        const candidates = result.rows
           .map((row: any) => ({
             id: row.id,
             documentId: row.document_id,
@@ -230,13 +234,13 @@ export class ChatService {
             content: row.content,
             chunkIndex: row.chunk_index,
             keywords: row.keywords || [],
-            score: keywordScore(query, row.content || ''),
+            score: keywordScore(query, `${row.document_title || ''} ${row.content || ''}`),
             retrievalMode: 'keyword-db',
             cacheHit: false,
           }))
-          .filter((chunk: any) => chunk.score > 0)
-          .sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
-          .slice(0, topK);
+          .filter((chunk: any) => chunk.score > 0);
+
+        results = this.rerankRetrieved(query, candidates, topK);
       } catch (error) {
         console.error('从 Supabase 检索 chunks 失败，回退到 MemoryStore：', error);
       }
@@ -244,20 +248,187 @@ export class ChatService {
 
     if (!results.length) {
       const visibleDocIds = new Set(this.store.documents.filter((doc) => user.role === 'admin' || doc.visibility === 'public' || doc.ownerId === user.id).map((doc) => doc.id));
-      results = this.store.chunks
+      const candidates = this.store.chunks
         .filter((chunk) => visibleDocIds.has(chunk.documentId))
         .map((chunk) => ({
           ...chunk,
-          score: keywordScore(query, chunk.content),
+          score: keywordScore(query, `${chunk.documentTitle || ''} ${chunk.content}`),
           retrievalMode: 'keyword-memory',
           cacheHit: false,
         }))
-        .filter((chunk) => chunk.score > 0)
-        .sort((a, b) => (b.score || 0) - (a.score || 0))
-        .slice(0, topK);
+        .filter((chunk) => chunk.score > 0);
+
+      results = this.rerankRetrieved(query, candidates, topK);
     }
 
     return results;
+  }
+
+  private rerankRetrieved(query: string, candidates: any[], topK: number): any[] {
+    const scored = candidates
+      .filter((candidate) => this.isSearchableKnowledge(candidate.documentTitle || ''))
+      .map((candidate) => {
+        const vectorScore = Number(candidate.score || 0);
+        const keywordMatchScore = keywordScore(
+          query,
+          `${candidate.documentTitle || ''}\n${(candidate.keywords || []).join(' ')}\n${candidate.content || ''}`,
+        );
+        const hybridBoost = this.hybridBoost(query, candidate);
+        const score = Math.max(0, Math.min(1, vectorScore * 0.68 + keywordMatchScore * 0.22 + hybridBoost));
+
+        return {
+          ...candidate,
+          vectorScore: Number(vectorScore.toFixed(4)),
+          keywordScore: Number(keywordMatchScore.toFixed(4)),
+          hybridBoost: Number(hybridBoost.toFixed(4)),
+          score: Number(score.toFixed(4)),
+        };
+      })
+      .sort((a, b) => (b.score || 0) - (a.score || 0));
+
+    const deduped: any[] = [];
+    const seenDocuments = new Set<string>();
+
+    for (const item of scored) {
+      const key = item.documentId || item.documentTitle || item.id;
+      if (seenDocuments.has(key)) continue;
+      seenDocuments.add(key);
+      deduped.push(item);
+      if (deduped.length >= topK) break;
+    }
+
+    return deduped;
+  }
+
+  private isSearchableKnowledge(title: string): boolean {
+    const normalized = this.normalizeForRerank(title);
+    const blockedPatterns = [
+      'readme',
+      '使用说明',
+      '上传说明',
+      '评估问题集',
+      'rag评估',
+      '评估题',
+      '测试问题',
+      'eval',
+      'do_not_upload',
+      'admin_notes',
+    ];
+
+    return !blockedPatterns.some((pattern) => normalized.includes(pattern));
+  }
+
+  private hybridBoost(query: string, candidate: any): number {
+    const q = this.normalizeForRerank(query);
+    const title = this.normalizeForRerank(candidate.documentTitle || '');
+    const content = this.normalizeForRerank(candidate.content || '').slice(0, 2500);
+    const fullText = `${title}\n${content}`;
+    let boost = 0;
+
+    const titleHas = (terms: string[]) => this.includesAny(title, terms);
+    const queryHas = (terms: string[]) => this.includesAny(q, terms);
+    const contentHitCount = (terms: string[]) => terms.filter((term) => fullText.includes(this.normalizeForRerank(term))).length;
+
+    const importantQueryTerms = ['英国', '计算机', '硕士', '申请', '材料', 'gpa', 'cgpa', '均分', 'ps', 'cv', '推荐信', '预算', '选校', '项目'];
+    boost += importantQueryTerms.filter((term) => q.includes(term) && title.includes(term)).length * 0.025;
+
+    const isMaterialIntent = queryHas(['申请材料', '材料清单', '提交哪些材料', '哪些材料', '需要提交', '准备哪些', '成绩单', '在读证明', '毕业证', '推荐信', '语言成绩'])
+      || (q.includes('材料') && q.includes('申请'));
+    if (isMaterialIntent) {
+      if (titleHas(['申请材料清单', '硕士申请材料', '英国硕士申请材料', '材料清单'])) boost += 0.62;
+      if (titleHas(['英国计算机硕士申请总览', '申请总览'])) boost += 0.22;
+      if (titleHas(['推荐信准备', 'cv简历', 'personalstatement', 'personal_statement', '文书写作'])) boost += 0.08;
+      boost += Math.min(0.24, contentHitCount(['成绩单', '在读证明', '毕业证', '学位证', 'personal statement', '个人陈述', '推荐信', '语言成绩', 'cv', 'resume', '护照', '作品集']) * 0.035);
+      if (titleHas(['前端ai工作台', 'rag项目申请素材', '项目申请素材', '选校分层', 'offer选择', '预算与城市', '面试', '安全边界'])) boost -= 0.36;
+    }
+
+    const isGpaIntent = queryHas(['cgpa', 'gpa', '均分', '绩点', '低gpa', '成绩不高']) && !q.includes('成绩单');
+    if (isGpaIntent) {
+      if (titleHas(['cgpa', 'gpa', '均分换算', '成绩解释'])) boost += 0.58;
+      if (titleHas(['马来西亚本科背景', '英国计算机硕士选校分层'])) boost += 0.16;
+      if (titleHas(['前端ai工作台', 'rag项目申请素材'])) boost -= 0.25;
+    }
+
+    const isPsIntent = queryHas(['ps', 'personalstatement', 'personal statement', '个人陈述', '文书怎么写', '文书主线', '低gpa文书']);
+    if (isPsIntent) {
+      if (titleHas(['personalstatement', 'personal_statement', '文书写作指南'])) boost += 0.6;
+      if (titleHas(['低gpa', 'cgpa', 'gpa'])) boost += 0.1;
+      if (titleHas(['申请材料清单'])) boost -= 0.12;
+    }
+
+    const isCvIntent = queryHas(['cv', 'resume', '简历']);
+    if (isCvIntent) {
+      if (titleHas(['cv简历', '简历与项目包装', 'resume'])) boost += 0.6;
+      if (titleHas(['项目作品集', 'github'])) boost += 0.15;
+    }
+
+    if (queryHas(['推荐信', '推荐人', '老师推荐', '实习主管'])) {
+      if (titleHas(['推荐信准备', '推荐信'])) boost += 0.62;
+      if (titleHas(['申请材料清单'])) boost += 0.1;
+    }
+
+    if (queryHas(['雅思', '托福', 'pte', '语言成绩', '语言班', '英语成绩'])) {
+      if (titleHas(['语言成绩', '语言班', '雅思'])) boost += 0.62;
+      if (titleHas(['申请材料清单'])) boost += 0.08;
+    }
+
+    if (queryHas(['时间线', '什么时候', '多久', '申请时间', '网申', '截止', '任务拆解'])) {
+      if (titleHas(['申请时间线', '任务拆解', '时间线'])) boost += 0.62;
+    }
+
+    if (queryHas(['预算', '费用', '学费', '生活费', '30万', '城市', '伦敦'])) {
+      if (titleHas(['预算与城市', '留学预算', '城市选择'])) boost += 0.62;
+    }
+
+    if (queryHas(['选校', '定位', '冲刺', '匹配', '保底', '学校推荐', '院校推荐'])) {
+      if (titleHas(['选校分层', '申请总览', '马来西亚本科背景'])) boost += 0.45;
+      if (titleHas(['申请材料清单'])) boost -= 0.12;
+    }
+
+    if (queryHas(['专业方向', '选什么专业', 'ai和数据科学', '软件工程和cs', 'cs区别'])) {
+      if (titleHas(['专业方向选择', '计算机硕士专业方向'])) boost += 0.62;
+    }
+
+    if (queryHas(['马来西亚', 'apu', '海外本科'])) {
+      if (titleHas(['马来西亚本科背景', 'cgpa', '英国计算机硕士申请总览'])) boost += 0.32;
+    }
+
+    const isRagProjectIntent = queryHas(['rag项目', 'embedding', 'pgvector', '向量检索', 'ai项目怎么写', 'rag怎么写']);
+    if (isRagProjectIntent) {
+      if (titleHas(['rag项目申请素材'])) boost += 0.65;
+      if (titleHas(['ai与数据科学', '项目作品集'])) boost += 0.12;
+    }
+
+    const isFrontendProjectIntent = queryHas(['前端ai', 'ai工作台', 'react项目', 'sse', '前端项目']);
+    if (isFrontendProjectIntent) {
+      if (titleHas(['前端ai工作台项目申请素材'])) boost += 0.65;
+      if (titleHas(['软件工程与全栈', '项目作品集'])) boost += 0.12;
+    }
+
+    if (queryHas(['作品集', 'github', 'portfolio', '项目包装']) && !isRagProjectIntent && !isFrontendProjectIntent) {
+      if (titleHas(['项目作品集', 'github', 'cv简历'])) boost += 0.42;
+    }
+
+    if (queryHas(['面试', '口头表达', '申请动机', '项目讲解'])) {
+      if (titleHas(['申请面试', '口头表达'])) boost += 0.62;
+    }
+
+    if (queryHas(['offer', '录取选择', '最终决策', '多个offer'])) {
+      if (titleHas(['offer选择', '最终决策'])) boost += 0.62;
+    }
+
+    return boost;
+  }
+
+  private normalizeForRerank(text: string): string {
+    return String(text || '')
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[\-_｜|：:，,。.!！?？「」“”'"`]/g, '');
+  }
+
+  private includesAny(text: string, terms: string[]): boolean {
+    return terms.some((term) => text.includes(this.normalizeForRerank(term)));
   }
 
   private async persistConversation(conversationId: string, title: string, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }) {
