@@ -46,11 +46,25 @@ interface StructuredAdvice {
 interface ChatResult {
   answer: string;
   rawAnswer?: string;
+  answerMode?: 'school_plan' | 'grounded_qa' | string;
   structured?: StructuredAdvice | null;
   sources: any[];
   toolCalls: any[];
   conversationId: string;
   quota?: { limit: number | null; used: number | null; remaining: number | null };
+  observability?: {
+    requestId?: string;
+    retrievalLatencyMs?: number;
+    llmLatencyMs?: number;
+    totalLatencyMs?: number;
+    ragHitCount?: number;
+    ragScores?: number[];
+    cacheHit?: boolean;
+    answerMode?: string;
+    retrievalModes?: string[];
+    fallbackTriggered?: boolean;
+    fallbackReason?: string;
+  };
 }
 
 
@@ -75,6 +89,12 @@ function cleanText(text?: unknown) {
     .replace(/```json/g, '')
     .replace(/```/g, '')
     .trim();
+}
+
+function formatMs(value?: number) {
+  const ms = Number(value || 0);
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${ms}ms`;
 }
 
 function cleanTime(text?: unknown) {
@@ -137,10 +157,50 @@ function DisplayValue({ value }: { value: unknown }) {
 }
 
 function SourceCard({ source, index }: { source: any; index: number }) {
+  const metaItems = [
+    ['rank', source.rank || index + 1],
+    ['score', source.score],
+    ['mode', source.retrievalMode],
+    ['cache', source.cacheHit ? 'hit' : 'miss'],
+    ['candidate', source.candidateSource],
+    ['vector', source.vectorScore],
+    ['keyword', source.keywordScore],
+    ['boost', source.hybridBoost],
+    ['intentLock', source.intentLockWeight],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+
   return (
-    <FoldSection title={cleanText(source.documentTitle || source.title || `来源 ${index + 1}`)} subtitle={`相似度：${cleanText(source.score) || '-'}`} defaultOpen={index < 2} className="inner-fold-card source-card-v13">
+    <FoldSection title={cleanText(source.documentTitle || source.title || `来源 ${index + 1}`)} subtitle={`score ${cleanText(source.score) || '-'} · ${cleanText(source.retrievalMode || 'unknown')}`} defaultOpen={index < 2} className="inner-fold-card source-card-v13">
+      <div className="tag-row source-debug-row">
+        {metaItems.map(([key, value]) => <span key={String(key)}>{String(key)}: {cleanText(value)}</span>)}
+      </div>
       <DisplayValue value={source.content || source.chunk || source.text} />
     </FoldSection>
+  );
+}
+
+function ObservabilityCard({ result }: { result: ChatResult }) {
+  const obs = result.observability;
+  if (!obs) return null;
+
+  const modeText = cleanText(obs.answerMode || result.answerMode || '-');
+  const retrievalModes = Array.isArray(obs.retrievalModes) && obs.retrievalModes.length ? obs.retrievalModes.join(' / ') : '-';
+  const scoreText = Array.isArray(obs.ragScores) && obs.ragScores.length ? obs.ragScores.map((score) => Number(score).toFixed(2)).join(', ') : '-';
+
+  return (
+    <SectionGroup title="可观测性" subtitle="latency / cache / mode / fallback" defaultOpen>
+      <div className="smart-object-grid observability-grid">
+        <div className="smart-object-cell"><span>回答模式</span><strong>{modeText}</strong></div>
+        <div className="smart-object-cell"><span>检索模式</span><strong>{retrievalModes}</strong></div>
+        <div className="smart-object-cell"><span>检索耗时</span><strong>{formatMs(obs.retrievalLatencyMs)}</strong></div>
+        <div className="smart-object-cell"><span>模型耗时</span><strong>{formatMs(obs.llmLatencyMs)}</strong></div>
+        <div className="smart-object-cell"><span>总耗时</span><strong>{formatMs(obs.totalLatencyMs)}</strong></div>
+        <div className="smart-object-cell"><span>RAG 命中</span><strong>{obs.ragHitCount ?? result.sources?.length ?? 0}</strong></div>
+        <div className="smart-object-cell"><span>缓存</span><strong>{obs.cacheHit ? 'Hit' : 'Miss'}</strong></div>
+        <div className="smart-object-cell"><span>Fallback</span><strong>{obs.fallbackTriggered ? (obs.fallbackReason || 'triggered') : 'No'}</strong></div>
+      </div>
+      <div className="tag-row"><span>scores: {scoreText}</span>{obs.requestId && <span>requestId: {obs.requestId}</span>}</div>
+    </SectionGroup>
   );
 }
 
@@ -400,6 +460,8 @@ export default function Chat() {
 
       {result && (
         <div className="meta-grid meta-grid-v13">
+          <ObservabilityCard result={result} />
+
           <SectionGroup title="来源引用" subtitle="RAG 命中文档" defaultOpen>
             <div className="meta-card-grid-v13">
               {result.sources?.length ? result.sources.map((s, i) => <SourceCard source={s} index={i} key={s.id || i} />) : <p className="muted-text">暂无来源引用。</p>}
