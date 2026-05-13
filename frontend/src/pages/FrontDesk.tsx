@@ -6,88 +6,44 @@ import { readSessionState, writeSessionState } from '../utils/sessionState';
 
 const STORAGE_KEY = 'eduagent.frontdesk.v9';
 
-function parseLooseJson(value: unknown): any {
-  if (typeof value !== 'string') return value;
-  let text = value.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
-  if (!text) return value;
-  try { return JSON.parse(text); } catch {}
-  const objectMatch = text.match(/\{[\s\S]*\}/);
-  const arrayMatch = text.match(/\[[\s\S]*\]/);
-  const candidate = arrayMatch?.[0] || objectMatch?.[0];
-  if (candidate) {
-    try { return JSON.parse(candidate); } catch {}
-  }
-  return value;
-}
-
-function compactText(value: unknown): string {
-  const parsed = parseLooseJson(value);
-  if (Array.isArray(parsed)) return parsed.map(compactText).filter(Boolean).join('；');
-  if (parsed && typeof parsed === 'object') {
-    const obj = parsed as Record<string, unknown>;
-    const prioritized = obj.content || obj.copy || obj.text || obj.script || obj.topic || obj.title || obj.theme;
-    if (prioritized) return String(prioritized);
-    return Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]): string => `${k}: ${compactText(v)}`).join('；');
-  }
-  return stringifySafe(parsed).replace(/[{}\[\]"]+/g, '').replace(/\s+/g, ' ').trim();
-}
-
-function normalizeCalendarItem(item: any, index: number) {
-  const parsed = parseLooseJson(item);
-  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-    return {
-      day: parsed.day || parsed.date || `第 ${index + 1} 天`,
-      platform: parsed.platform || parsed.channel || parsed.place || '内容渠道',
-      type: parsed.type || parsed.format || parsed.scene || '内容',
-      topic: parsed.topic || parsed.title || parsed.theme || parsed.headline || `第 ${index + 1} 天内容`,
-      content: compactText(parsed.content || parsed.copy || parsed.text || parsed.script || parsed.body || parsed),
-    };
-  }
-  return { day: `第 ${index + 1} 天`, platform: '内容渠道', type: '内容', topic: `第 ${index + 1} 天内容`, content: compactText(parsed) };
-}
-
-
 function CopyCard({ title, content }: { title: string; content: unknown }) {
-  const parsed = parseLooseJson(content);
-  const items = asArray(parsed).filter(Boolean);
-  const text = items.length > 1 ? items.map(compactText).join('\n') : compactText(parsed);
+  const items = asArray(content).filter(Boolean);
+  const text = items.length > 1 ? items.map(stringifySafe).join('\n') : stringifySafe(content);
   return (
     <article className="copy-card enhanced-card">
       <div className="row-between top-align">
         <h3>{title}</h3>
         <button className="ghost-button" type="button" onClick={() => navigator.clipboard?.writeText(text)}>复制</button>
       </div>
-      {items.length > 1 ? <ul>{items.map((item, index) => <li key={`${title}-${index}`}>{compactText(item)}</li>)}</ul> : <p>{text || '暂无内容'}</p>}
+      {items.length > 1 ? <ul>{items.map((item, index) => <li key={`${title}-${index}`}>{stringifySafe(item)}</li>)}</ul> : <p>{text || '暂无内容'}</p>}
     </article>
   );
 }
 
+
+function parseCalendarItem(item: any) {
+  if (typeof item === 'string') {
+    try { return JSON.parse(item); } catch { return { content: item }; }
+  }
+  return item && typeof item === 'object' ? item : { content: stringifySafe(item) };
+}
+
 function CalendarCard({ items }: { items: any[] }) {
-  const normalized = items.map(normalizeCalendarItem);
-  const copyText = normalized.map((x) => `${x.day}｜${x.platform}｜${x.type}｜${x.topic}\n${x.content}`).join('\n\n');
+  const parsed = items.map(parseCalendarItem);
+  const copyText = parsed.map((x, i) => `${x.day || `第 ${i + 1} 天`}｜${x.date || ''}｜${x.platform || ''}｜${x.type || x.format || ''}｜${x.topic || x.title || x.content || ''}`).join('\n');
   return (
-    <article className="copy-card enhanced-card full-span-card calendar-panel-v13">
+    <article className="copy-card enhanced-card full-span-card publish-plan-card-v18">
       <div className="row-between top-align">
-        <div>
-          <h3>发布计划</h3>
-          <p className="muted compact-note">按时间、渠道和内容类型拆分，避免展示原始 JSON。</p>
-        </div>
+        <h3>发布计划</h3>
         <button className="ghost-button" type="button" onClick={() => navigator.clipboard?.writeText(copyText)}>复制</button>
       </div>
-      <div className="calendar-board-v14">
-        {normalized.map((item, index) => (
-          <div className="calendar-row-v14" key={index}>
-            <div className="calendar-row-index">
-              <strong>{index + 1}</strong>
-              <span>{item.day}</span>
-            </div>
-            <div className="calendar-row-main">
-              <div className="calendar-card-head">
-                <h4>{item.topic}</h4>
-                <div className="tag-row compact-tags"><span>{item.platform}</span><span>{item.type}</span></div>
-              </div>
-              <p>{item.content || '待补充内容'}</p>
-            </div>
+      <div className="publish-plan-grid-v18">
+        {parsed.map((item, index) => (
+          <div className="publish-plan-item-v18" key={index}>
+            <div className="row-between top-align"><strong>{item.day || `第 ${index + 1} 天`}</strong><span>{item.date || item.time || ''}</span></div>
+            <div className="tag-row compact-tags"><span>{item.platform || '渠道'}</span><span>{item.type || item.format || '内容'}</span></div>
+            <h4>{item.topic || item.title || '跟进内容'}</h4>
+            <p>{item.content || item.copy || item.text || stringifySafe(item)}</p>
           </div>
         ))}
       </div>
@@ -156,7 +112,7 @@ export default function FrontDesk() {
   }
 
   return (
-    <section className="page-stack compact-page">
+    <section className="page-stack compact-page frontdesk-page-v18">
       <div className="page-title elevated clean-title">
         <div>
           <span className="eyebrow">客户线索</span>
@@ -172,9 +128,9 @@ export default function FrontDesk() {
       {error && <div className="error-card"><strong>生成失败</strong><p>{error}</p></div>}
       {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{result.llmFallbackReason}</div>}
 
-      <div className={`two-col wide-right frontdesk-workbench-v13 frontdesk-workbench-v15 ${result ? 'with-result' : ''}`}>
+      <div className="frontdesk-workbench-v18">
         <section className="panel form-panel sticky-panel">
-          <div className="panel-title compact form-action-title"><div><span className="eyebrow">录入</span><h2>学生信息</h2></div><button className="primary compact-run-button" type="button" disabled={loading} onClick={() => generate()}>{loading ? '生成中...' : '生成内容'}</button></div>
+          <div className="panel-title compact"><span className="eyebrow">录入</span><h2>学生信息</h2></div>
           <form className="form-stack" onSubmit={generate}>
             <div className="form-grid two">
               <label>学生称呼<input value={name} onChange={(e) => setName(e.target.value)} /></label>
@@ -189,10 +145,11 @@ export default function FrontDesk() {
             </div>
             <label>沟通切入点<select value={angle} onChange={(e) => setAngle(e.target.value)}>{angleOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
             <label>投放渠道<select value={platform} onChange={(e) => setPlatform(e.target.value)}>{platformOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <button className="primary" disabled={loading}>{loading ? '生成中...' : '生成内容'}</button>
           </form>
         </section>
 
-        <section className="panel result-panel frontdesk-result-panel-v13 frontdesk-result-panel-v15">
+        <section className="panel result-panel">
           <div className="panel-title compact"><span className="eyebrow">结果</span><h2>内容包</h2></div>
           {!result ? (
             <div className="empty-advice compact-empty"><div className="empty-icon">✍</div><h2>等待生成</h2><p>填写左侧信息后生成内容。</p></div>

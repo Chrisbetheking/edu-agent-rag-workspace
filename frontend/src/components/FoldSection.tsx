@@ -18,6 +18,38 @@ export function toDisplayText(value: unknown): string {
   return String(value);
 }
 
+function openParentDetails(target: HTMLElement) {
+  let node: HTMLElement | null = target;
+  while (node) {
+    if (node instanceof HTMLDetailsElement) node.open = true;
+    node = node.parentElement;
+  }
+}
+
+function scrollToElement(id: string) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  openParentDetails(target);
+
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+    target.classList.add('section-target-flash');
+    window.setTimeout(() => target.classList.remove('section-target-flash'), 1400);
+    try {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${id}`);
+    } catch {}
+  });
+}
+
+function scrollToPageTop() {
+  const root = document.querySelector('.page-stack') || document.querySelector('.main') || document.body;
+  if (root instanceof HTMLElement) {
+    root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 export function FoldSection({
   id,
   title,
@@ -85,68 +117,20 @@ export function SectionGroup({
 export function SectionNav({ items }: { items: Array<{ id: string; label: string }> }) {
   if (!items.length) return null;
 
-  function getScrollRoot(target?: HTMLElement): HTMLElement | Window {
-    const main = target?.closest('.main') as HTMLElement | null;
-    if (main && main.scrollHeight > main.clientHeight) return main;
-    const fallback = document.querySelector('.main') as HTMLElement | null;
-    if (fallback && fallback.scrollHeight > fallback.clientHeight) return fallback;
-    return window;
-  }
-
-  function openAncestorDetails(target: HTMLElement) {
-    let node: HTMLElement | null = target;
-    while (node) {
-      if (node.tagName?.toLowerCase() === 'details') (node as HTMLDetailsElement).open = true;
-      node = node.parentElement;
-    }
-  }
-
-  function scrollToElement(target: HTMLElement) {
-    openAncestorDetails(target);
-    target.classList.add('section-flash');
-    window.setTimeout(() => target.classList.remove('section-flash'), 1200);
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const root = getScrollRoot(target);
-        const offset = 18;
-        if (root instanceof Window) {
-          const top = target.getBoundingClientRect().top + window.scrollY - offset;
-          window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-        } else {
-          const rootRect = root.getBoundingClientRect();
-          const targetRect = target.getBoundingClientRect();
-          const top = root.scrollTop + targetRect.top - rootRect.top - offset;
-          root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-        }
-      });
-    });
-  }
-
-  function scrollToId(id: string) {
-    const target = document.getElementById(id);
-    if (!target) return;
-    scrollToElement(target);
-  }
-
-  function backToTop() {
-    const main = document.querySelector('.main') as HTMLElement | null;
-    if (main && main.scrollHeight > main.clientHeight) main.scrollTo({ top: 0, behavior: 'smooth' });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
   return (
-    <nav className="section-nav section-nav-inline section-nav-clean" aria-label="页面目录">
-      <div className="section-nav-label">
+    <nav className="section-nav section-nav-readable" aria-label="页面目录">
+      <div className="section-nav-title">
         <strong>目录</strong>
-        <span>跳到结果模块</span>
+        <small>点击跳到对应模块</small>
       </div>
-      <div className="section-nav-links">
+      <div className="section-nav-actions">
         {items.map((item) => (
-          <button key={item.id} type="button" onClick={() => scrollToId(item.id)}>{item.label}</button>
+          <button key={item.id} type="button" onClick={() => scrollToElement(item.id)}>
+            {item.label}
+          </button>
         ))}
       </div>
-      <button className="section-nav-top" type="button" onClick={backToTop}>顶部</button>
+      <button className="section-nav-top" type="button" onClick={scrollToPageTop}>回到顶部</button>
     </nav>
   );
 }
