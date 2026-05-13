@@ -8,7 +8,7 @@ EduAgent 是一个面向留学咨询场景的 AI 应用工作台。它不是单�
 
 - 使用 React + TypeScript 搭建 AI 工作台页面，包括对话、知识库、评测、日志和业务工具。
 - 使用 NestJS 实现认证、文档、RAG、LLM、工具、评测和日志接口。
-- 设计 RAG 检索链路，支持 chunk、Top-K、来源引用和 fallback。
+- 设计 RAG 检索链路，支持 chunk、embedding、pgvector 语义检索、Top-K、来源引用和 keyword fallback。
 - 增加 RAG 评测面板，复用真实检索链路统计命中、Recall@K 和耗时。
 - 增加日志观测字段，记录检索耗时、模型耗时、cache hit、fallback 和错误类型。
 - 增加 Redis-compatible cache，配置 Redis 时使用 Redis，异常时回退内存缓存。
@@ -16,12 +16,10 @@ EduAgent 是一个面向留学咨询场景的 AI 应用工作台。它不是单�
 ## 3. RAG 怎么做
 
 ```txt
-文档上传 → 文本切片 → keywords / chunks 入库 → query 归一化 → cache lookup → Top-K 检索 → 来源引用 → LLM 生成 → 调用日志
+文档上传 → 文本切片 → chunk embedding → Supabase/pgvector 入库 → query embedding → cache lookup → pgvector Top-K → keyword fallback → 来源引用 → LLM 生成 → 调用日志
 ```
 
-当前版本使用增强版 keyword retrieval，包含领域词、中文 n-gram、国家词权重和国家不匹配惩罚。这样做的原因是 Demo 成本可控，并且能保证在没有 embedding API 时仍然可运行。
-
-后续升级方向是接入 embedding API 和 pgvector：语义检索优先，keyword retrieval 作为 fallback。
+当前版本配置 embedding 后优先使用 pgvector 语义检索；如果 embedding 未配置、pgvector 不可用或没有命中结果，会回退增强版 keyword retrieval。这样既能展示真实 RAG 工程链路，也能保证 Demo 稳定运行。
 
 ## 4. 为什么要做评测
 
@@ -79,7 +77,6 @@ AI 应用的问题通常不是接口通不通，而是回答慢、检索错、�
 
 ## 9. 下一步优化
 
-1. 接入 embedding + pgvector 语义检索。
-2. 给核心接口增加 DTO + ValidationPipe。
+1. 给核心接口增加 DTO + ValidationPipe。
 3. 拆分 ToolsService，把业务工具拆成多个 service。
 4. 增加更多 RAG 评测样例和 bad case 分析。

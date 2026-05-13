@@ -2,6 +2,7 @@
 -- Run this once in Supabase SQL Editor or with: psql "$DATABASE_URL" -f docs/supabase-full-schema.sql
 
 create extension if not exists "pgcrypto";
+create extension if not exists vector;
 
 create table if not exists documents (
   id uuid primary key default gen_random_uuid(),
@@ -26,6 +27,7 @@ create table if not exists chunks (
   chunk_index integer not null default 0,
   keywords text[] not null default '{}',
   owner_id text not null default 'u_chris',
+  embedding vector(1536),
   created_at timestamptz not null default now()
 );
 
@@ -109,3 +111,44 @@ create index if not exists idx_call_logs_created_at on call_logs(created_at desc
 create index if not exists idx_call_logs_success on call_logs(success);
 create index if not exists idx_call_logs_cache_hit on call_logs(cache_hit);
 create index if not exists idx_call_logs_fallback on call_logs(fallback_triggered);
+
+
+-- pgvector semantic retrieval helper. The vector dimension must match EMBEDDING_DIMENSION.
+create index if not exists idx_chunks_embedding_ivfflat
+on chunks using ivfflat (embedding vector_cosine_ops)
+with (lists = 100);
+
+create or replace function match_chunks(
+  query_embedding vector(1536),
+  match_count int,
+  p_user_id text,
+  p_role text
+)
+returns table (
+  id uuid,
+  document_id uuid,
+  document_title text,
+  content text,
+  chunk_index int,
+  score float
+)
+language sql stable
+as $$
+  select
+    c.id,
+    c.document_id,
+    c.document_title,
+    c.content,
+    c.chunk_index,
+    1 - (c.embedding <=> query_embedding) as score
+  from chunks c
+  left join documents d on d.id = c.document_id
+  where c.embedding is not null
+    and (
+      p_role = 'admin'
+      or coalesce(d.visibility, 'public') = 'public'
+      or coalesce(c.owner_id, d.owner_id, 'u_chris') = p_user_id
+    )
+  order by c.embedding <=> query_embedding
+  limit match_count;
+$$;

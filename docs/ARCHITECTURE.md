@@ -13,7 +13,7 @@ NestJS API
         ↓
 Auth / Quota / Rate Control
         ↓
-RAG Retrieval + Agent Tools
+RAG Retrieval（pgvector + keyword fallback）+ Agent Tools
         ↓
 LLM Service / Safe Fallback
         ↓
@@ -49,7 +49,7 @@ query normalize
   ↓
 RAG cache lookup
   ↓
-keyword retrieval / memory fallback
+embedding configured? pgvector semantic retrieval : keyword fallback
   ↓
 Top-K ranking
   ↓
@@ -60,7 +60,7 @@ LLM answer / safe fallback
 call log + eval metrics
 ```
 
-当前版本使用增强版 keyword RAG：包含领域词、中文 n-gram、国家词权重和国家不匹配惩罚。下一步可接入 embedding + pgvector，把检索升级为语义检索，并保留 keyword fallback。
+当前版本支持两层检索：配置 embedding 后优先使用 pgvector 语义检索；没有 embedding 或 pgvector 查询失败时，自动回退增强版 keyword RAG。keyword fallback 包含领域词、中文 n-gram、国家词权重和国家不匹配惩罚，保证公开 Demo 在没有 embedding API 时仍可运行。
 
 ## 缓存设计
 

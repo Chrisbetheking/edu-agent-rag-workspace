@@ -35,6 +35,11 @@ export class DocumentsController {
     return this.documents.bulk(body, this.user(authorization));
   }
 
+  @Post('embeddings/rebuild')
+  rebuildEmbeddings(@Headers('authorization') authorization?: string) {
+    return this.documents.rebuildEmbeddings(this.user(authorization));
+  }
+
   @Get(':id/chunks')
   chunks(@Param('id') id: string, @Headers('authorization') authorization?: string) {
     return this.documents.chunks(id, this.user(authorization));

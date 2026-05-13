@@ -4,6 +4,7 @@ import { MemoryStore } from '../../shared/memory-store';
 import { DatabaseService } from '../../shared/database.service';
 import { DocumentRecord, RequestUser } from '../../shared/types';
 import { makeChunk, splitIntoChunks } from '../../shared/text-utils';
+import { EmbeddingService } from '../embedding/embedding.service';
 
 interface BulkDocumentInput {
   title?: string;
@@ -15,10 +16,12 @@ interface BulkDocumentInput {
 @Injectable()
 export class DocumentsService {
   private schemaReady = false;
+  private vectorSchemaReady = false;
 
   constructor(
     private readonly store: MemoryStore,
     private readonly db: DatabaseService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   private defaultUser(): RequestUser {
@@ -88,24 +91,60 @@ export class DocumentsService {
   }
 
   private async ensureSchema() {
-    if (!this.db.enabled || this.schemaReady) return;
+    if (!this.db.enabled) return;
+
+    if (!this.schemaReady) {
+      try {
+        await this.db.query(`
+          alter table if exists documents
+            add column if not exists owner_id text not null default 'u_chris',
+            add column if not exists visibility text not null default 'public',
+            add column if not exists tags text[] not null default '{}',
+            add column if not exists updated_at timestamptz not null default now(),
+            add column if not exists expires_at timestamptz;
+        `);
+        await this.db.query(`
+          alter table if exists chunks
+            add column if not exists owner_id text not null default 'u_chris';
+        `);
+        this.schemaReady = true;
+      } catch (error) {
+        console.error('知识库权限字段自动升级失败：', error);
+      }
+    }
+
+    if (this.embeddingService.isConfigured()) {
+      await this.ensureVectorSchema();
+    }
+  }
+
+  private async ensureVectorSchema() {
+    if (!this.db.enabled || this.vectorSchemaReady) return;
+
+    const dimension = this.embeddingService.vectorDimension();
 
     try {
+      await this.db.query('create extension if not exists vector;');
+      await this.db.query(`alter table if exists chunks add column if not exists embedding vector(${dimension});`);
       await this.db.query(`
-        alter table if exists documents
-          add column if not exists owner_id text not null default 'u_chris',
-          add column if not exists visibility text not null default 'public',
-          add column if not exists tags text[] not null default '{}',
-          add column if not exists updated_at timestamptz not null default now(),
-          add column if not exists expires_at timestamptz;
+        create index if not exists idx_chunks_embedding_ivfflat
+        on chunks using ivfflat (embedding vector_cosine_ops)
+        with (lists = 100);
       `);
-      await this.db.query(`
-        alter table if exists chunks
-          add column if not exists owner_id text not null default 'u_chris';
-      `);
-      this.schemaReady = true;
-    } catch (error) {
-      console.error('知识库权限字段自动升级失败：', error);
+      this.vectorSchemaReady = true;
+    } catch (error: any) {
+      console.error('pgvector schema 初始化失败，当前仍可使用 keyword RAG：', error?.message || error);
+    }
+  }
+
+  private async buildChunkEmbedding(content: string) {
+    if (!this.embeddingService.isConfigured()) return null;
+
+    try {
+      return await this.embeddingService.embed(content);
+    } catch (error: any) {
+      console.error('chunk embedding 生成失败，跳过该 chunk 向量：', error?.message || error);
+      return null;
     }
   }
 
@@ -157,11 +196,42 @@ export class DocumentsService {
     await this.ensureSchema();
 
     const chunks = this.store.chunks.filter((chunk) => chunk.documentId === documentId);
+    const canPersistEmbedding = this.vectorSchemaReady && this.embeddingService.isConfigured();
 
     try {
       await this.db.query('delete from chunks where document_id = $1', [documentId]);
 
       for (const chunk of chunks) {
+        if (canPersistEmbedding) {
+          const embedding = await this.buildChunkEmbedding(chunk.content);
+          await this.db.query(
+            `
+            insert into chunks (
+              id,
+              document_id,
+              document_title,
+              content,
+              chunk_index,
+              keywords,
+              owner_id,
+              embedding
+            )
+            values ($1, $2, $3, $4, $5, $6, $7, case when $8::text is null then null else $8::vector end)
+            `,
+            [
+              chunk.id,
+              chunk.documentId,
+              chunk.documentTitle,
+              chunk.content,
+              chunk.chunkIndex,
+              chunk.keywords || [],
+              chunk.ownerId || 'u_chris',
+              embedding ? this.embeddingService.toSqlVector(embedding) : null,
+            ],
+          );
+          continue;
+        }
+
         await this.db.query(
           `
           insert into chunks (
@@ -355,6 +425,59 @@ export class DocumentsService {
       count: created.length,
       totalChunks: created.reduce((sum, doc) => sum + Number(doc.chunkCount || 0), 0),
       documents: created,
+    };
+  }
+
+  async rebuildEmbeddings(user: RequestUser = this.defaultUser()) {
+    if (!this.db.enabled) {
+      return { message: 'DATABASE_URL 未配置，当前仅使用内存知识库，无法写入 pgvector。', updated: 0 };
+    }
+
+    if (!this.embeddingService.isConfigured()) {
+      return { message: 'Embedding 未配置。请先配置 EMBEDDING_API_KEY、EMBEDDING_BASE_URL、EMBEDDING_MODEL。', updated: 0 };
+    }
+
+    await this.ensureSchema();
+
+    if (!this.vectorSchemaReady) {
+      return { message: 'pgvector schema 未初始化成功。请确认 Supabase 已启用 vector 扩展并执行 docs/supabase-full-schema.sql。', updated: 0 };
+    }
+
+    const limit = Math.min(Number(process.env.EMBEDDING_REINDEX_LIMIT || 200), 1000);
+    const result = await this.db.query(
+      `
+      select c.id, c.content
+      from chunks c
+      left join documents d on d.id = c.document_id
+      where c.embedding is null
+        and (($1 = 'admin') or coalesce(d.visibility, 'public') = 'public' or coalesce(c.owner_id, d.owner_id, 'u_chris') = $2)
+      order by c.created_at desc
+      limit $3
+      `,
+      [user.role, user.id, limit],
+    );
+
+    let updated = 0;
+    const failed: string[] = [];
+
+    for (const row of result.rows) {
+      try {
+        const embedding = await this.embeddingService.embed(row.content || '');
+        await this.db.query('update chunks set embedding = $2::vector where id = $1', [row.id, this.embeddingService.toSqlVector(embedding)]);
+        updated += 1;
+      } catch (error: any) {
+        failed.push(`${row.id}: ${error?.message || error}`);
+      }
+    }
+
+    return {
+      message: 'Embedding 重建完成',
+      model: this.embeddingService.modelName(),
+      dimension: this.embeddingService.vectorDimension(),
+      scanned: result.rows.length,
+      updated,
+      failedCount: failed.length,
+      failed: failed.slice(0, 5),
     };
   }
 

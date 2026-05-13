@@ -38,7 +38,7 @@ VITE_API_BASE_URL=https://your-backend.example.com
 docs/supabase-full-schema.sql
 ```
 
-这个文件是当前唯一推荐的初始化 SQL。旧的 `supabase-knowledge-tables.sql` 和 `supabase-vector-setup.sql` 不再维护。
+这个文件是当前唯一推荐的初始化 SQL，包含 pgvector 扩展、embedding 字段和 match_chunks 函数。旧的 `supabase-knowledge-tables.sql` 和 `supabase-vector-setup.sql` 不再维护。
 
 ## Redis
 
@@ -57,6 +57,7 @@ docker compose up redis -d
 3. 给访客设置每日调用额度。
 4. 限制输入长度、文件大小和输出 tokens。
 5. Demo 环境可以不配置 `LLM_API_KEY`，系统会使用 safe fallback。
+6. 如果配置 embedding，请优先给 `EMBEDDING_REINDEX_LIMIT` 设置合理上限，避免一次性重建造成 API 成本过高。
 6. 简历投递建议附 GitHub、线上 Demo 和 1-2 分钟演示视频。
 
 ## GitHub 上传建议

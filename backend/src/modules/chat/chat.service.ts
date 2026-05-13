@@ -9,6 +9,7 @@ import { CacheService } from '../../shared/cache.service';
 import { RequestUser } from '../../shared/types';
 import { ToolsService } from '../tools/tools.service';
 import { LlmService } from '../llm/llm.service';
+import { EmbeddingService } from '../embedding/embedding.service';
 
 export interface SchoolAdvice {
   name: string;
@@ -59,6 +60,7 @@ export class ChatService {
     private readonly db: DatabaseService,
     private readonly authContext: AuthContextService,
     private readonly cache: CacheService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   async conversations(user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
@@ -133,11 +135,14 @@ export class ChatService {
   }
 
   async retrieve(query: string, topK = 3, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any[]> {
-    const cacheKey = this.cache.makeKey('rag:v2', {
-      query: String(query || '').trim().toLowerCase(),
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const cacheKey = this.cache.makeKey('rag:v3', {
+      query: normalizedQuery,
       topK,
       userId: user.id,
       role: user.role,
+      embeddingConfigured: this.embeddingService.isConfigured(),
+      embeddingModel: this.embeddingService.modelName(),
     });
 
     const cached = await this.cache.get<any[]>(cacheKey);
@@ -145,6 +150,62 @@ export class ChatService {
       return cached.map((item, index) => ({ ...item, cacheHit: true, rank: index + 1 }));
     }
 
+    let results = await this.retrieveWithVector(query, topK, user);
+
+    if (!results.length) {
+      results = await this.retrieveWithKeyword(query, topK, user);
+    }
+
+    const ranked = results.map((item, index) => ({ ...item, rank: index + 1 }));
+    await this.cache.set(cacheKey, ranked, Number(process.env.RAG_CACHE_TTL_SECONDS || 300));
+    return ranked;
+  }
+
+  private async retrieveWithVector(query: string, topK: number, user: RequestUser): Promise<any[]> {
+    if (!this.db.enabled || !this.embeddingService.isConfigured()) return [];
+
+    try {
+      const embedding = await this.embeddingService.embed(query);
+      const vector = this.embeddingService.toSqlVector(embedding);
+      const result = await this.db.query(
+        `
+        select
+          c.id,
+          c.document_id,
+          c.document_title,
+          c.content,
+          c.chunk_index,
+          c.keywords,
+          coalesce(c.owner_id, d.owner_id, 'u_chris') as owner_id,
+          1 - (c.embedding <=> $1::vector) as score
+        from chunks c
+        left join documents d on d.id = c.document_id
+        where c.embedding is not null
+          and (($2 = 'admin') or coalesce(d.visibility, 'public') = 'public' or coalesce(c.owner_id, d.owner_id, 'u_chris') = $3)
+        order by c.embedding <=> $1::vector
+        limit $4
+        `,
+        [vector, user.role, user.id, topK],
+      );
+
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        documentId: row.document_id,
+        documentTitle: row.document_title,
+        content: row.content,
+        chunkIndex: row.chunk_index,
+        keywords: row.keywords || [],
+        score: Number(Number(row.score || 0).toFixed(4)),
+        retrievalMode: 'pgvector',
+        cacheHit: false,
+      }));
+    } catch (error: any) {
+      console.error('pgvector 语义检索失败，回退 keyword RAG：', error?.message || error);
+      return [];
+    }
+  }
+
+  private async retrieveWithKeyword(query: string, topK: number, user: RequestUser): Promise<any[]> {
     let results: any[] = [];
 
     if (this.db.enabled) {
@@ -170,7 +231,7 @@ export class ChatService {
             chunkIndex: row.chunk_index,
             keywords: row.keywords || [],
             score: keywordScore(query, row.content || ''),
-            retrievalMode: 'keyword',
+            retrievalMode: 'keyword-db',
             cacheHit: false,
           }))
           .filter((chunk: any) => chunk.score > 0)
@@ -196,9 +257,7 @@ export class ChatService {
         .slice(0, topK);
     }
 
-    const ranked = results.map((item, index) => ({ ...item, rank: index + 1 }));
-    await this.cache.set(cacheKey, ranked, Number(process.env.RAG_CACHE_TTL_SECONDS || 300));
-    return ranked;
+    return results;
   }
 
   private async persistConversation(conversationId: string, title: string, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }) {
