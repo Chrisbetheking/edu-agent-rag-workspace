@@ -68,7 +68,7 @@ interface ChatResult {
 }
 
 
-const CHAT_STORAGE_KEY = 'eduagent.chat.v9';
+const CHAT_STORAGE_KEY = 'eduagent.chat.v10';
 let pendingChatRequest: Promise<{ data: ChatResult; conversations: any[] }> | null = null;
 
 function persistChatSnapshot(snapshot: Partial<{ question: string; result: ChatResult | null; conversations: any[] }>) {
@@ -77,9 +77,10 @@ function persistChatSnapshot(snapshot: Partial<{ question: string; result: ChatR
 }
 
 const examples = [
-  'APU 计算机本科 CGPA 3.2，想申请英国硕士，预算30万，请给我冲刺、匹配、保底三档选校。',
-  '马来西亚本科软件工程，GPA 3.5，想申请澳洲数据科学硕士，怎么规划？',
-  '双非本科均分82，想申请英国人工智能硕士，预算35万，有哪些学校适合？',
+  '英国计算机硕士申请一般需要提交哪些材料？',
+  '我双非一本，均分85，想申请英国计算机硕士，应该怎么选校？',
+  '申请英国计算机硕士时，CV里的项目经历应该怎么写？',
+  '这个 EduAgent 项目里的 RAG 是怎么做检索和重排的？',
 ];
 
 function cleanText(text?: unknown) {
@@ -379,6 +380,7 @@ export default function Chat() {
 
   const structured = useMemo(() => {
     if (!result) return null;
+    if (result.answerMode !== 'school_plan') return null;
     if (result.structured) return result.structured;
     return tryParseStructuredAnswer(result.rawAnswer) || tryParseStructuredAnswer(result.answer) || null;
   }, [result]);
@@ -405,10 +407,13 @@ export default function Chat() {
     try {
       const { data, conversations: convData } = await pendingChatRequest;
       setResult(data);
-      const bridgedProfile = profileFromChat(currentQuestion, data);
-      mergeToolsDraft(bridgedProfile, { active: 'advisor' });
-      if (!isGuest) {
-        runAdvisorInBackground(api, bridgedProfile);
+      const shouldSyncAdvisor = data.answerMode === 'school_plan' || Boolean(data.structured);
+      if (shouldSyncAdvisor) {
+        const bridgedProfile = profileFromChat(currentQuestion, data);
+        mergeToolsDraft(bridgedProfile, { active: 'advisor' });
+        if (!isGuest) {
+          runAdvisorInBackground(api, bridgedProfile);
+        }
       }
       if (data.quota && isGuest && user) {
         setUser({ ...user, quotaLimit: data.quota.limit, quotaRemaining: data.quota.remaining });
@@ -430,31 +435,30 @@ export default function Chat() {
       <div className="hero-panel">
         <div>
           <span className="section-kicker">AI 咨询</span>
-          <h1>AI 咨询与选校</h1>
-          <p>输入学生背景后生成结构化选校方案；请求在后台继续执行，切换页面后回来结果不会丢。</p>
+          <h1>AI 咨询工作台</h1>
+          <p>可问申请材料、文书、语言、选校和项目包装；只有选校类问题才会同步到方案引擎。</p>
         </div>
         <div className="model-badge">{isGuest ? `访客额度 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端已连接'}</div>
       </div>
 
       <div className="prompt-panel">
         <form onSubmit={ask} className="prompt-box">
-          <label>学生背景 / 咨询问题</label>
-          <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="请输入学生背景、目标国家、专业方向、预算等信息..." />
+          <label>咨询问题</label>
+          <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="例如：英国计算机硕士申请一般需要提交哪些材料？" />
           <div className="example-row">{examples.map((item) => <button type="button" key={item} onClick={() => setQuestion(item)}>{item.slice(0, 18)}...</button>)}</div>
-          <button className="primary ask-button" disabled={loading}>{loading ? '正在生成结构化方案...' : '生成选校方案'}</button>
+          <button className="primary ask-button" disabled={loading}>{loading ? '正在生成回答...' : '开始咨询'}</button>
         </form>
       </div>
 
       {error && <div className="error-card"><strong>请求失败</strong><p>{error}</p></div>}
       {!result && !loading && !error && <EmptyState />}
-      {loading && <div className="loading-card"><div className="loader-dot" /><div><strong>正在分析学生背景和院校档次</strong><p>系统会把回答拆成卡片，并附上来源引用和工具调用记录。</p></div></div>}
+      {loading && <div className="loading-card"><div className="loader-dot" /><div><strong>正在检索知识库并生成回答</strong><p>系统会展示回答模式、工具调用、来源引用和检索分数。</p></div></div>}
 
       {structured && <StructuredResult data={structured} />}
 
       {result && !structured && (
         <FoldSection title="AI 回答" defaultOpen>
           <TextBlock value={result.answer} />
-          <div className="error-card" style={{ marginTop: 16 }}><strong>提示</strong><p>当前回答没有解析成卡片，可能是模型返回被截断。可以稍后重试，或调高后端输出上限。</p></div>
         </FoldSection>
       )}
 
@@ -462,15 +466,15 @@ export default function Chat() {
         <div className="meta-grid meta-grid-v13">
           <ObservabilityCard result={result} />
 
-          <SectionGroup title="来源引用" subtitle="RAG 命中文档" defaultOpen>
+          <SectionGroup title="工具调用" subtitle="仅在选校、GPA、销售话术等场景触发" defaultOpen>
             <div className="meta-card-grid-v13">
-              {result.sources?.length ? result.sources.map((s, i) => <SourceCard source={s} index={i} key={s.id || i} />) : <p className="muted-text">暂无来源引用。</p>}
+              {result.toolCalls?.length ? result.toolCalls.map((t, i) => <ToolCallCard call={t} index={i} key={i} />) : <p className="muted-text">本次是知识库问答，没有触发额外工具。</p>}
             </div>
           </SectionGroup>
 
-          <SectionGroup title="工具调用" subtitle="结构化输出" defaultOpen>
+          <SectionGroup title="来源引用" subtitle="RAG 命中文档 / 分数 / 重排信号" defaultOpen>
             <div className="meta-card-grid-v13">
-              {result.toolCalls?.length ? result.toolCalls.map((t, i) => <ToolCallCard call={t} index={i} key={i} />) : <p className="muted-text">本次未触发工具。</p>}
+              {result.sources?.length ? result.sources.map((s, i) => <SourceCard source={s} index={i} key={s.id || i} />) : <p className="muted-text">暂无来源引用。</p>}
             </div>
           </SectionGroup>
 

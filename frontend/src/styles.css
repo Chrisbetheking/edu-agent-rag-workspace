@@ -2458,3 +2458,73 @@ th { color: var(--muted); font-weight: 800; }
   }
   .tools-page-v9 .school-summary-v15 p { grid-column: auto !important; grid-row: auto !important; }
 }
+
+/* v10 UX: empty-first workspaces + quick-fill presets. */
+.inline-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quick-fill-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px dashed #c9d7ef;
+  background: linear-gradient(180deg, #fbfdff, #f5f8ff);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.quick-fill-panel > strong {
+  font-size: 13px;
+  color: #3150c8;
+  font-weight: 900;
+}
+
+.quick-fill-panel .example-row {
+  margin: 0;
+}
+
+.readable-source-rank-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.readable-source-rank-list .history-row {
+  display: grid;
+  gap: 6px;
+  align-items: start;
+  border: 1px solid #e4ebf5;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.readable-source-rank-list .top-source-row {
+  border-color: #b8c7ff;
+  background: linear-gradient(180deg, #ffffff, #f7f9ff);
+}
+
+.readable-source-rank-list .history-row strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.readable-source-rank-list .history-row span,
+.readable-source-rank-list .history-row p {
+  color: #64748b;
+  line-height: 1.55;
+}
+
+@media (max-width: 720px) {
+  .inline-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .inline-actions button {
+    flex: 1;
+  }
+}

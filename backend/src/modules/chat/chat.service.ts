@@ -49,6 +49,8 @@ export interface StructuredAdvice {
   disclaimer: string;
 }
 
+type AnswerMode = 'school_plan' | 'grounded_qa';
+
 @Injectable()
 export class ChatService {
   private callLogSchemaReady = false;
@@ -299,7 +301,7 @@ export class ChatService {
 
   private intentTitlePatterns(intent: string): string[] {
     const patternMap: Record<string, string[]> = {
-      materials: ['%02_%', '%申请材料%', '%材料清单%', '%申请总览%', '%07_CV%', '%CV简历%', '%08_推荐信%', '%推荐信准备%', '%09_语言%', '%语言成绩%'],
+      materials: ['%02_%', '%申请材料%', '%材料清单%', '%英国硕士申请 FAQ%', '%FAQ%', '%申请总览%', '%07_CV%', '%CV简历%', '%08_推荐信%', '%推荐信准备%', '%09_语言%', '%语言成绩%'],
       gpa: ['%03_CGPA%', '%CGPA%', '%GPA%', '%均分%', '%风险解释%', '%16_马来西亚%', '%马来西亚本科%'],
       ps: ['%06_Personal%', '%Personal_Statement%', '%文书写作%', '%个人陈述%'],
       cv: ['%07_CV%', '%CV简历%', '%简历与项目包装%', '%12_计算机项目%', '%GitHub%'],
@@ -318,8 +320,8 @@ export class ChatService {
   private intentTitleWeight(intent: string, title: string): number {
     const t = this.normalizeForRerank(title);
     if (intent === 'materials') {
-      if (this.includesAny(t, ['02英国硕士申请材料清单', '申请材料清单', '材料清单'])) return 0.99;
-      if (this.includesAny(t, ['01英国计算机硕士申请总览', '申请总览'])) return 0.92;
+      if (this.includesAny(t, ['02英国硕士申请材料清单', '申请材料清单', '材料清单', '英国硕士申请faq'])) return 0.99;
+      if (this.includesAny(t, ['01英国计算机硕士申请总览', '申请总览', '英国硕士申请'])) return 0.92;
       if (this.includesAny(t, ['cv简历', '推荐信准备', '语言成绩'])) return 0.82;
       return 0.72;
     }
@@ -392,6 +394,38 @@ export class ChatService {
     }
   }
 
+  private retrieveIntentLockedMemoryCandidates(query: string, intent: string, topK: number, user: RequestUser): any[] {
+    if (!intent || intent === 'general') return [];
+
+    const visibleDocIds = new Set(
+      this.store.documents
+        .filter((doc) => user.role === 'admin' || doc.visibility === 'public' || doc.ownerId === user.id)
+        .map((doc) => doc.id),
+    );
+
+    return this.store.chunks
+      .filter((chunk) => visibleDocIds.has(chunk.documentId))
+      .map((chunk) => {
+        const intentLockWeight = this.intentTitleWeight(intent, chunk.documentTitle || '');
+        const keywordSignal = keywordScore(query, `${chunk.documentTitle || ''}
+${(chunk.keywords || []).join(' ')}
+${chunk.content || ''}`);
+        return {
+          ...chunk,
+          score: intentLockWeight,
+          keywordSignal,
+          intent,
+          intentLockWeight,
+          retrievalMode: 'keyword-memory',
+          cacheHit: false,
+          candidateSource: `intent-lock-memory:${intent}`,
+        };
+      })
+      .filter((candidate: any) => candidate.intentLockWeight > 0)
+      .sort((a: any, b: any) => Number(b.intentLockWeight || 0) - Number(a.intentLockWeight || 0))
+      .slice(0, Math.max(topK * 4, 12));
+  }
+
   private async retrieveWithKeyword(query: string, topK: number, user: RequestUser): Promise<any[]> {
     let results: any[] = [];
 
@@ -409,6 +443,8 @@ export class ChatService {
           [user.role, user.id],
         );
 
+        const intent = this.detectKnowledgeIntent(query);
+        const intentLockedCandidates = await this.retrieveIntentLockedCandidates(query, intent, topK, user);
         const candidates = result.rows
           .map((row: any) => ({
             id: row.id,
@@ -417,13 +453,14 @@ export class ChatService {
             content: row.content,
             chunkIndex: row.chunk_index,
             keywords: row.keywords || [],
-            score: keywordScore(query, `${row.document_title || ''} ${row.content || ''}`),
+            score: keywordScore(query, `${row.document_title || ''} ${(row.keywords || []).join(' ')} ${row.content || ''}`),
             retrievalMode: 'keyword-db',
             cacheHit: false,
+            candidateSource: 'keyword-primary',
           }))
-          .filter((chunk: any) => chunk.score > 0);
+          .filter((chunk: any) => chunk.score > 0 || this.hybridBoost(query, chunk) > 0.2);
 
-        results = this.rerankRetrieved(query, candidates, topK);
+        results = this.rerankRetrieved(query, [...intentLockedCandidates, ...candidates], topK);
       } catch (error) {
         console.error('从 Supabase 检索 chunks 失败，回退到 MemoryStore：', error);
       }
@@ -431,17 +468,20 @@ export class ChatService {
 
     if (!results.length) {
       const visibleDocIds = new Set(this.store.documents.filter((doc) => user.role === 'admin' || doc.visibility === 'public' || doc.ownerId === user.id).map((doc) => doc.id));
+      const intent = this.detectKnowledgeIntent(query);
+      const memoryIntentCandidates = this.retrieveIntentLockedMemoryCandidates(query, intent, topK, user);
       const candidates = this.store.chunks
         .filter((chunk) => visibleDocIds.has(chunk.documentId))
         .map((chunk) => ({
           ...chunk,
-          score: keywordScore(query, `${chunk.documentTitle || ''} ${chunk.content}`),
+          score: keywordScore(query, `${chunk.documentTitle || ''} ${(chunk.keywords || []).join(' ')} ${chunk.content}`),
           retrievalMode: 'keyword-memory',
           cacheHit: false,
+          candidateSource: 'keyword-memory',
         }))
-        .filter((chunk) => chunk.score > 0);
+        .filter((chunk) => chunk.score > 0 || this.hybridBoost(query, chunk) > 0.2);
 
-      results = this.rerankRetrieved(query, candidates, topK);
+      results = this.rerankRetrieved(query, [...memoryIntentCandidates, ...candidates], topK);
     }
 
     return results;
@@ -458,7 +498,8 @@ export class ChatService {
         );
         const hybridBoost = this.hybridBoost(query, candidate);
         const keywordSignal = Math.max(keywordMatchScore, Number(candidate.keywordSignal || 0));
-        const intentLockWeight = Number(candidate.intentLockWeight || 0);
+        const rawIntentLockWeight = Number(candidate.intentLockWeight || 0);
+        const intentLockWeight = this.guardIntentLockWeight(query, candidate, rawIntentLockWeight);
         const blendedScore = Math.max(0, Math.min(1, vectorScore * 0.34 + keywordSignal * 0.28 + hybridBoost));
         const score = Math.max(intentLockWeight, blendedScore);
 
@@ -489,6 +530,27 @@ export class ChatService {
     }
 
     return deduped;
+  }
+
+
+  private guardIntentLockWeight(query: string, candidate: any, weight: number): number {
+    const intent = this.detectKnowledgeIntent(query);
+    const q = this.normalizeForRerank(query);
+    const title = this.normalizeForRerank(candidate.documentTitle || '');
+    const queryHas = (terms: string[]) => this.includesAny(q, terms);
+    const titleHas = (terms: string[]) => this.includesAny(title, terms);
+
+    if (intent === 'materials') {
+      const isProfileCase = titleHas(['马来西亚本科背景', 'apu', '背景申请策略']);
+      const isProjectCase = titleHas(['前端ai工作台', 'rag项目申请素材', '项目申请素材', '选校分层', '预算与城市']);
+      const queryNeedsProfile = queryHas(['马来西亚', 'apu', 'cgpa', 'gpa', '均分', '背景', '项目', '选校', '预算']);
+      if ((isProfileCase || isProjectCase) && !queryNeedsProfile) return Math.min(weight, 0.32);
+    }
+
+    if (intent !== 'frontend-project' && titleHas(['前端ai工作台项目申请素材']) && !queryHas(['前端ai', 'ai工作台', 'react', '前端项目'])) return Math.min(weight, 0.35);
+    if (intent !== 'rag-project' && titleHas(['rag项目申请素材']) && !queryHas(['rag项目', 'embedding', 'pgvector', '向量检索'])) return Math.min(weight, 0.35);
+
+    return weight;
   }
 
   private isSearchableKnowledge(title: string): boolean {
@@ -526,11 +588,12 @@ export class ChatService {
     const isMaterialIntent = queryHas(['申请材料', '材料清单', '提交哪些材料', '哪些材料', '需要提交', '提交什么', '准备哪些', '材料包括', '材料类型', '成绩单', '在读证明', '毕业证', '推荐信', '语言成绩'])
       || (q.includes('材料') && this.includesAny(q, ['申请', '提交', '准备', '需要', '哪些', '清单', '包括']));
     if (isMaterialIntent) {
-      if (titleHas(['申请材料清单', '硕士申请材料', '英国硕士申请材料', '材料清单'])) boost += 0.95;
-      if (titleHas(['英国计算机硕士申请总览', '申请总览'])) boost += 0.36;
+      if (titleHas(['申请材料清单', '硕士申请材料', '英国硕士申请材料', '材料清单', '英国硕士申请faq'])) boost += 0.98;
+      if (titleHas(['英国计算机硕士申请总览', '申请总览', '英国硕士申请'])) boost += 0.42;
       if (titleHas(['推荐信准备', 'cv简历', 'personalstatement', 'personal_statement', '文书写作'])) boost += 0.16;
       boost += Math.min(0.24, contentHitCount(['成绩单', '在读证明', '毕业证', '学位证', 'personal statement', '个人陈述', '推荐信', '语言成绩', 'cv', 'resume', '护照', '作品集']) * 0.035);
-      if (titleHas(['前端ai工作台', 'rag项目申请素材', '项目申请素材', '选校分层', 'offer选择', '预算与城市', '面试', '安全边界'])) boost -= 0.72;
+      if (titleHas(['前端ai工作台', 'rag项目申请素材', '项目申请素材', '选校分层', 'offer选择', '预算与城市', '面试', '安全边界'])) boost -= 0.85;
+      if (titleHas(['马来西亚本科背景', 'apu', '背景申请策略']) && !queryHas(['马来西亚', 'apu', 'cgpa', 'gpa', '均分', '背景'])) boost -= 0.68;
     }
 
     const isGpaIntent = queryHas(['cgpa', 'gpa', '均分', '绩点', '低gpa', '成绩不高']) && !q.includes('成绩单');
@@ -804,6 +867,7 @@ export class ChatService {
   private async detectTools(query: string) {
     const calls: any[] = [];
     const lower = query.toLowerCase();
+    const answerMode = this.detectAnswerMode(query);
 
     if (/cgpa|gpa|绩点|均分/.test(lower)) {
       const num = Number((query.match(/\d+(\.\d+)?/) || ['3.2'])[0]);
@@ -818,7 +882,7 @@ export class ChatService {
       });
     }
 
-    if (/推荐|学校|院校|university|申请|硕士|master|msc/.test(lower)) {
+    if (answerMode === 'school_plan') {
       calls.push({
         name: '院校推荐工具',
         result: await this.tools.recommendSchools({
@@ -980,7 +1044,129 @@ export class ChatService {
     return `${structured.summary}\n\n${tierText}\n\n时间规划：\n${timelineText}\n\n下一步：\n${(structured.nextActions || []).join('\n')}\n\n${structured.disclaimer}`;
   }
 
-  private async buildRealAnswer(question: string, sources: any[], toolCalls: any[]) {
+  private detectAnswerMode(question: string): AnswerMode {
+    const q = this.normalizeForRerank(question);
+    const asksSchoolPlan = this.includesAny(q, [
+      '选校',
+      '学校推荐',
+      '院校推荐',
+      '冲刺',
+      '匹配',
+      '保底',
+      '定位',
+      '适合哪些学校',
+      '申请哪些学校',
+      '三档',
+      '档选校',
+    ]);
+
+    const asksBackgroundPlan = this.includesAny(q, ['cgpa', 'gpa', '均分', '绩点', '预算'])
+      && this.includesAny(q, ['申请英国硕士', '申请澳洲硕士', '申请海外硕士', '怎么规划', '规划']);
+
+    const asksPureKnowledge = this.includesAny(q, [
+      '申请材料',
+      '材料清单',
+      '提交哪些材料',
+      '需要哪些材料',
+      '准备哪些材料',
+      '推荐信怎么',
+      '语言成绩',
+      '语言班',
+      'ps怎么写',
+      'personalstatement',
+      'cv怎么写',
+      '时间线',
+      '截止时间',
+    ]);
+
+    if (asksPureKnowledge) return 'grounded_qa';
+    if (asksSchoolPlan || (asksBackgroundPlan && !asksPureKnowledge)) return 'school_plan';
+    return 'grounded_qa';
+  }
+
+  private fallbackGroundedAnswer(question: string, sources: any[], toolCalls: any[]) {
+    const intent = this.detectKnowledgeIntent(question);
+    const titles = sources.map((source) => source.documentTitle || '未命名资料').filter(Boolean);
+    const sourceHint = titles.length ? `本次主要参考：${titles.slice(0, 3).join('、')}。` : '当前没有命中高质量知识库来源，请先补充资料或重新上传 clean-kb。';
+
+    if (intent === 'materials') {
+      return [
+        '英国计算机硕士申请通常需要先准备一套基础材料，再按学校和项目要求补充课程描述或作品集。',
+        '',
+        '核心材料一般包括：本科成绩单、在读证明或毕业证/学位证、个人陈述 PS、推荐信、CV/Resume、语言成绩、护照信息；部分项目还会要求课程描述、项目作品集、实习证明或补充问答。',
+        '',
+        '准备顺序建议是：先确认目标项目要求，再统一整理成绩单和证明文件；同时写 PS、CV 和推荐信素材；语言成绩可以同步推进，不够时再评估是否接受后补或语言班。',
+        '',
+        sourceHint,
+        '真实申请仍以学校官网和当年招生要求为准。',
+      ].join('\n');
+    }
+
+    if (intent === 'recommendation') {
+      return `${sourceHint}\n推荐信建议优先选择熟悉你课程表现、项目经历或实习表现的人；内容要证明学术能力、工程能力、沟通协作和申请方向匹配度。真实要求以学校官网为准。`;
+    }
+
+    if (intent === 'language') {
+      return `${sourceHint}\n语言成绩建议先按目标项目要求准备；如果暂时没有达标，要确认学校是否接受后补、配语言班或替代考试。真实要求以学校官网为准。`;
+    }
+
+    if (intent === 'cv') {
+      return `${sourceHint}\nCV 建议突出教育背景、核心课程、技术栈、项目经历、实习经历和成果指标；计算机方向要把 RAG、前端 AI 工作台、工程部署和可量化结果写清楚。`;
+    }
+
+    if (intent === 'ps') {
+      return `${sourceHint}\nPS 建议围绕申请动机、学术基础、项目经历、职业目标和项目匹配度组织，不要堆经历，要形成一条清晰主线。`;
+    }
+
+    const toolText = toolCalls.length ? `\n系统也触发了工具：${toolCalls.map((tool) => tool.name).join('、')}。` : '';
+    return `${sourceHint}${toolText}\n建议基于命中的知识库来源逐项核对；不确定的学校要求以官网当年页面为准。`;
+  }
+
+  private async buildGroundedAnswer(question: string, sources: any[], toolCalls: any[]) {
+    const intent = this.detectKnowledgeIntent(question);
+    if (intent === 'materials') {
+      const answer = this.fallbackGroundedAnswer(question, sources, toolCalls);
+      return { raw: answer, structured: null, answer };
+    }
+
+    const sourceText = this.buildSourceText(sources);
+    const toolText = this.buildToolText(toolCalls);
+
+    const raw = await this.llmService.chat([
+      {
+        role: 'system',
+        content: `你是 EduAgent，一个面向留学咨询场景的 RAG 助手。
+
+回答规则：
+1. 只基于“知识库检索结果”和“工具调用结果”回答，不要编造学校官网没有给出的精确要求。
+2. 如果问题是材料、CV、PS、推荐信、语言成绩、时间线等知识型问题，直接给清单和执行建议，不要强行输出冲刺/匹配/保底院校。
+3. 结构必须清晰，建议使用“小标题 + 条目”的中文回答。
+4. 最后必须加一句：真实申请请以学校官网和当年招生要求为准。
+5. 不要返回 JSON，不要使用代码块。`,
+      },
+      {
+        role: 'user',
+        content: `用户问题：
+${question}
+
+知识库检索结果：
+${sourceText}
+
+系统工具调用结果：
+${toolText}
+
+请给出基于来源的回答。`,
+      },
+    ]);
+
+    return {
+      raw,
+      structured: null,
+      answer: raw,
+    };
+  }
+
+  private async buildSchoolPlanAnswer(question: string, sources: any[], toolCalls: any[]) {
     const sourceText = this.buildSourceText(sources);
     const toolText = this.buildToolText(toolCalls);
 
@@ -1069,6 +1255,37 @@ ${toolText}
     };
   }
 
+  private async buildRealAnswer(question: string, sources: any[], toolCalls: any[], answerMode: AnswerMode) {
+    if (answerMode === 'school_plan') {
+      return this.buildSchoolPlanAnswer(question, sources, toolCalls);
+    }
+
+    return this.buildGroundedAnswer(question, sources, toolCalls);
+  }
+
+  async retrievePreview(query: string, topK = 3, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any> {
+    const startedAt = Date.now();
+    const normalizedQuery = String(query || '').slice(0, Number(process.env.MAX_INPUT_LENGTH || 2000));
+    const sources = await this.retrieve(normalizedQuery, topK, user);
+    const answerMode = this.detectAnswerMode(normalizedQuery);
+    const intent = this.detectKnowledgeIntent(normalizedQuery);
+
+    return {
+      question: normalizedQuery,
+      answerMode,
+      intent,
+      topK,
+      sources,
+      observability: {
+        retrievalLatencyMs: Date.now() - startedAt,
+        ragHitCount: sources.length,
+        ragScores: sources.map((source) => Number(source.score || 0)),
+        cacheHit: sources.some((source) => Boolean(source.cacheHit)),
+        retrievalModes: Array.from(new Set(sources.map((source) => source.retrievalMode).filter(Boolean))),
+      },
+    };
+  }
+
   async ask(body: { conversationId?: string; question: string; topK?: number }, user: RequestUser = { id: 'u_chris', username: 'CHRISWANG', displayName: 'Chris Wang', role: 'admin' }): Promise<any> {
     const requestId = uuid();
     const startedAt = Date.now();
@@ -1099,6 +1316,7 @@ ${toolText}
     const ragScores = sources.map((source) => Number(source.score || 0));
 
     const toolCalls = await this.detectTools(question);
+    const answerMode = this.detectAnswerMode(question);
 
     let answer = '';
     let structured: StructuredAdvice | null = null;
@@ -1113,18 +1331,24 @@ ${toolText}
     if (this.isDemoMode()) {
       fallbackTriggered = true;
       fallbackReason = 'demo_mode_or_missing_llm_key';
-      structured = this.fallbackStructured(question, sources, toolCalls);
-      answer = this.structuredToPlainText(structured);
-      rawAnswer = JSON.stringify(structured, null, 2);
+      if (answerMode === 'school_plan') {
+        structured = this.fallbackStructured(question, sources, toolCalls);
+        answer = this.structuredToPlainText(structured);
+        rawAnswer = JSON.stringify(structured, null, 2);
+      } else {
+        structured = null;
+        answer = this.fallbackGroundedAnswer(question, sources, toolCalls);
+        rawAnswer = answer;
+      }
     } else {
       const llmStartedAt = Date.now();
       try {
-        const result = await this.buildRealAnswer(question, sources, toolCalls);
+        const result = await this.buildRealAnswer(question, sources, toolCalls, answerMode);
         llmLatencyMs = Date.now() - llmStartedAt;
         answer = result.answer;
         structured = result.structured;
         rawAnswer = result.raw;
-        if (!structured) {
+        if (answerMode === 'school_plan' && !structured) {
           fallbackTriggered = true;
           fallbackReason = 'structured_json_parse_failed';
         }
@@ -1168,6 +1392,7 @@ ${toolText}
       answer,
       structured,
       rawAnswer,
+      answerMode,
       sources,
       toolCalls,
       quota,
@@ -1179,6 +1404,8 @@ ${toolText}
         ragHitCount: sources.length,
         ragScores,
         cacheHit,
+        answerMode,
+        retrievalModes: Array.from(new Set(sources.map((source) => source.retrievalMode).filter(Boolean))),
         fallbackTriggered,
         fallbackReason,
       },

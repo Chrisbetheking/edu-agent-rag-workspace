@@ -1,6 +1,6 @@
 import { readSessionState, writeSessionState } from './sessionState';
 
-export const TOOLS_WORKSPACE_KEY = 'eduagent.tools.v9';
+export const TOOLS_WORKSPACE_KEY = 'eduagent.tools.v10';
 
 export type WorkspaceProfile = {
   name?: string;

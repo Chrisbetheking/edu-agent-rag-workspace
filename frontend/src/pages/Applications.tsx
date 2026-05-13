@@ -5,7 +5,7 @@ import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTy
 import { CompactMetric, FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 import { readSessionState, writeSessionState } from '../utils/sessionState';
 
-const STORAGE_KEY = 'eduagent.applications.v9';
+const STORAGE_KEY = 'eduagent.applications.v10';
 
 const defaultStages = [
   { stage: '背景确认', owner: '咨询顾问', tasks: ['确认目标国家、专业、预算', '收集成绩单和语言成绩'] },
@@ -14,6 +14,27 @@ const defaultStages = [
   { stage: '文书制作', owner: '文书顾问', tasks: ['确定 PS 主线', '优化 CV 和推荐信素材'] },
   { stage: '网申递交', owner: '申请顾问', tasks: ['创建网申账号', '上传材料并核对文件命名'] },
   { stage: 'Offer 跟进', owner: '顾问 + 学生', tasks: ['跟进补件', '比较录取、押金和住宿'] },
+];
+
+const applicationPresets = [
+  {
+    label: 'Chris｜英国计算机硕士',
+    name: 'Chris', country: '英国', major: '计算机科学', degree: '硕士', gpa: '3.2', scale: '4', languageType: 'IELTS', languageScore: '6.5', budget: '30万人民币',
+    experience: '马来西亚 APU 计算机本科，有软件项目、AI/数据项目、实习和 GitHub 作品集。GPA 不算高，希望用项目经历和文书主线补强。',
+    targetSchools: '暂未确定，优先英国计算机/AI/数据科学方向',
+  },
+  {
+    label: '双非｜英国 AI 硕士',
+    name: '学生A', country: '英国', major: '人工智能', degree: '硕士', gpa: '85', scale: '100', languageType: 'IELTS', languageScore: '6.5', budget: '35万人民币',
+    experience: '双非一本计算机相关专业，均分85，有机器学习课程项目、Web 全栈项目和一段实习，想申请英国 AI/CS 硕士。',
+    targetSchools: '曼彻斯特、格拉斯哥、谢菲尔德、诺丁汉等',
+  },
+  {
+    label: '澳洲｜数据科学硕士',
+    name: '学生B', country: '澳洲', major: '数据科学', degree: '硕士', gpa: '3.5', scale: '4', languageType: 'IELTS', languageScore: '6.5', budget: '40万人民币',
+    experience: '软件工程本科，GPA 3.5/4.0，有 Python 数据分析、数据库、云部署和实习经历，希望转数据科学方向。',
+    targetSchools: '悉尼大学、新南威尔士、莫纳什、昆士兰大学',
+  },
 ];
 
 function normalizeStage(stage: any, index: number) {
@@ -100,19 +121,19 @@ function MaterialPanel({ items }: { items: any[] }) {
 
 export default function Applications() {
   const [hydrated, setHydrated] = useState(false);
-  const [name, setName] = useState('Chris');
-  const [country, setCountry] = useState('英国');
-  const [major, setMajor] = useState('计算机科学');
-  const [degree, setDegree] = useState('硕士');
-  const [gpa, setGpa] = useState('3.2');
-  const [scale, setScale] = useState('4');
-  const [languageType, setLanguageType] = useState('IELTS');
-  const [languageScore, setLanguageScore] = useState('6.5');
+  const [name, setName] = useState('');
+  const [country, setCountry] = useState('');
+  const [major, setMajor] = useState('');
+  const [degree, setDegree] = useState('');
+  const [gpa, setGpa] = useState('');
+  const [scale, setScale] = useState('');
+  const [languageType, setLanguageType] = useState('');
+  const [languageScore, setLanguageScore] = useState('');
   const [gaokaoTaken, setGaokaoTaken] = useState('否');
   const [gaokaoScore, setGaokaoScore] = useState('');
-  const [budget, setBudget] = useState('30万人民币');
-  const [experience, setExperience] = useState('马来西亚 APU 计算机本科，有软件项目、AI/数据项目、实习和 GitHub 作品集');
-  const [targetSchools, setTargetSchools] = useState('暂未确定');
+  const [budget, setBudget] = useState('');
+  const [experience, setExperience] = useState('');
+  const [targetSchools, setTargetSchools] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -120,10 +141,10 @@ export default function Applications() {
   useEffect(() => {
     const saved = readSessionState<any>(STORAGE_KEY, {});
     if (saved.form) {
-      setName(saved.form.name ?? 'Chris'); setCountry(saved.form.country ?? '英国'); setMajor(saved.form.major ?? '计算机科学'); setDegree(saved.form.degree ?? '硕士');
-      setGpa(saved.form.gpa ?? '3.2'); setScale(saved.form.scale ?? '4'); setLanguageType(saved.form.languageType ?? 'IELTS'); setLanguageScore(saved.form.languageScore ?? '6.5');
-      setGaokaoTaken(saved.form.gaokaoTaken ?? '否'); setGaokaoScore(saved.form.gaokaoScore ?? ''); setBudget(saved.form.budget ?? '30万人民币');
-      setExperience(saved.form.experience ?? '马来西亚 APU 计算机本科，有软件项目、AI/数据项目、实习和 GitHub 作品集'); setTargetSchools(saved.form.targetSchools ?? '暂未确定');
+      setName(saved.form.name ?? ''); setCountry(saved.form.country ?? ''); setMajor(saved.form.major ?? ''); setDegree(saved.form.degree ?? '');
+      setGpa(saved.form.gpa ?? ''); setScale(saved.form.scale ?? ''); setLanguageType(saved.form.languageType ?? ''); setLanguageScore(saved.form.languageScore ?? '');
+      setGaokaoTaken(saved.form.gaokaoTaken ?? '否'); setGaokaoScore(saved.form.gaokaoScore ?? ''); setBudget(saved.form.budget ?? '');
+      setExperience(saved.form.experience ?? ''); setTargetSchools(saved.form.targetSchools ?? '');
     }
     if (saved.result) setResult(saved.result);
     setHydrated(true);
@@ -150,6 +171,19 @@ export default function Applications() {
         message: err?.response?.data?.message || err?.message || '生成失败', durationMs: Date.now() - started,
       });
     } catch {}
+  }
+
+
+  function applyPreset(preset: any) {
+    setName(preset.name || ''); setCountry(preset.country || ''); setMajor(preset.major || ''); setDegree(preset.degree || '');
+    setGpa(preset.gpa || ''); setScale(preset.scale || ''); setLanguageType(preset.languageType || ''); setLanguageScore(preset.languageScore || '');
+    setBudget(preset.budget || ''); setExperience(preset.experience || ''); setTargetSchools(preset.targetSchools || '');
+  }
+
+  function clearForm() {
+    setName(''); setCountry(''); setMajor(''); setDegree(''); setGpa(''); setScale(''); setLanguageType(''); setLanguageScore('');
+    setGaokaoTaken('否'); setGaokaoScore(''); setBudget(''); setExperience(''); setTargetSchools(''); setResult(null);
+    writeSessionState(STORAGE_KEY, { form: {}, result: null });
   }
 
   async function run(e?: FormEvent) {
@@ -184,7 +218,7 @@ export default function Applications() {
         <div>
           <span className="eyebrow">申请案卷</span>
           <h1>文书与材料流程</h1>
-          <p>结果会保存在本机；切换页面后回来不会清空。</p>
+          <p>默认空表单，支持一键填入测试画像；生成后可导出案卷。</p>
         </div>
         <div className="title-actions">
           {result && <button className="ghost-button" onClick={() => downloadText(`application-${name || 'student'}.md`, exportMarkdown)}>导出 Markdown</button>}
@@ -198,23 +232,24 @@ export default function Applications() {
 
       <div className={`two-col application-workbench-v9 application-workbench-v13 application-workbench-v15 ${result ? 'with-result' : ''}`}>
         <section className={`panel compact-form-card ${result ? 'form-panel-inline' : 'sticky-panel'}`}>
-          <div className="panel-title compact form-action-title"><div><span className="eyebrow">录入</span><h2>学生档案</h2></div><button className="primary compact-run-button" type="button" disabled={loading} onClick={() => run()}>{loading ? '生成中...' : '生成申请案卷'}</button></div>
+          <div className="panel-title compact form-action-title"><div><span className="eyebrow">录入</span><h2>学生档案</h2></div><div className="inline-actions"><button className="ghost-button" type="button" onClick={clearForm}>清空</button><button className="primary compact-run-button" type="button" disabled={loading} onClick={() => run()}>{loading ? '生成中...' : '生成申请案卷'}</button></div></div>
           <form className="form-stack" onSubmit={run}>
             <div className="form-grid two">
               <label>学生称呼<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-              <label>目标国家<select value={country} onChange={(e) => setCountry(e.target.value)}>{countryOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-              <label>目标专业<select value={major} onChange={(e) => setMajor(e.target.value)}>{majorOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-              <label>申请学位<select value={degree} onChange={(e) => setDegree(e.target.value)}>{degreeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label>目标国家<select value={country} onChange={(e) => setCountry(e.target.value)}><option value="">请选择</option>{countryOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label>目标专业<select value={major} onChange={(e) => setMajor(e.target.value)}><option value="">请选择</option>{majorOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label>申请学位<select value={degree} onChange={(e) => setDegree(e.target.value)}><option value="">请选择</option>{degreeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               <label>GPA / CGPA<input value={gpa} onChange={(e) => setGpa(e.target.value)} /></label>
-              <label>满分制<select value={scale} onChange={(e) => setScale(e.target.value)}><option value="4">4.0</option><option value="5">5.0</option><option value="100">100</option></select></label>
-              <label>语言类型<select value={languageType} onChange={(e) => setLanguageType(e.target.value)}>{languageTypeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label>满分制<select value={scale} onChange={(e) => setScale(e.target.value)}><option value="">请选择</option><option value="4">4.0</option><option value="5">5.0</option><option value="100">100</option></select></label>
+              <label>语言类型<select value={languageType} onChange={(e) => setLanguageType(e.target.value)}><option value="">请选择</option>{languageTypeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               <label>语言分数<input value={languageScore} onChange={(e) => setLanguageScore(e.target.value)} placeholder="例如 6.5 / 90 / 65" disabled={languageType === '暂无'} /></label>
               {degree === '本科' && <label>是否有高考成绩<select value={gaokaoTaken} onChange={(e) => setGaokaoTaken(e.target.value)}><option value="否">否</option><option value="是">是</option></select></label>}
               {degree === '本科' && gaokaoTaken === '是' && <label>高考分数<input value={gaokaoScore} onChange={(e) => setGaokaoScore(e.target.value)} placeholder="例如 580/750" /></label>}
-              <label>预算<select value={budget} onChange={(e) => setBudget(e.target.value)}>{budgetOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+              <label>预算<select value={budget} onChange={(e) => setBudget(e.target.value)}><option value="">请选择</option>{budgetOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
             </div>
             <label>项目 / 实习 / 课程经历<textarea value={experience} onChange={(e) => setExperience(e.target.value)} /></label>
-            <label>目标院校<input value={targetSchools} onChange={(e) => setTargetSchools(e.target.value)} /></label>
+            <label>目标院校<input value={targetSchools} onChange={(e) => setTargetSchools(e.target.value)} placeholder="可空，例如：暂未确定 / 曼大、格拉斯哥..." /></label>
+            <div className="quick-fill-panel"><strong>快速填写</strong><div className="example-row">{applicationPresets.map((preset) => <button type="button" key={preset.label} onClick={() => applyPreset(preset)}>{preset.label}</button>)}</div></div>
           </form>
         </section>
 
