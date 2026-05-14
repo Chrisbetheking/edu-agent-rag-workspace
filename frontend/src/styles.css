@@ -2569,3 +2569,100 @@ th { color: var(--muted); font-weight: 800; }
   .runtime-banner { align-items: flex-start; flex-direction: column; }
   .runtime-banner em { white-space: normal; }
 }
+
+/* v12 Chat intake: structured lead form for HR-friendly AI consultation. */
+.chat-intake-panel-v12 {
+  border: 1px solid #dbe7ff;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.chat-intake-form-v12 {
+  gap: 16px;
+}
+
+.chat-intake-head-v12 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.chat-intake-head-v12 h2 {
+  margin: 4px 0 6px;
+  font-size: 22px;
+  line-height: 1.25;
+  color: #0f172a;
+}
+
+.chat-intake-head-v12 p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.65;
+}
+
+.chat-mode-grid-v12 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.chat-mode-grid-v12 button {
+  border: 1px solid #dce6f7;
+  border-radius: 16px;
+  background: #fff;
+  padding: 12px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.chat-mode-grid-v12 button strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.chat-mode-grid-v12 button span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-mode-grid-v12 button.active {
+  border-color: #7c9cff;
+  background: linear-gradient(180deg, #f4f7ff, #eef5ff);
+  box-shadow: 0 12px 24px rgba(49, 80, 200, 0.12);
+}
+
+.chat-form-grid-v12 {
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) !important;
+}
+
+.question-preview-v12 {
+  min-height: 96px !important;
+  background: #fbfdff;
+}
+
+.chat-quick-fill-v12 {
+  margin-top: 2px;
+}
+
+.error-card p {
+  white-space: pre-line;
+}
+
+@media (max-width: 1180px) {
+  .chat-mode-grid-v12,
+  .chat-form-grid-v12 {
+    grid-template-columns: repeat(2, minmax(160px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .chat-mode-grid-v12,
+  .chat-form-grid-v12 {
+    grid-template-columns: 1fr !important;
+  }
+}

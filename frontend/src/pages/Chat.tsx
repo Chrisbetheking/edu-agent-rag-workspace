@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api, describeDeployment, type DeploymentInfo } from '../api/client';
+import { api, describeDeployment, explainApiFailure, type DeploymentInfo } from '../api/client';
+import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
 import { useAuthStore } from '../store/auth';
 import { FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 import { readSessionState, writeSessionState } from '../utils/sessionState';
@@ -69,10 +70,10 @@ interface ChatResult {
 }
 
 
-const CHAT_STORAGE_KEY = 'eduagent.chat.v11';
+const CHAT_STORAGE_KEY = 'eduagent.chat.v12';
 let pendingChatRequest: Promise<{ data: ChatResult; conversations: any[] }> | null = null;
 
-function persistChatSnapshot(snapshot: Partial<{ question: string; result: ChatResult | null; conversations: any[] }>) {
+function persistChatSnapshot(snapshot: Partial<{ question: string; result: ChatResult | null; conversations: any[]; form: ChatFormState; manualQuestion: boolean }>) {
   const previous = readSessionState<any>(CHAT_STORAGE_KEY, {});
   writeSessionState(CHAT_STORAGE_KEY, { ...previous, ...snapshot });
 }
@@ -83,6 +84,95 @@ const examples = [
   '申请英国计算机硕士时，CV里的项目经历应该怎么写？',
   '这个 EduAgent 项目里的 RAG 是怎么做检索和重排的？',
 ];
+
+
+type InquiryType = 'school_plan' | 'materials' | 'cv' | 'ps' | 'tech_explain';
+
+interface ChatFormState {
+  name: string;
+  degree: string;
+  country: string;
+  major: string;
+  cgpa: string;
+  scale: string;
+  budget: string;
+  languageType: string;
+  languageScore: string;
+  background: string;
+  concern: string;
+  inquiryType: InquiryType;
+}
+
+const defaultChatForm: ChatFormState = {
+  name: '学生A',
+  degree: '硕士',
+  country: '英国',
+  major: '计算机科学',
+  cgpa: '85',
+  scale: '100',
+  budget: '35万人民币',
+  languageType: 'IELTS',
+  languageScore: '6.5',
+  background: '双非一本计算机相关专业，有机器学习课程项目、Web 全栈项目和一段实习。',
+  concern: '希望冲一部分排名更高的学校，同时保证匹配和保底选择。',
+  inquiryType: 'school_plan',
+};
+
+const inquiryTypes: Array<{ key: InquiryType; label: string; desc: string }> = [
+  { key: 'school_plan', label: '选校方案', desc: '三档选校 + 风险 + 时间线' },
+  { key: 'materials', label: '材料清单', desc: '成绩单 / PS / CV / 推荐信' },
+  { key: 'cv', label: 'CV 包装', desc: '项目经历和技术栈表达' },
+  { key: 'ps', label: 'PS 主线', desc: '申请动机和专业匹配' },
+  { key: 'tech_explain', label: '项目讲解', desc: 'RAG / Agent / 可观测性' },
+];
+
+const chatPresets: Array<{ label: string; form: ChatFormState }> = [
+  { label: '双非｜均分85｜英国 CS', form: defaultChatForm },
+  {
+    label: 'APU｜CGPA 3.2｜英国 DS',
+    form: {
+      name: 'Chris', degree: '硕士', country: '英国', major: '数据科学', cgpa: '3.2', scale: '4', budget: '35万人民币', languageType: 'IELTS', languageScore: '6.5',
+      background: '马来西亚 APU 计算机本科，有软件项目、AI/数据项目和实习经历。',
+      concern: 'GPA 不算高，希望用项目经历和文书提升竞争力。', inquiryType: 'school_plan',
+    },
+  },
+  {
+    label: '新加坡国立｜CGPA 3.8｜英国 CS',
+    form: {
+      name: '学生B', degree: '硕士', country: '英国', major: '计算机科学', cgpa: '3.8', scale: '4', budget: '50万人民币以上', languageType: 'IELTS', languageScore: '7.0',
+      background: '新加坡国立大学计算机相关本科，有数据结构、机器学习、Web 全栈和科研项目经历。',
+      concern: '希望冲刺 G5 或英国头部项目，同时保留匹配选择。', inquiryType: 'school_plan',
+    },
+  },
+  {
+    label: '材料清单｜英国 CS',
+    form: { ...defaultChatForm, inquiryType: 'materials', concern: '想确认递交前需要准备哪些材料，以及哪些材料容易漏。' },
+  },
+];
+
+function composeQuestion(form: ChatFormState) {
+  const language = buildLanguage(form.languageType, form.languageScore);
+  const profile = `${form.name || '学生'}，${form.degree || '硕士'}申请，目标${form.country || '英国'}${form.major || '计算机科学'}，成绩 ${form.cgpa || '-'} / ${form.scale || '-'}，语言 ${language}，预算 ${form.budget || '待定'}。背景：${form.background || '待补充'}。顾虑：${form.concern || '待补充'}。`;
+
+  if (form.inquiryType === 'materials') {
+    return `${profile}\n请输出申请材料清单，按必交材料、条件材料、时间节点、容易遗漏的风险项整理。`;
+  }
+  if (form.inquiryType === 'cv') {
+    return `${profile}\n请重点分析 CV 应该如何包装项目经历、技术栈、实习和 GitHub/作品集，并给出可复制的 CV bullet 思路。`;
+  }
+  if (form.inquiryType === 'ps') {
+    return `${profile}\n请给出 Personal Statement 主线、段落结构、需要强调的专业匹配点和应该避免的表达。`;
+  }
+  if (form.inquiryType === 'tech_explain') {
+    return '请用面试官视角解释 EduAgent 项目的 RAG、Agent 工具编排、评测指标、日志可观测性、EdgeOne/Render 部署和 fallback 设计，说明为什么它是一个 AI 应用全栈项目。';
+  }
+  return `${profile}\n请给出三档选校方案：冲刺、匹配、保底，并说明判断依据、材料补强策略、时间线和下一步动作。`;
+}
+
+function failureMessage(err: any) {
+  const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || '请求失败，请稍后重试。';
+  return `AI 对话请求未完整返回：${message}\n${explainApiFailure(message)}`;
+}
 
 function cleanText(text?: unknown) {
   return toDisplayText(text)
@@ -187,8 +277,8 @@ function RuntimeStatusCard({ deployment }: { deployment?: DeploymentInfo }) {
   return (
     <div className={live ? 'runtime-banner live' : 'runtime-banner fallback'}>
       <div>
-        <strong>{live ? 'Live API：真实后端已连接' : 'Demo Fallback：后端不可用时的兜底演示'}</strong>
-        <span>{describeDeployment(deployment)}</span>
+        <strong>{live ? 'Live API：真实后端已连接' : 'Demo Fallback：海外链路超时后的兜底演示'}</strong>
+        <span>{live ? describeDeployment(deployment) : `${describeDeployment(deployment)}。Render 海外后端或 DeepSeek / SiliconFlow 模型平台可能冷启动、排队或跨境链路抖动，系统保留兜底结果避免 HR 看到白屏。`}</span>
       </div>
       <em>{deployment.proxy || 'Direct API'}{deployment.latencyMs ? ` · ${deployment.latencyMs}ms` : ''}</em>
     </div>
@@ -348,16 +438,36 @@ export default function Chat() {
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const isGuest = user?.role === 'guest';
-  const [question, setQuestion] = useState('');
+  const [form, setForm] = useState<ChatFormState>(defaultChatForm);
+  const [question, setQuestion] = useState(() => composeQuestion(defaultChatForm));
+  const [manualQuestion, setManualQuestion] = useState(false);
   const [result, setResult] = useState<ChatResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [conversations, setConversations] = useState<any[]>([]);
   const [error, setError] = useState('');
 
+  function updateForm(patch: Partial<ChatFormState>) {
+    setForm((prev) => {
+      const next = { ...prev, ...patch };
+      if (!manualQuestion) setQuestion(composeQuestion(next));
+      return next;
+    });
+  }
+
+  function applyPreset(preset: ChatFormState) {
+    setManualQuestion(false);
+    setForm(preset);
+    setQuestion(composeQuestion(preset));
+    setResult(null);
+    setError('');
+  }
+
   useEffect(() => {
     let alive = true;
     const cached = readSessionState<any>(CHAT_STORAGE_KEY, {});
+    if (cached.form) setForm({ ...defaultChatForm, ...cached.form });
     if (cached.question) setQuestion(cached.question);
+    if (cached.manualQuestion !== undefined) setManualQuestion(Boolean(cached.manualQuestion));
     if (cached.result) setResult(cached.result);
     if (Array.isArray(cached.conversations)) setConversations(cached.conversations);
 
@@ -373,8 +483,7 @@ export default function Chat() {
         })
         .catch((err) => {
           if (!alive) return;
-          const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || '请求失败，请稍后重试。';
-          setError(`AI 对话请求失败：${message}`);
+          setError(failureMessage(err));
         })
         .finally(() => { if (alive) setLoading(false); });
     } else {
@@ -390,8 +499,8 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    persistChatSnapshot({ question, result, conversations });
-  }, [question, result, conversations]);
+    persistChatSnapshot({ question, result, conversations, form, manualQuestion });
+  }, [question, result, conversations, form, manualQuestion]);
 
   const structured = useMemo(() => {
     if (!result) return null;
@@ -402,13 +511,15 @@ export default function Chat() {
 
   async function ask(e: FormEvent) {
     e.preventDefault();
-    if (!question.trim()) {
-      setError('请输入问题。');
+    const preparedQuestion = question.trim() || composeQuestion(form);
+    if (!preparedQuestion.trim()) {
+      setError('请输入问题或完善学生画像。');
       return;
     }
+    setQuestion(preparedQuestion);
     setLoading(true);
     setError('');
-    const currentQuestion = question;
+    const currentQuestion = preparedQuestion;
     persistChatSnapshot({ question: currentQuestion });
     pendingChatRequest = api
       .post('/chat', { question: currentQuestion, topK: 3 })
@@ -436,7 +547,7 @@ export default function Chat() {
       setConversations(convData);
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || '请求失败，请稍后重试。';
-      setError(`AI 对话请求失败：${message}`);
+      setError(failureMessage(err));
       try {
         await api.post('/tools/client-error-log', { toolName: 'AI 咨询页面', activeTool: 'chat', endpoint: '/chat', message });
       } catch {}
@@ -456,11 +567,44 @@ export default function Chat() {
         <div className="model-badge">{isGuest ? `访客额度 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端已连接'} · v11</div>
       </div>
 
-      <div className="prompt-panel">
-        <form onSubmit={ask} className="prompt-box">
-          <label>咨询问题</label>
-          <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="例如：英国计算机硕士申请一般需要提交哪些材料？" />
-          <div className="example-row">{examples.map((item) => <button type="button" key={item} onClick={() => setQuestion(item)}>{item.slice(0, 18)}...</button>)}</div>
+      <div className="prompt-panel chat-intake-panel-v12">
+        <form onSubmit={ask} className="prompt-box chat-intake-form-v12">
+          <div className="chat-intake-head-v12">
+            <div>
+              <span className="eyebrow">结构化录入</span>
+              <h2>学生画像 + 咨询类型</h2>
+              <p>像信息检索/方案引擎一样先筛选关键信息，再自动生成可追踪的 AI 咨询问题。</p>
+            </div>
+            <button className="ghost-button" type="button" onClick={() => applyPreset(defaultChatForm)}>重置案例</button>
+          </div>
+
+          <div className="chat-mode-grid-v12">
+            {inquiryTypes.map((item) => (
+              <button type="button" key={item.key} className={form.inquiryType === item.key ? 'active' : ''} onClick={() => updateForm({ inquiryType: item.key })}>
+                <strong>{item.label}</strong><span>{item.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="form-grid two chat-form-grid-v12">
+            <label>学生称呼<input value={form.name} onChange={(e) => updateForm({ name: e.target.value })} /></label>
+            <label>申请学位<select value={form.degree} onChange={(e) => updateForm({ degree: e.target.value })}>{degreeOptions.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+            <label>GPA / CGPA / 均分<input value={form.cgpa} onChange={(e) => updateForm({ cgpa: e.target.value })} /></label>
+            <label>满分制<select value={form.scale} onChange={(e) => updateForm({ scale: e.target.value })}><option value="4">4.0</option><option value="5">5.0</option><option value="100">100</option></select></label>
+            <label>目标国家<select value={form.country} onChange={(e) => updateForm({ country: e.target.value })}>{countryOptions.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+            <label>目标专业<select value={form.major} onChange={(e) => updateForm({ major: e.target.value })}>{majorOptions.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+            <label>语言类型<select value={form.languageType} onChange={(e) => updateForm({ languageType: e.target.value })}>{languageTypeOptions.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+            <label>语言分数<input value={form.languageScore} onChange={(e) => updateForm({ languageScore: e.target.value })} disabled={form.languageType === '暂无'} /></label>
+            <label>预算<select value={form.budget} onChange={(e) => updateForm({ budget: e.target.value })}>{budgetOptions.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+          </div>
+
+          <label>项目 / 实习 / 课程经历<textarea value={form.background} onChange={(e) => updateForm({ background: e.target.value })} /></label>
+          <label>主要顾虑<textarea value={form.concern} onChange={(e) => updateForm({ concern: e.target.value })} /></label>
+
+          <div className="quick-fill-panel chat-quick-fill-v12"><strong>快速画像</strong><div className="example-row">{chatPresets.map((preset) => <button type="button" key={preset.label} onClick={() => applyPreset(preset.form)}>{preset.label}</button>)}</div></div>
+
+          <label>自动生成的咨询问题<textarea className="question-preview-v12" value={question} onChange={(e) => { setManualQuestion(true); setQuestion(e.target.value); }} placeholder="系统会根据上方画像自动生成，也可以手动改写。" /></label>
+          <div className="example-row">{examples.map((item) => <button type="button" key={item} onClick={() => { setManualQuestion(true); setQuestion(item); }}>{item.slice(0, 18)}...</button>)}</div>
           <button className="primary ask-button" disabled={loading}>{loading ? '正在生成回答...' : '开始咨询'}</button>
         </form>
       </div>

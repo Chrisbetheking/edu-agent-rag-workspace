@@ -51,25 +51,38 @@ function getRequestPath(url?: string) {
   return value.startsWith('/') ? value : `/${value}`;
 }
 
-function shouldUseDirectRender(url?: string) {
+function shouldUseDirectRender(url?: string, method?: string) {
   if (!DIRECT_API_BASE_URL) return false;
   const path = getRequestPath(url);
+  const methodName = String(method || 'GET').toUpperCase();
 
-  // EdgeOne Functions can hit platform-level net_exception_timeout on long LLM calls.
-  // Keep login/guest/health on same-domain /api, but send long AI/business calls
-  // directly to Render so the browser can wait for DeepSeek/SiliconFlow results.
+  // Keep auth and health checks on same-origin EdgeOne /api.
+  // Long LLM/RAG/tool requests go directly to Render to avoid EdgeOne Function platform-level fetch timeout.
+  if (path.startsWith('/auth') || path.includes('/auth/')) return false;
+  if (path.includes('/health')) return false;
+
   return (
-    path === '/chat' ||
-    path.startsWith('/chat/') ||
+    (path === '/chat' && methodName === 'POST') ||
     path.startsWith('/tools/') ||
     path.startsWith('/eval') ||
     path.startsWith('/documents')
   );
 }
 
+function shouldRetryThroughEdgeOne(error: any) {
+  const config = error?.config as any;
+  if (!config?.__eduagentDirectRender) return false;
+  if (config?.__eduagentRetriedViaEdgeOne) return false;
+  const message = String(error?.message || '').toLowerCase();
+  const status = Number(error?.response?.status || 0);
+  return !status || status >= 500 || message.includes('network') || message.includes('timeout');
+}
+
 api.interceptors.request.use((config) => {
-  if (shouldUseDirectRender(config.url)) {
-    config.baseURL = DIRECT_API_BASE_URL;
+  const nextConfig = config as any;
+  if (shouldUseDirectRender(config.url, config.method)) {
+    nextConfig.baseURL = DIRECT_API_BASE_URL;
+    nextConfig.__eduagentDirectRender = true;
   }
 
   const token = localStorage.getItem('eduagent_token');
@@ -82,7 +95,15 @@ api.interceptors.response.use(
     syncGuestQuota(response.data);
     return response;
   },
-  (error) => {
+  async (error) => {
+    if (shouldRetryThroughEdgeOne(error)) {
+      const retryConfig = { ...(error.config || {}) } as any;
+      retryConfig.baseURL = API_BASE_URL;
+      retryConfig.__eduagentDirectRender = false;
+      retryConfig.__eduagentRetriedViaEdgeOne = true;
+      return api.request(retryConfig);
+    }
+
     if (error.response?.status === 401 && !isDemoFallbackPayload(error.response?.data)) {
       clearEduAgentAuth();
       if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
@@ -92,8 +113,16 @@ api.interceptors.response.use(
 );
 
 export function describeDeployment(info?: DeploymentInfo | null) {
-  if (!info) return '本地 / 直连 API';
+  if (!info) return DIRECT_API_BASE_URL ? 'Live API · Render Direct / EdgeOne Auth' : '本地 / 直连 API';
   if (info.mode === 'live_api') return `Live API · ${info.backend || '真实后端'}`;
   if (info.mode === 'demo_fallback') return `Demo Fallback · ${info.reason || '后端不可用'}`;
   return `${info.mode || 'unknown'} · ${info.backend || '-'}`;
+}
+
+export function explainApiFailure(message?: string) {
+  const text = String(message || '');
+  if (/timeout|network|net_exception|failed to fetch|exceeded/i.test(text)) {
+    return '当前请求已进入真实后端链路，但 Render 海外后端、DeepSeek / SiliconFlow 海外模型服务或 EdgeOne 边缘节点之间可能出现冷启动、跨境链路抖动或模型排队，导致本次等待超时。系统会保留兜底演示，不代表项目功能不可用；可稍后重试或查看系统日志确认真实后端调用记录。';
+  }
+  return '请求未完成。请检查访客登录状态、Render 后端健康状态和模型 API Key；系统会保留兜底演示，避免页面白屏。';
 }
