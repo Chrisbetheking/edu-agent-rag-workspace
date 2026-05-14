@@ -3,7 +3,6 @@
   "installCommand": "npm install --prefix frontend",
   "buildCommand": "VITE_EDGEONE_PROXY=true VITE_DEPLOY_TARGET=edgeone npm run build --prefix frontend",
   "outputDirectory": "frontend/dist",
-  "nodeVersion": "20.11.1",
   "headers": [
     {
       "source": "/assets/*",
