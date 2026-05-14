@@ -4,7 +4,7 @@ import { clearEduAgentAuth, useAuthStore } from '../store/auth';
 const useEdgeProxy = import.meta.env.VITE_EDGEONE_PROXY === 'true' || import.meta.env.VITE_DEPLOY_TARGET === 'edgeone';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (useEdgeProxy ? '/api' : 'http://localhost:3000');
-export const DIRECT_API_BASE_URL = import.meta.env.VITE_DIRECT_API_BASE_URL || '';
+export const DIRECT_API_BASE_URL = import.meta.env.VITE_DIRECT_API_BASE_URL || (useEdgeProxy ? 'https://edu-agent-backend.onrender.com' : '');
 export const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || (useEdgeProxy ? 120000 : 180000));
 
 export type RuntimeMode = 'live_api' | 'demo_fallback' | 'local' | string;
@@ -133,17 +133,31 @@ api.interceptors.response.use(
   },
 );
 
+export const AI_LOADING_HINT = '正在调用 AI。后端部署在海外 Render，首次唤醒或模型排队时可能会慢一些，请多等 30–60 秒。';
+
+export function humanizeFallbackReason(reason?: unknown) {
+  const text = String(reason || '').trim();
+  if (!text) return '这次没等到完整的 AI 返回，先展示备用内容，稍后再点一次通常就能拿到真实结果。';
+  if (/edgeone_demo|demo_fallback|render|timeout|network|unavailable|proxy/i.test(text)) {
+    return '这次请求没有等到海外后端完整返回，页面先展示备用内容。Render 首次唤醒或模型排队会比较慢，稍后重新生成即可。';
+  }
+  if (/JSON|parse|合法/i.test(text)) {
+    return '模型有返回，但结构不够稳定，系统先保留一份可编辑的备用稿。';
+  }
+  return text;
+}
+
 export function describeDeployment(info?: DeploymentInfo | null) {
-  if (!info) return DIRECT_API_BASE_URL ? 'Live API · Render Direct / EdgeOne Auth' : '本地 / 直连 API';
-  if (info.mode === 'live_api') return `Live API · ${info.backend || '真实后端'}`;
-  if (info.mode === 'demo_fallback') return `Demo Fallback · ${info.reason || '后端不可用'}`;
-  return `${info.mode || 'unknown'} · ${info.backend || '-'}`;
+  if (!info) return DIRECT_API_BASE_URL ? '后端直连已配置' : '本地接口';
+  if (info.mode === 'live_api') return '后端已接通';
+  if (info.mode === 'demo_fallback') return humanizeFallbackReason(info.reason || 'demo_fallback');
+  return `${info.mode || '接口状态未知'}${info.backend ? ` · ${info.backend}` : ''}`;
 }
 
 export function explainApiFailure(message?: string) {
   const text = String(message || '');
   if (/timeout|network|net_exception|failed to fetch|exceeded/i.test(text)) {
-    return '当前请求已进入真实后端链路，但 Render 海外后端、DeepSeek / SiliconFlow 海外模型服务或 EdgeOne 边缘节点之间可能出现冷启动、跨境链路抖动或模型排队，导致本次等待超时。系统会保留兜底演示，不代表项目功能不可用；可稍后重试或查看系统日志确认真实后端调用记录。';
+    return '这次没有等到 AI 完整返回。后端在海外 Render，首次唤醒、模型排队或跨境网络抖动都会拉长等待时间；可以等一会儿重试，系统日志里如果出现 deepseek 调用，说明后端已经进模型链路。';
   }
-  return '请求未完成。请检查访客登录状态、Render 后端健康状态和模型 API Key；系统会保留兜底演示，避免页面白屏。';
+  return '这次请求没有完成。可以先确认访客登录、Render 后端状态和模型 Key；页面会保留上一次结果，避免空白。';
 }

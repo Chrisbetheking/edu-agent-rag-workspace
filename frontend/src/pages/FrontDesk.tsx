@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, AI_LOADING_HINT, explainApiFailure, humanizeFallbackReason } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
 import { angleOptions, countryOptions, degreeOptions, majorOptions, platformOptions } from '../constants/options';
 import { readSessionState, writeSessionState } from '../utils/sessionState';
@@ -130,12 +130,14 @@ export default function FrontDesk() {
     e?.preventDefault();
     setLoading(true);
     setError('');
+    setResult(null);
     try {
       const { data } = await api.post('/tools/growth-campaign', { name, student, background: student, country, major, degree, angle, concern: angle, platform, gaokaoTaken, gaokaoScore });
       setResult(data || {});
       writeSessionState(STORAGE_KEY, { form: { name, student, country, major, degree, angle, platform, gaokaoTaken, gaokaoScore }, result: data || {} });
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || '生成失败');
+      const message = err?.response?.data?.message || err?.message || '生成失败';
+      setError(`${message}。${explainApiFailure(message)}`);
     } finally {
       setLoading(false);
     }
@@ -147,7 +149,7 @@ export default function FrontDesk() {
         <div>
           <span className="eyebrow">客户线索</span>
           <h1>获客内容与跟进话术</h1>
-          <p>默认空表单，可一键填入线索画像，生成可复制的笔记、短视频脚本和私域跟进内容。</p>
+          <p>填一个学生画像，直接出小红书标题、短视频脚本和微信跟进话术，方便拿去改稿或发给销售。</p>
         </div>
         <div className="title-actions">
           {result && <button className="ghost-button" onClick={() => downloadText(`lead-${name || 'student'}.md`, exportContent)}>导出 Markdown</button>}
@@ -156,7 +158,7 @@ export default function FrontDesk() {
       </div>
 
       {error && <div className="error-card"><strong>生成失败</strong><p>{error}</p></div>}
-      {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{result.llmFallbackReason}</div>}
+      {result?.llmFallbackReason && <div className="permission-banner">{humanizeFallbackReason(result.llmFallbackReason)}</div>}
 
       <div className="frontdesk-workbench-v18">
         <section className="panel form-panel sticky-panel">
@@ -176,14 +178,15 @@ export default function FrontDesk() {
             <label>沟通切入点<select value={angle} onChange={(e) => setAngle(e.target.value)}><option value="">请选择</option>{angleOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
             <label>投放渠道<select value={platform} onChange={(e) => setPlatform(e.target.value)}><option value="">请选择</option>{platformOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
             <div className="quick-fill-panel"><strong>快速填写</strong><div className="example-row">{frontDeskPresets.map((preset) => <button type="button" key={preset.label} onClick={() => applyPreset(preset)}>{preset.label}</button>)}</div></div>
-            <button className="primary" disabled={loading}>{loading ? '生成中...' : '生成内容'}</button>
+            <button className="primary" disabled={loading}>{loading ? 'AI 生成中…' : '生成内容'}</button>
+            {loading && <p className="muted-text">{AI_LOADING_HINT}</p>}
           </form>
         </section>
 
         <section className="panel result-panel">
           <div className="panel-title compact"><span className="eyebrow">结果</span><h2>内容包</h2></div>
           {!result ? (
-            <div className="empty-advice compact-empty"><div className="empty-icon">✍</div><h2>等待生成</h2><p>填写左侧信息后生成内容。</p></div>
+            <div className="empty-advice compact-empty"><div className="empty-icon">✍</div><h2>{loading ? '正在写内容' : '等待生成'}</h2><p>{loading ? AI_LOADING_HINT : '填写左侧信息后生成内容。'}</p></div>
           ) : (
             <div className="copy-grid two-output-grid">
               <CopyCard title="线索摘要" content={result.brief} />

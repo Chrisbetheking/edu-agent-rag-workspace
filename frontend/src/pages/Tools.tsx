@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, AI_LOADING_HINT, explainApiFailure, humanizeFallbackReason } from '../api/client';
 import { asArray, downloadText, jsonMarkdown } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
 import { CompactMetric, FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
@@ -399,7 +399,7 @@ export default function Tools() {
       window.setTimeout(() => document.querySelector('.result-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.message || '工具调用失败';
-      setError(message);
+      setError(`${message}。${explainApiFailure(message)}`);
       await logClientError(type, err, started);
     } finally { setLoadingTool(null); }
   }
@@ -410,7 +410,7 @@ export default function Tools() {
   return (
     <section className="page-stack compact-page tools-page-v9 tools-page-v15">
       <div className="page-title elevated clean-title">
-        <div><span className="eyebrow">方案引擎</span><h1>评分与工具编排</h1><p>默认空表单，先选择快速画像或手动录入，再运行完整流程。</p></div>
+        <div><span className="eyebrow">方案引擎</span><h1>评分与工具编排</h1><p>把学生画像放进来，先出评分和三档学校，再拆文书、话术和材料清单。</p></div>
         <div className="title-actions">
           {activeResult && <button className="ghost-button" onClick={() => downloadText(`tool-${active}.md`, exportText)}>导出 Markdown</button>}
           {activeResult && <button className="ghost-button" onClick={() => downloadText(`tool-${active}.json`, JSON.stringify(activeResult, null, 2), 'application/json;charset=utf-8')}>导出 JSON</button>}
@@ -422,7 +422,7 @@ export default function Tools() {
       </div>
 
       {error && <div className="error-card"><strong>工具调用失败</strong><p>{error}</p><small>已尝试写入前端失败日志；如系统日志没有出现，请重新部署后端。</small></div>}
-      {activeResult?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(activeResult.llmFallbackReason)}</div>}
+      {activeResult?.llmFallbackReason && <div className="permission-banner">{humanizeFallbackReason(activeResult.llmFallbackReason)}</div>}
 
       <div className={`two-col wide-right tools-workbench-grid tools-workbench-v9 tools-workbench-v13 tools-workbench-v15 tools-workbench-v17 ${activeResult ? 'with-result generated' : ''}`}>
         <section className={`panel form-panel compact-form-card ${activeResult ? 'form-panel-inline' : 'sticky-panel'}`}>
@@ -430,7 +430,7 @@ export default function Tools() {
             <div><span className="eyebrow">录入</span><h2>{activeMeta.name}</h2></div>
             <div className="inline-actions"><button className="ghost-button" type="button" onClick={clearWorkspace}>清空</button>
             <button className="primary compact-run-button" type="button" disabled={!!loadingTool} onClick={() => callTool(active)}>
-              {isLoading ? '运行中...' : active === 'advisor' ? '运行完整流程' : `运行${activeMeta.name}`}
+              {isLoading ? 'AI 处理中…' : active === 'advisor' ? '运行完整流程' : `运行${activeMeta.name}`}
             </button></div>
           </div>
           <form className="form-stack" onSubmit={(e) => callTool(active, e)}>
@@ -450,12 +450,13 @@ export default function Tools() {
             <label>项目 / 实习 / 课程经历<textarea value={experience} onChange={(e) => setExperience(e.target.value)} /></label>
             <label>主要顾虑<textarea value={concern} onChange={(e) => setConcern(e.target.value)} placeholder="例如：GPA 不够高 / 预算有限 / 想转专业 / 缺少项目" /></label>
             <div className="quick-fill-panel"><strong>快速填写</strong><div className="example-row">{toolPresets.map((preset) => <button type="button" key={preset.label} onClick={() => applyPreset(preset)}>{preset.label}</button>)}</div></div>
+            {loadingTool && <p className="muted-text">{AI_LOADING_HINT}</p>}
           </form>
         </section>
 
         <section className="panel result-panel generated-result-panel result-panel-v9 result-panel-v13 result-panel-v15 result-panel-v17">
           <div className="panel-title"><div><span className="eyebrow">结果</span><h2>{activeMeta.name}</h2></div>{activeResult && <span className="pill success">完成</span>}</div>
-          {activeResult ? <><GenericResult result={activeResult} active={active} /><details className="raw-json-details"><summary>查看结构化数据</summary><pre className="json-block compact-json">{JSON.stringify(activeResult, null, 2)}</pre></details></> : <div className="empty-advice compact-empty"><div className="empty-icon">⌘</div><h2>{loadingTool ? '正在运行' : '等待运行'}</h2><p>建议先运行“完整流程”，再查看各节点结果。</p></div>}
+          {activeResult ? <><GenericResult result={activeResult} active={active} /><details className="raw-json-details"><summary>查看结构化数据</summary><pre className="json-block compact-json">{JSON.stringify(activeResult, null, 2)}</pre></details></> : <div className="empty-advice compact-empty"><div className="empty-icon">⌘</div><h2>{loadingTool ? '正在处理' : '等待运行'}</h2><p>{loadingTool ? AI_LOADING_HINT : '建议先运行“完整流程”，再查看各节点结果。'}</p></div>}
         </section>
       </div>
     </section>

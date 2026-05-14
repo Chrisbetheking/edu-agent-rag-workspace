@@ -139,14 +139,14 @@ export default function Logs() {
         <div>
           <span className="eyebrow">日志</span>
           <h1>调用日志</h1>
-          <p>按状态、耗时、工具和关键词筛选调用记录，用于定位失败、慢请求和 RAG 命中情况。</p>
+          <p>这里能看到每次请求有没有成功、用了多久、命中了哪些工具，方便排查线上问题。</p>
         </div>
         <button className="primary" onClick={loadLogs} disabled={loading}>{loading ? '刷新中...' : '刷新日志'}</button>
       </div>
 
       <section className="panel log-filter-panel">
         <div className="filter-grid-v18">
-          <label>状态<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="all">全部</option><option value="success">成功</option><option value="failed">失败</option><option value="slow">慢请求 ≥ 30s</option><option value="rag-miss">RAG 未命中</option><option value="cache-hit">缓存命中</option><option value="fallback">Fallback</option></select></label>
+          <label>状态<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="all">全部</option><option value="success">成功</option><option value="failed">失败</option><option value="slow">慢请求 ≥ 30s</option><option value="rag-miss">RAG 未命中</option><option value="cache-hit">缓存命中</option><option value="fallback">备用结果</option></select></label>
           <label>时间<select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)}><option value="all">全部</option><option value="today">今天</option><option value="24h">最近 24 小时</option><option value="7d">最近 7 天</option></select></label>
           <label>工具<select value={toolFilter} onChange={(e) => setToolFilter(e.target.value)}><option value="all">全部工具</option>{toolOptions.map((name) => <option value={name} key={name}>{name}</option>)}</select></label>
           <label>排序<select value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="time">按时间</option><option value="duration">按耗时</option><option value="rag">按 RAG 命中</option></select></label>
@@ -162,7 +162,7 @@ export default function Logs() {
         <div className="stat-card"><span>慢请求</span><strong>{stats.slowCount}</strong><p>≥ 30s</p></div>
         <div className="stat-card"><span>平均 RAG 命中</span><strong>{stats.avgRag}</strong><p>每次命中切片</p></div>
         <div className="stat-card"><span>缓存命中</span><strong>{stats.cacheHitCount}</strong><p>重复问题 / 检索缓存</p></div>
-        <div className="stat-card"><span>Fallback</span><strong>{stats.fallbackCount}</strong><p>兜底或解析失败</p></div>
+        <div className="stat-card"><span>备用结果</span><strong>{stats.fallbackCount}</strong><p>超时或解析不稳</p></div>
       </div>
 
       {error && <div className="error-card"><strong>加载失败</strong><p>{error}</p></div>}
@@ -195,13 +195,13 @@ export default function Logs() {
                 <div><span>RAG 命中</span><strong>{log.ragHitCount || 0}</strong></div>
                 <div><span>检索耗时</span><strong>{formatDuration(log.retrievalLatencyMs)}</strong></div>
                 <div><span>模型耗时</span><strong>{formatDuration(log.llmLatencyMs)}</strong></div>
-                <div><span>缓存</span><strong>{log.cacheHit ? 'Hit' : 'Miss'}</strong></div>
+                <div><span>缓存</span><strong>{log.cacheHit ? '命中' : '未命中'}</strong></div>
                 <div><span>工具数量</span><strong>{log.toolNames?.length || 0}</strong></div>
               </div>
 
               <div className="tag-row">
                 {log.toolNames?.length ? log.toolNames.map((name) => <span key={name}>{name}</span>) : <span>本次未触发工具</span>}
-                {log.fallbackTriggered && <span>Fallback: {log.fallbackReason || 'triggered'}</span>}
+                {log.fallbackTriggered && <span>备用结果：{log.fallbackReason || '已触发'}</span>}
                 {Array.isArray(log.ragScores) && log.ragScores.length > 0 && <span>scores: {log.ragScores.map((x) => Number(x).toFixed(2)).join(', ')}</span>}
               </div>
 

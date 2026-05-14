@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api, describeDeployment, type DeploymentInfo } from '../api/client';
+import { api, AI_LOADING_HINT, describeDeployment, type DeploymentInfo } from '../api/client';
 
 type EvalQuestion = {
   id: string;
@@ -59,10 +59,10 @@ function RuntimeMini({ deployment }: { deployment?: DeploymentInfo }) {
   return (
     <div className={live ? 'runtime-banner live compact-runtime' : 'runtime-banner fallback compact-runtime'}>
       <div>
-        <strong>{live ? 'Live Evaluation：真实后端评测' : 'Demo Evaluation：后端不可用时的兜底结果'}</strong>
-        <span>{describeDeployment(deployment)}</span>
+        <strong>{live ? '后端评测已接入' : '暂时展示备用评测'}</strong>
+        <span>{live ? '本次走后端检索评测接口。' : describeDeployment(deployment)}</span>
       </div>
-      <em>{deployment.proxy || 'Direct API'}{deployment.latencyMs ? ` · ${deployment.latencyMs}ms` : ''}</em>
+      <em>{deployment.latencyMs ? `${deployment.latencyMs}ms` : ''}</em>
     </div>
   );
 }
@@ -159,9 +159,9 @@ export default function Evaluation() {
         <div>
           <span className="eyebrow">检索评测</span>
           <h1>RAG 评测面板</h1>
-          <p>用固定问题集验证 Top-1 / Top-3 / MRR / latency / cacheHit，展示可量化的 RAG 质量闭环。</p>
+          <p>用固定问题集看检索到底准不准：第一条有没有命中、Top-3 是否覆盖、排序质量和耗时是否稳定。</p>
         </div>
-        <div className="inline-actions"><button className="ghost-button" onClick={seedAllQuestions} disabled={loading}>导入8个标准问题</button><button className="primary" onClick={run} disabled={loading}>{loading ? '评测中...' : '运行 Top-3 评测'}</button></div>
+        <div className="inline-actions"><button className="ghost-button" onClick={seedAllQuestions} disabled={loading}>导入8个标准问题</button><button className="primary" onClick={run} disabled={loading}>{loading ? '评测中…' : '运行 Top-3 评测'}</button></div>
       </div>
 
       <div className="stats-grid">
@@ -169,13 +169,14 @@ export default function Evaluation() {
         <div className="stat-card"><span>Hit@1</span><strong>{pct(summary.hitAt1)}</strong><p>第一条命中</p></div>
         <div className="stat-card"><span>Hit@3</span><strong>{pct(summary.hitAt3 || summary.hitRate)}</strong><p>Top-3 命中</p></div>
         <div className="stat-card"><span>MRR</span><strong>{summary.mrr.toFixed(3)}</strong><p>排序质量</p></div>
-        <div className="stat-card"><span>平均耗时</span><strong>{fmt(summary.avgLatency)}</strong><p>检索耗时</p></div>
-        <div className="stat-card"><span>P95 耗时</span><strong>{fmt(summary.p95Latency)}</strong><p>尾延迟</p></div>
-        <div className="stat-card"><span>缓存命中</span><strong>{pct(summary.cacheHitRate)}</strong><p>重复问题加速</p></div>
+        <div className="stat-card"><span>平均耗时</span><strong>{fmt(summary.avgLatency)}</strong><p>平均检索</p></div>
+        <div className="stat-card"><span>P95 耗时</span><strong>{fmt(summary.p95Latency)}</strong><p>最慢一批</p></div>
+        <div className="stat-card"><span>缓存命中</span><strong>{pct(summary.cacheHitRate)}</strong><p>重复问题命中</p></div>
         <div className="stat-card"><span>异常样本</span><strong>{summary.badCases}</strong><p>需要补知识库或 rerank</p></div>
       </div>
 
       {error && <div className="error-card"><strong>评测失败</strong><p>{error}</p></div>}
+      {loading && <div className="permission-banner">{AI_LOADING_HINT}</div>}
       {results.deployment && <RuntimeMini deployment={results.deployment} />}
 
       <div className="two-col wide-left">

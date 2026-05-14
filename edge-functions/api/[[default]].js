@@ -11,7 +11,7 @@ const DEMO_SOURCES = [
     hybridBoost: 0.22,
     intentLockWeight: 0.31,
     retrievalMode: 'demo-hybrid',
-    candidateSource: 'edgeone-demo-fallback',
+    candidateSource: 'domestic-entry-backup',
   },
   {
     id: 'demo-src-overview',
@@ -25,7 +25,7 @@ const DEMO_SOURCES = [
     hybridBoost: 0.16,
     intentLockWeight: 0.22,
     retrievalMode: 'demo-hybrid',
-    candidateSource: 'edgeone-demo-fallback',
+    candidateSource: 'domestic-entry-backup',
   },
   {
     id: 'demo-src-cv',
@@ -39,7 +39,7 @@ const DEMO_SOURCES = [
     hybridBoost: 0.11,
     intentLockWeight: 0.12,
     retrievalMode: 'demo-hybrid',
-    candidateSource: 'edgeone-demo-fallback',
+    candidateSource: 'domestic-entry-backup',
   },
 ];
 
@@ -90,7 +90,7 @@ function materialAnswer() {
     '4. 身份与补充材料：护照、申请表、作品集或 GitHub / 项目链接；计算机方向建议补充项目经历和技术栈。',
     '5. 申请策略：不同学校要求会变，递交前要逐项核对官网 checklist，避免漏传推荐信、课程描述或语言条件。',
     '',
-    '这个回答来自国内入口版的 Demo Fallback。Render 后端可用时，系统会优先返回真实 RAG 检索结果。',
+    '这是一份备用展示结果；海外后端连上后，系统会优先返回真实 RAG 检索结果。',
   ].join('\n');
 }
 
@@ -140,7 +140,7 @@ function makeChatFallback(body, reason) {
     answerMode,
     structured,
     sources,
-    toolCalls: school ? [{ name: 'weighted-fit 选校评分', status: 'demo_fallback', result: { tiers: ['冲刺', '匹配', '保底'], note: 'EdgeOne fallback 展示，真实后端可用时会返回 Render 计算结果。' } }] : [],
+    toolCalls: school ? [{ name: 'weighted-fit 选校评分', status: 'demo_fallback', result: { tiers: ['冲刺', '匹配', '保底'], note: '这次先展示备用结果；海外后端可用时会返回真实计算结果。' } }] : [],
     conversationId: 'edgeone-demo-conversation',
     quota: { limit: 20, used: 1, remaining: 19 },
     observability: {
@@ -217,7 +217,7 @@ function makeLogs() {
       id: 'edgeone-log-1',
       type: 'chat',
       question: '英国计算机硕士申请一般需要提交哪些材料？',
-      model: 'EdgeOne Demo Fallback / Render Proxy',
+      model: '备用结果 / Render 后端',
       success: true,
       status: 'success',
       durationMs: 36,
@@ -227,7 +227,7 @@ function makeLogs() {
       ragScores: [0.94, 0.87, 0.79],
       cacheHit: false,
       fallbackTriggered: true,
-      fallbackReason: 'render_unavailable_or_forced_demo',
+      fallbackReason: '海外后端暂时没有完整返回',
       toolNames: [],
       createdAt: nowIso(),
     },
@@ -235,7 +235,7 @@ function makeLogs() {
       id: 'edgeone-log-2',
       type: 'eval',
       question: '运行 Top-3 RAG 评测',
-      model: 'EdgeOne Demo Evaluation',
+      model: '备用评测结果',
       success: true,
       status: 'success',
       durationMs: 92,
@@ -245,7 +245,7 @@ function makeLogs() {
       ragScores: [0.92, 0.88, 0.83],
       cacheHit: true,
       fallbackTriggered: true,
-      fallbackReason: 'render_unavailable_or_forced_demo',
+      fallbackReason: '海外后端暂时没有完整返回',
       toolNames: ['RAG Evaluation'],
       createdAt: nowIso(),
     },
@@ -255,7 +255,7 @@ function makeLogs() {
 function deploymentInfo(mode, reason, latencyMs, target) {
   return {
     mode,
-    backend: mode === 'live_api' ? 'Render via EdgeOne Proxy' : 'EdgeOne Demo Fallback',
+    backend: mode === 'live_api' ? 'Render 后端' : '备用展示结果',
     proxy: 'EdgeOne Pages Functions',
     fallback: mode !== 'live_api',
     reason: reason || null,
@@ -290,7 +290,7 @@ function makeProfileFitFallback(body, reason) {
     risks: ['热门计算机 / AI 方向竞争高，需要尽早递交并准备替代专业。'],
     riskSignals: ['申请轮次越晚，热门方向名额越紧张。'],
     nextActions: ['整理成绩单与课程描述', '补齐 CV / PS / 推荐信素材', '把学校拆成冲刺、匹配、保底三档', '为每所学校核对官网 checklist'],
-    llmFallbackReason: 'edgeone_demo_fallback',
+    llmFallbackReason: '这次没有等到海外后端完整返回，先展示备用内容。',
     deployment: deploymentInfo('demo_fallback', reason),
   };
 }
@@ -314,7 +314,7 @@ function makeSchoolRecommendFallback(body, reason) {
     ],
     risk: ['热门 CS / AI 项目滚动录取节奏快', '部分学校会要求相关课程比例', '最终名单必须以当年官网为准'],
     nextActions: ['确定 8-10 所候选学校', '逐校核对课程要求和申请截止时间', '准备文书主线和推荐信素材'],
-    llmFallbackReason: 'edgeone_demo_fallback',
+    llmFallbackReason: '这次没有等到海外后端完整返回，先展示备用内容。',
     deployment: deploymentInfo('demo_fallback', reason),
   };
 }
@@ -344,7 +344,7 @@ function makeMaterialListFallback(body, reason) {
       { stage: '拿到 conditional offer 后', task: '补语言、毕业材料和押金相关文件。' },
     ],
     reminders: ['不同学校材料口径不同，最终以官网和网申系统为准。', '推荐信尽量提前 2-3 周沟通。'],
-    llmFallbackReason: 'edgeone_demo_fallback',
+    llmFallbackReason: '这次没有等到海外后端完整返回，先展示备用内容。',
     deployment: deploymentInfo('demo_fallback', reason),
   };
 }
@@ -375,7 +375,7 @@ function makeApplicationPlanFallback(body, reason) {
     riskFlags: ['热门计算机方向竞争高，需要尽早递交。', '需要逐校确认先修课程和语言小分要求。'],
     nextBestActions: ['确定 8-10 所候选学校', '完成 CV 和 PS 初稿', '整理项目经历为 STAR / 项目指标形式', '联系推荐人并提供素材包'],
     exportMarkdown: `# ${name} 申请案卷\n\n## 方向\n${country} ${major}\n\n## PS 主题\n计算机课程基础 + AI / Web 项目实践 + 职业目标\n\n## 材料\n- 成绩单\n- PS\n- CV\n- 推荐信\n- 语言成绩\n`,
-    llmFallbackReason: 'edgeone_demo_fallback',
+    llmFallbackReason: '这次没有等到海外后端完整返回，先展示备用内容。',
     deployment: deploymentInfo('demo_fallback', reason),
   };
 }
@@ -412,7 +412,7 @@ function makeGrowthCampaignFallback(body, reason) {
       { day: '周三', platform: '短视频', format: '口播', topic: '均分85怎么选校', content: '讲冲刺、匹配、保底的逻辑。' },
       { day: '周五', platform: '私域', format: 'Checklist', topic: '计算机硕士申请材料清单', content: '引导用户提交成绩单和项目经历。' },
     ],
-    llmFallbackReason: 'edgeone_demo_fallback',
+    llmFallbackReason: '这次没有等到海外后端完整返回，先展示备用内容。',
     deployment: deploymentInfo('demo_fallback', reason),
   };
 }
@@ -430,7 +430,7 @@ function makeCopywritingFallback(body, reason) {
     ],
     callOutline: ['确认目标国家和专业', '确认成绩、课程和语言', '询问项目 / 实习经历', '解释三档选校', '约定材料清单和下一步'],
     followUpTasks: ['索要成绩单', '索要 CV 或项目清单', '确认预算与城市偏好', '输出初版学校分层'],
-    llmFallbackReason: 'edgeone_demo_fallback',
+    llmFallbackReason: '这次没有等到海外后端完整返回，先展示备用内容。',
     deployment: deploymentInfo('demo_fallback', reason),
   };
 }
@@ -442,7 +442,7 @@ function makeAdvisorSuiteFallback(body, reason) {
   const sales = makeCopywritingFallback(body, reason);
   const materials = makeMaterialListFallback(body, reason);
   return {
-    executiveSummary: '已生成 EdgeOne Demo Fallback 综合申请方案：先完成适配评分，再拆分选校，最后输出文书、材料和跟进动作。',
+    executiveSummary: '已生成备用综合申请方案：先完成适配评分，再拆分选校，最后输出文书、材料和跟进动作。',
     workflow: [
       { step: 1, name: '适配评分', tool: 'weighted-fit-v2', status: 'done', output: `${fit.overall}/100 · ${fit.band}` },
       { step: 2, name: '选校分层', tool: 'school-recommend', status: 'done', output: '冲刺 / 匹配 / 保底' },
@@ -451,12 +451,12 @@ function makeAdvisorSuiteFallback(body, reason) {
     ],
     outputs: { fit, schools, application, sales, materials },
     agentTrace: {
-      mode: 'edgeone-demo-fallback',
+      mode: 'domestic-entry-backup',
       algorithm: 'weighted-fit-v2',
       tools: ['profile-fit', 'school-recommend', 'application-plan', 'copywriting', 'material-list'],
       fallbackReason: reason || 'render_unavailable',
     },
-    llmFallbackReason: 'edgeone_demo_fallback',
+    llmFallbackReason: '这次没有等到海外后端完整返回，先展示备用内容。',
     deployment: deploymentInfo('demo_fallback', reason),
   };
 }
@@ -485,7 +485,7 @@ function fallbackFor(pathname, method, body, reason) {
   }
 
   if (pathname === '/api/chat/conversations') {
-    return json([{ id: 'edgeone-demo-conversation', title: 'EdgeOne 国内入口演示会话', updatedAt: nowIso() }]);
+    return json([{ id: 'edgeone-demo-conversation', title: '国内入口备用会话', updatedAt: nowIso() }]);
   }
 
   if (pathname === '/api/chat' && method === 'POST') return json(makeChatFallback(body, reason));
@@ -531,7 +531,7 @@ function fallbackFor(pathname, method, body, reason) {
 
   return json({
     ok: true,
-    message: 'EdgeOne demo fallback：该接口在完整 Render 后端可用时会返回真实结果。',
+    message: '当前先返回备用结果；海外后端可用时会返回真实结果。',
     path: pathname,
     method,
     deployment: deploymentInfo('demo_fallback', reason),

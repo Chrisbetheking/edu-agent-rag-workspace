@@ -78,7 +78,7 @@ export default function Layout() {
         <div className="sidebar-status">
           <span className="pulse-dot" />
           <div className="sidebar-text">
-            <strong>{deployment?.mode === 'demo_fallback' ? 'Fallback 入口' : (isGuest ? '访客体验' : '管理员')}</strong>
+            <strong>{deployment?.mode === 'demo_fallback' ? '备用入口' : (isGuest ? '访客体验' : '管理员')}</strong>
             <small>{deployment ? describeDeployment(deployment) : (isGuest ? `今日剩余 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端服务在线')}</small>
           </div>
         </div>

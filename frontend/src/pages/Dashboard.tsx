@@ -62,7 +62,7 @@ export default function Dashboard() {
         <div>
           <span className="eyebrow">系统概览</span>
           <h1>EduAgent 工作台</h1>
-          <p>当前项目把客户线索、知识库检索、选校建议、申请案卷和调用日志放在同一套流程里。</p>
+          <p>客户线索、知识库检索、选校建议、申请案卷和调用日志，都放在这一套流程里看。</p>
         </div>
         <button className="ghost-button" onClick={load} disabled={loading}>{loading ? '刷新中...' : '刷新'}</button>
       </div>
@@ -89,7 +89,7 @@ export default function Dashboard() {
         <article className="product-card">
           <span>工程能力</span>
           <h2>可追踪的后端调用</h2>
-          <p>模型、耗时、命中、工具链和失败原因都会记录，方便排查线上问题。</p>
+          <p>每次 AI 请求的耗时、命中和工具调用都会留下记录，方便定位哪里慢、哪里失败。</p>
         </article>
       </div>
 

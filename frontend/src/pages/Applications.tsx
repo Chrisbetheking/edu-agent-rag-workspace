@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, AI_LOADING_HINT, explainApiFailure, humanizeFallbackReason } from '../api/client';
 import { asArray, downloadText, stringifySafe } from '../utils/export';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
 import { CompactMetric, FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
@@ -191,6 +191,7 @@ export default function Applications() {
     const started = Date.now();
     setLoading(true);
     setError('');
+    setResult(null);
     try {
       const payload = { name, country, major, degree, gpa, cgpa: gpa, scale, language, languageType, languageScore, gaokaoTaken, gaokaoScore, budget, experience, background: experience, targetSchools };
       const [fitRes, planRes] = await Promise.all([
@@ -202,7 +203,8 @@ export default function Applications() {
       writeSessionState(STORAGE_KEY, { form: { name, country, major, degree, gpa, scale, languageType, languageScore, gaokaoTaken, gaokaoScore, budget, experience, targetSchools }, result: next });
       window.setTimeout(() => document.querySelector('#app-score')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || '生成失败');
+      const message = err?.response?.data?.message || err?.message || '生成失败';
+      setError(`${message}。${explainApiFailure(message)}`);
       await logError(err, started);
     } finally {
       setLoading(false);
@@ -218,7 +220,7 @@ export default function Applications() {
         <div>
           <span className="eyebrow">申请案卷</span>
           <h1>文书与材料流程</h1>
-          <p>默认空表单，支持一键填入测试画像；生成后可导出案卷。</p>
+          <p>填完学生背景后，一键生成文书方向、材料清单和申请流程；结果可以直接导出给文书或申请老师继续改。</p>
         </div>
         <div className="title-actions">
           {result && <button className="ghost-button" onClick={() => downloadText(`application-${name || 'student'}.md`, exportMarkdown)}>导出 Markdown</button>}
@@ -227,12 +229,12 @@ export default function Applications() {
       </div>
 
       {error && <div className="error-card"><strong>操作失败</strong><p>{error}</p></div>}
-      {result?.llmFallbackReason && <div className="permission-banner">已使用兜底结果：{toDisplayText(result.llmFallbackReason)}</div>}
+      {result?.llmFallbackReason && <div className="permission-banner">{humanizeFallbackReason(result.llmFallbackReason)}</div>}
 
 
       <div className={`two-col application-workbench-v9 application-workbench-v13 application-workbench-v15 ${result ? 'with-result' : ''}`}>
         <section className={`panel compact-form-card ${result ? 'form-panel-inline' : 'sticky-panel'}`}>
-          <div className="panel-title compact form-action-title"><div><span className="eyebrow">录入</span><h2>学生档案</h2></div><div className="inline-actions"><button className="ghost-button" type="button" onClick={clearForm}>清空</button><button className="primary compact-run-button" type="button" disabled={loading} onClick={() => run()}>{loading ? '生成中...' : '生成申请案卷'}</button></div></div>
+          <div className="panel-title compact form-action-title"><div><span className="eyebrow">录入</span><h2>学生档案</h2></div><div className="inline-actions"><button className="ghost-button" type="button" onClick={clearForm}>清空</button><button className="primary compact-run-button" type="button" disabled={loading} onClick={() => run()}>{loading ? 'AI 生成中…' : '生成申请案卷'}</button></div></div>
           <form className="form-stack" onSubmit={run}>
             <div className="form-grid two">
               <label>学生称呼<input value={name} onChange={(e) => setName(e.target.value)} /></label>
@@ -250,6 +252,7 @@ export default function Applications() {
             <label>项目 / 实习 / 课程经历<textarea value={experience} onChange={(e) => setExperience(e.target.value)} /></label>
             <label>目标院校<input value={targetSchools} onChange={(e) => setTargetSchools(e.target.value)} placeholder="可空，例如：暂未确定 / 曼大、格拉斯哥..." /></label>
             <div className="quick-fill-panel"><strong>快速填写</strong><div className="example-row">{applicationPresets.map((preset) => <button type="button" key={preset.label} onClick={() => applyPreset(preset)}>{preset.label}</button>)}</div></div>
+            {loading && <p className="muted-text">{AI_LOADING_HINT}</p>}
           </form>
         </section>
 
@@ -258,7 +261,7 @@ export default function Applications() {
             <div><span className="eyebrow">结果</span><h2>申请案卷</h2></div>
             {result && <span className="pill success">已生成</span>}
           </div>
-          {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>先生成申请案卷</h2><p>结果会包含评分、文书、材料和流程。</p></div> : (
+          {!result ? <div className="empty-advice compact-empty"><div className="empty-icon">CRM</div><h2>{loading ? '正在写案卷' : '先生成申请案卷'}</h2><p>{loading ? AI_LOADING_HINT : '结果会包含评分、文书方向、材料和流程。'}</p></div> : (
             <div className="application-output-stack-v10 application-output-grid-v11 application-output-grid-v13 application-output-grid-v15 application-output-grid-v16 application-output-grid-v17">
               <SectionNav items={[
                 { id: 'app-score', label: '评分' },

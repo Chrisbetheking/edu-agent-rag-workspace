@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../api/client';
+import { api, AI_LOADING_HINT, explainApiFailure } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { FoldSection, SectionNav, TextBlock } from '../components/FoldSection';
 
@@ -92,7 +92,8 @@ export default function Knowledge() {
       if (mode !== 'files') setText('');
       await load();
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || '导入文档失败');
+      const message = err?.response?.data?.message || err?.message || '导入文档失败';
+      setError(`${message}。${explainApiFailure(message)}`);
     } finally {
       setLoading(false);
     }
@@ -161,7 +162,7 @@ export default function Knowledge() {
         <div>
           <span className="eyebrow">知识库</span>
           <h1>知识库管理</h1>
-          <p>资料入库、自动切片、查看切片和权限控制。</p>
+          <p>把案例、FAQ、材料清单放进知识库，后面的 AI 咨询会优先从这些内容里检索。</p>
         </div>
         <div className="title-actions">
           <span className="status-dot">{stats.已解析}/{stats.docs} 已解析</span>
@@ -219,7 +220,8 @@ export default function Knowledge() {
                 <div><span>归属</span><strong>{isGuest ? '访客资料' : '系统资料'}</strong></div>
               </div>
 
-              <button className="primary" disabled={loading}>{loading ? '写入中...' : '导入并写入 Supabase'}</button>
+              <button className="primary" disabled={loading}>{loading ? '写入中…' : '导入并写入 Supabase'}</button>
+              {loading && <p className="muted-text">{AI_LOADING_HINT}</p>}
             </form>
           </FoldSection>
         </section>

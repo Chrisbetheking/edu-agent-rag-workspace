@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api, describeDeployment, explainApiFailure, type DeploymentInfo } from '../api/client';
+import { api, AI_LOADING_HINT, describeDeployment, explainApiFailure, type DeploymentInfo } from '../api/client';
 import { buildLanguage, budgetOptions, countryOptions, degreeOptions, languageTypeOptions, majorOptions } from '../constants/options';
 import { useAuthStore } from '../store/auth';
 import { FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
@@ -277,10 +277,10 @@ function RuntimeStatusCard({ deployment }: { deployment?: DeploymentInfo }) {
   return (
     <div className={live ? 'runtime-banner live' : 'runtime-banner fallback'}>
       <div>
-        <strong>{live ? 'Live API：真实后端已连接' : 'Demo Fallback：海外链路超时后的兜底演示'}</strong>
-        <span>{live ? describeDeployment(deployment) : `${describeDeployment(deployment)}。Render 海外后端或 DeepSeek / SiliconFlow 模型平台可能冷启动、排队或跨境链路抖动，系统保留兜底结果避免 HR 看到白屏。`}</span>
+        <strong>{live ? '真实后端已连接' : '这次先展示备用回答'}</strong>
+        <span>{live ? '回答来自后端 RAG / AI 链路。' : describeDeployment(deployment)}</span>
       </div>
-      <em>{deployment.proxy || 'Direct API'}{deployment.latencyMs ? ` · ${deployment.latencyMs}ms` : ''}</em>
+      <em>{deployment.latencyMs ? `${deployment.latencyMs}ms` : ''}</em>
     </div>
   );
 }
@@ -294,7 +294,7 @@ function ObservabilityCard({ result }: { result: ChatResult }) {
   const scoreText = Array.isArray(obs.ragScores) && obs.ragScores.length ? obs.ragScores.map((score) => Number(score).toFixed(2)).join(', ') : '-';
 
   return (
-    <SectionGroup title="可观测性" subtitle="latency / cache / mode / fallback" defaultOpen>
+    <SectionGroup title="调用情况" subtitle="耗时、命中、缓存和备用结果" defaultOpen>
       <div className="smart-object-grid observability-grid">
         <div className="smart-object-cell"><span>回答模式</span><strong>{modeText}</strong></div>
         <div className="smart-object-cell"><span>检索模式</span><strong>{retrievalModes}</strong></div>
@@ -303,7 +303,7 @@ function ObservabilityCard({ result }: { result: ChatResult }) {
         <div className="smart-object-cell"><span>总耗时</span><strong>{formatMs(obs.totalLatencyMs)}</strong></div>
         <div className="smart-object-cell"><span>RAG 命中</span><strong>{obs.ragHitCount ?? result.sources?.length ?? 0}</strong></div>
         <div className="smart-object-cell"><span>缓存</span><strong>{obs.cacheHit ? 'Hit' : 'Miss'}</strong></div>
-        <div className="smart-object-cell"><span>Fallback</span><strong>{obs.fallbackTriggered ? (obs.fallbackReason || 'triggered') : 'No'}</strong></div>
+        <div className="smart-object-cell"><span>备用结果</span><strong>{obs.fallbackTriggered ? (obs.fallbackReason || '已触发') : '未触发'}</strong></div>
       </div>
       <div className="tag-row"><span>scores: {scoreText}</span>{obs.requestId && <span>requestId: {obs.requestId}</span>}</div>
     </SectionGroup>
@@ -562,7 +562,7 @@ export default function Chat() {
         <div>
           <span className="section-kicker">AI 咨询</span>
           <h1>AI 咨询工作台</h1>
-          <p>可问申请材料、文书、语言、选校和项目包装；只有选校类问题才会同步到方案引擎。</p>
+          <p>可以问申请材料、文书、语言、选校和项目包装；选校类问题会同步到方案引擎，方便继续拆方案。</p>
         </div>
         <div className="model-badge">{isGuest ? `访客额度 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端已连接'} · v11</div>
       </div>
@@ -573,7 +573,7 @@ export default function Chat() {
             <div>
               <span className="eyebrow">结构化录入</span>
               <h2>学生画像 + 咨询类型</h2>
-              <p>像信息检索/方案引擎一样先筛选关键信息，再自动生成可追踪的 AI 咨询问题。</p>
+              <p>先把学生背景整理清楚，再让 AI 根据画像生成更具体的问题和回答。</p>
             </div>
             <button className="ghost-button" type="button" onClick={() => applyPreset(defaultChatForm)}>重置案例</button>
           </div>
@@ -605,14 +605,15 @@ export default function Chat() {
 
           <label>自动生成的咨询问题<textarea className="question-preview-v12" value={question} onChange={(e) => { setManualQuestion(true); setQuestion(e.target.value); }} placeholder="系统会根据上方画像自动生成，也可以手动改写。" /></label>
           <div className="example-row">{examples.map((item) => <button type="button" key={item} onClick={() => { setManualQuestion(true); setQuestion(item); }}>{item.slice(0, 18)}...</button>)}</div>
-          <button className="primary ask-button" disabled={loading}>{loading ? '正在生成回答...' : '开始咨询'}</button>
+          <button className="primary ask-button" disabled={loading}>{loading ? 'AI 生成中…' : '开始咨询'}</button>
+          {loading && <p className="muted-text">{AI_LOADING_HINT}</p>}
         </form>
       </div>
 
       {error && <div className="error-card"><strong>请求失败</strong><p>{error}</p></div>}
       {result?.deployment && <RuntimeStatusCard deployment={result.deployment} />}
       {!result && !loading && !error && <EmptyState />}
-      {loading && <div className="loading-card"><div className="loader-dot" /><div><strong>正在检索知识库并生成回答</strong><p>系统会展示回答模式、工具调用、来源引用和检索分数。</p></div></div>}
+      {loading && <div className="loading-card"><div className="loader-dot" /><div><strong>正在检索知识库并生成回答</strong><p>{AI_LOADING_HINT}</p></div></div>}
 
       {structured && <StructuredResult data={structured} />}
 
@@ -626,13 +627,13 @@ export default function Chat() {
         <div className="meta-grid meta-grid-v13">
           <ObservabilityCard result={result} />
 
-          <SectionGroup title="工具调用" subtitle="仅在选校、GPA、销售话术等场景触发" defaultOpen>
+          <SectionGroup title="工具调用" subtitle="选校、GPA、销售话术等问题会触发" defaultOpen>
             <div className="meta-card-grid-v13">
               {result.toolCalls?.length ? result.toolCalls.map((t, i) => <ToolCallCard call={t} index={i} key={i} />) : <p className="muted-text">本次是知识库问答，没有触发额外工具。</p>}
             </div>
           </SectionGroup>
 
-          <SectionGroup title="来源引用" subtitle="RAG 命中文档 / 分数 / 重排信号" defaultOpen>
+          <SectionGroup title="来源引用" subtitle="AI 回答参考了哪些知识库内容" defaultOpen>
             <div className="meta-card-grid-v13">
               {result.sources?.length ? result.sources.map((s, i) => <SourceCard source={s} index={i} key={s.id || i} />) : <p className="muted-text">暂无来源引用。</p>}
             </div>

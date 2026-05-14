@@ -169,7 +169,12 @@ export class ToolsService {
     fallback: T;
     normalize?: (value: any, raw?: string) => T;
   }): Promise<T> {
-    if (!this.hasRealLlm()) return config.fallback;
+    if (!this.hasRealLlm()) {
+      return {
+        ...(config.fallback as any),
+        llmFallbackReason: '后端没有检测到模型配置，先返回可编辑的备用结构。',
+      } as T;
+    }
 
     try {
       const raw = await this.llm.chat([
@@ -184,7 +189,7 @@ export class ToolsService {
         return {
           ...(config.fallback as any),
           raw,
-          llmFallbackReason: "LLM 返回不是合法 JSON，已使用安全兜底结构。",
+          llmFallbackReason: "模型这次返回的格式不稳定，先保留一份可编辑的备用稿。",
         } as T;
       return config.normalize
         ? config.normalize(parsed, raw)
@@ -196,7 +201,7 @@ export class ToolsService {
     } catch (error: any) {
       return {
         ...(config.fallback as any),
-        llmFallbackReason: error?.message || "LLM unavailable",
+        llmFallbackReason: error?.message || "模型服务这次没有完整返回，先保留备用稿。",
       } as T;
     }
   }
