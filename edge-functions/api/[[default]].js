@@ -569,40 +569,62 @@ async function proxyToRender(request, env, rawBody) {
   const target = makeTargetUrl(request, env);
   if (!target) throw new Error('missing_RENDER_API_BASE_URL');
 
-  const controller = new AbortController();
-  const timeoutMs = Number(env?.EDGEONE_PROXY_TIMEOUT_MS || 7500);
-  const timer = setTimeout(() => controller.abort('edgeone_proxy_timeout'), timeoutMs);
-  const headers = new Headers(request.headers);
-  headers.set('host', target.host);
-  if (/edgeone-demo-token/i.test(headers.get('authorization') || '')) headers.delete('authorization');
+  const timeoutMs = Number(env?.EDGEONE_PROXY_TIMEOUT_MS || 15000);
+  const started = Date.now();
 
-  try {
-    const started = Date.now();
-    const response = await fetch(target.toString(), {
-      method: request.method,
-      headers,
-      body: ['GET', 'HEAD'].includes(request.method) ? undefined : rawBody,
-      signal: controller.signal,
-    });
-    const latencyMs = Date.now() - started;
-    const contentType = response.headers.get('content-type') || '';
-    const responseHeaders = new Headers(response.headers);
-    responseHeaders.set('access-control-allow-origin', '*');
-    responseHeaders.set('x-eduagent-runtime-mode', 'live_api');
-    responseHeaders.set('x-eduagent-proxy', 'edgeone-functions');
+  const incomingHeaders = new Headers(request.headers);
+  const headers = new Headers();
 
-    if (contentType.includes('application/json')) {
-      const data = await response.json().catch(() => null);
-      if (response.ok && data && typeof data === 'object' && !Array.isArray(data)) {
-        data.deployment = deploymentInfo('live_api', null, latencyMs, target.origin);
-      }
-      return json(data, response.status, Object.fromEntries(responseHeaders.entries()));
+  const contentType = incomingHeaders.get('content-type');
+  const accept = incomingHeaders.get('accept');
+  const authorization = incomingHeaders.get('authorization');
+
+  if (contentType) headers.set('content-type', contentType);
+  if (accept) headers.set('accept', accept);
+
+  // Do not forward the old EdgeOne demo token to Render.
+  // That token is only for local fallback and would break real backend auth.
+  if (authorization && !/edgeone-demo-token/i.test(authorization)) {
+    headers.set('authorization', authorization);
+  }
+
+  const fetchPromise = fetch(target.toString(), {
+    method: request.method,
+    headers,
+    body: ['GET', 'HEAD'].includes(request.method.toUpperCase()) ? undefined : rawBody,
+  });
+
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('edgeone_proxy_timeout')), timeoutMs);
+  });
+
+  const response = await Promise.race([fetchPromise, timeoutPromise]);
+  const latencyMs = Date.now() - started;
+  const contentTypeResp = response.headers.get('content-type') || '';
+
+  if (contentTypeResp.includes('application/json')) {
+    const data = await response.json().catch(() => null);
+
+    if (response.ok && data && typeof data === 'object' && !Array.isArray(data)) {
+      data.deployment = deploymentInfo('live_api', null, latencyMs, target.origin);
     }
 
-    return new Response(response.body, { status: response.status, headers: responseHeaders });
-  } finally {
-    clearTimeout(timer);
+    return json(data, response.status, {
+      'x-eduagent-runtime-mode': 'live_api',
+      'x-eduagent-proxy': 'edgeone-functions',
+    });
   }
+
+  const responseText = await response.text().catch(() => '');
+  return new Response(responseText, {
+    status: response.status,
+    headers: {
+      'content-type': contentTypeResp || 'text/plain; charset=UTF-8',
+      'access-control-allow-origin': '*',
+      'x-eduagent-runtime-mode': 'live_api',
+      'x-eduagent-proxy': 'edgeone-functions',
+    },
+  });
 }
 
 async function handleRequest(context) {
