@@ -8,6 +8,7 @@ function allowedOrigins() {
     'http://localhost:5173',
     'http://localhost:3000',
     'https://edu-agent-rag-workspace.vercel.app',
+    'https://edu-agent-rag-workspace.edgeone.cool',
   ];
 
   return Array.from(

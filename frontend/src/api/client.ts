@@ -56,16 +56,30 @@ function shouldUseDirectRender(url?: string, method?: string) {
   const path = getRequestPath(url);
   const methodName = String(method || 'GET').toUpperCase();
 
-  // Keep auth and health checks on same-origin EdgeOne /api.
-  // Long LLM/RAG/tool requests go directly to Render to avoid EdgeOne Function platform-level fetch timeout.
+  // Keep auth, health, dashboard stats and log/overview reads on same-origin EdgeOne /api.
+  // Only long-running AI / embedding requests go directly to Render to avoid EdgeOne Function
+  // platform-level fetch timeouts. This prevents dashboard counters from showing 0 just
+  // because Render is cold-starting or the browser blocks a cross-origin read.
   if (path.startsWith('/auth') || path.includes('/auth/')) return false;
   if (path.includes('/health')) return false;
+  if (methodName === 'GET') return false;
+
+  const longToolActions = new Set([
+    '/tools/school-recommend',
+    '/tools/copywriting',
+    '/tools/growth-campaign',
+    '/tools/application-plan',
+    '/tools/advisor-suite',
+  ]);
 
   return (
     (path === '/chat' && methodName === 'POST') ||
-    path.startsWith('/tools/') ||
-    path.startsWith('/eval') ||
-    path.startsWith('/documents')
+    longToolActions.has(path) ||
+    path === '/eval/run' ||
+    path === '/documents/upload' ||
+    path === '/documents/bulk' ||
+    path === '/documents/embeddings/rebuild' ||
+    /^\/documents\/[^/]+\/reprocess$/.test(path)
   );
 }
 
@@ -80,9 +94,16 @@ function shouldRetryThroughEdgeOne(error: any) {
 
 api.interceptors.request.use((config) => {
   const nextConfig = config as any;
-  if (shouldUseDirectRender(config.url, config.method)) {
+
+  if (nextConfig.__eduagentRetriedViaEdgeOne) {
+    nextConfig.baseURL = API_BASE_URL;
+    nextConfig.__eduagentDirectRender = false;
+  } else if (shouldUseDirectRender(config.url, config.method)) {
     nextConfig.baseURL = DIRECT_API_BASE_URL;
     nextConfig.__eduagentDirectRender = true;
+  } else {
+    nextConfig.baseURL = API_BASE_URL;
+    nextConfig.__eduagentDirectRender = false;
   }
 
   const token = localStorage.getItem('eduagent_token');
