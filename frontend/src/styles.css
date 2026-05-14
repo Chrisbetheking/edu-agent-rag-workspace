@@ -2528,3 +2528,44 @@ th { color: var(--muted); font-weight: 800; }
     flex: 1;
   }
 }
+
+/* v11 EdgeOne live API / fallback status */
+.runtime-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  border-radius: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-soft);
+  background: #fff;
+  margin: 12px 0;
+}
+.runtime-banner div { display: grid; gap: 4px; }
+.runtime-banner strong { color: #0f172a; }
+.runtime-banner span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.runtime-banner em {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+.runtime-banner.live {
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.95), rgba(240, 253, 250, 0.95));
+  border-color: #bbf7d0;
+}
+.runtime-banner.live em { background: #dcfce7; color: #166534; }
+.runtime-banner.fallback {
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.96), rgba(255, 251, 235, 0.96));
+  border-color: #fed7aa;
+}
+.runtime-banner.fallback em { background: #ffedd5; color: #9a3412; }
+.compact-runtime { margin-top: -8px; margin-bottom: 18px; }
+
+@media (max-width: 680px) {
+  .runtime-banner { align-items: flex-start; flex-direction: column; }
+  .runtime-banner em { white-space: normal; }
+}

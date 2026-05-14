@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, describeDeployment, type DeploymentInfo } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { FoldSection, ListBlock, ResultShell, SectionGroup, SectionNav, TextBlock, toDisplayText } from '../components/FoldSection';
 import { readSessionState, writeSessionState } from '../utils/sessionState';
@@ -52,6 +52,7 @@ interface ChatResult {
   toolCalls: any[];
   conversationId: string;
   quota?: { limit: number | null; used: number | null; remaining: number | null };
+  deployment?: DeploymentInfo;
   observability?: {
     requestId?: string;
     retrievalLatencyMs?: number;
@@ -68,7 +69,7 @@ interface ChatResult {
 }
 
 
-const CHAT_STORAGE_KEY = 'eduagent.chat.v10';
+const CHAT_STORAGE_KEY = 'eduagent.chat.v11';
 let pendingChatRequest: Promise<{ data: ChatResult; conversations: any[] }> | null = null;
 
 function persistChatSnapshot(snapshot: Partial<{ question: string; result: ChatResult | null; conversations: any[] }>) {
@@ -177,6 +178,20 @@ function SourceCard({ source, index }: { source: any; index: number }) {
       </div>
       <DisplayValue value={source.content || source.chunk || source.text} />
     </FoldSection>
+  );
+}
+
+function RuntimeStatusCard({ deployment }: { deployment?: DeploymentInfo }) {
+  if (!deployment) return null;
+  const live = deployment.mode === 'live_api';
+  return (
+    <div className={live ? 'runtime-banner live' : 'runtime-banner fallback'}>
+      <div>
+        <strong>{live ? 'Live API：真实后端已连接' : 'Demo Fallback：后端不可用时的兜底演示'}</strong>
+        <span>{describeDeployment(deployment)}</span>
+      </div>
+      <em>{deployment.proxy || 'Direct API'}{deployment.latencyMs ? ` · ${deployment.latencyMs}ms` : ''}</em>
+    </div>
   );
 }
 
@@ -333,7 +348,7 @@ export default function Chat() {
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const isGuest = user?.role === 'guest';
-  const [question, setQuestion] = useState(examples[0]);
+  const [question, setQuestion] = useState('');
   const [result, setResult] = useState<ChatResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [conversations, setConversations] = useState<any[]>([]);
@@ -438,7 +453,7 @@ export default function Chat() {
           <h1>AI 咨询工作台</h1>
           <p>可问申请材料、文书、语言、选校和项目包装；只有选校类问题才会同步到方案引擎。</p>
         </div>
-        <div className="model-badge">{isGuest ? `访客额度 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端已连接'}</div>
+        <div className="model-badge">{isGuest ? `访客额度 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端已连接'} · v11</div>
       </div>
 
       <div className="prompt-panel">
@@ -451,6 +466,7 @@ export default function Chat() {
       </div>
 
       {error && <div className="error-card"><strong>请求失败</strong><p>{error}</p></div>}
+      {result?.deployment && <RuntimeStatusCard deployment={result.deployment} />}
       {!result && !loading && !error && <EmptyState />}
       {loading && <div className="loading-card"><div className="loader-dot" /><div><strong>正在检索知识库并生成回答</strong><p>系统会展示回答模式、工具调用、来源引用和检索分数。</p></div></div>}
 

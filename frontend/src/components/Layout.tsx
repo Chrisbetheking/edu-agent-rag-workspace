@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
-import { api } from '../api/client';
+import { api, describeDeployment, type DeploymentInfo } from '../api/client';
 
 const navs = [
   { to: '/workspace', label: '工作台', icon: '▦', desc: '概览' },
@@ -35,12 +35,21 @@ export default function Layout() {
   const isGuest = user?.role === 'guest';
   const resumeUrl = 'https://chrisbetheking.github.io/WANGHONG-s-Resume-Website/';
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [deployment, setDeployment] = useState<DeploymentInfo | null>(null);
 
   useEffect(() => {
     api.get('/auth/profile')
       .then(({ data }) => setUser(data))
       .catch(() => undefined);
   }, [location.pathname, setUser]);
+
+  useEffect(() => {
+    let alive = true;
+    api.get('/health')
+      .then(({ data }) => { if (alive) setDeployment(data?.deployment || null); })
+      .catch(() => { if (alive) setDeployment({ mode: 'demo_fallback', backend: 'EdgeOne Demo Fallback', proxy: 'EdgeOne Pages Functions', fallback: true, reason: 'health_check_failed' }); });
+    return () => { alive = false; };
+  }, []);
 
   function toggleSidebar() {
     setCollapsed((value) => {
@@ -69,8 +78,8 @@ export default function Layout() {
         <div className="sidebar-status">
           <span className="pulse-dot" />
           <div className="sidebar-text">
-            <strong>{isGuest ? '访客体验' : '管理员'}</strong>
-            <small>{isGuest ? `今日剩余 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端服务在线'}</small>
+            <strong>{deployment?.mode === 'demo_fallback' ? 'Fallback 入口' : (isGuest ? '访客体验' : '管理员')}</strong>
+            <small>{deployment ? describeDeployment(deployment) : (isGuest ? `今日剩余 ${user?.quotaRemaining ?? '-'} / ${user?.quotaLimit ?? '-'}` : '后端服务在线')}</small>
           </div>
         </div>
 

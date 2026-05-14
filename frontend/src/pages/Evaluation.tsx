@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, describeDeployment, type DeploymentInfo } from '../api/client';
 
 type EvalQuestion = {
   id: string;
@@ -24,6 +24,7 @@ type EvalResult = {
 };
 
 type EvalPayload = {
+  deployment?: DeploymentInfo;
   summary?: {
     total?: number;
     hitRate?: number;
@@ -50,6 +51,20 @@ const starterQuestions = [
 
 function pct(value?: number) {
   return `${Math.round(Number(value || 0) * 100)}%`;
+}
+
+function RuntimeMini({ deployment }: { deployment?: DeploymentInfo }) {
+  if (!deployment) return null;
+  const live = deployment.mode === 'live_api';
+  return (
+    <div className={live ? 'runtime-banner live compact-runtime' : 'runtime-banner fallback compact-runtime'}>
+      <div>
+        <strong>{live ? 'Live Evaluation：真实后端评测' : 'Demo Evaluation：后端不可用时的兜底结果'}</strong>
+        <span>{describeDeployment(deployment)}</span>
+      </div>
+      <em>{deployment.proxy || 'Direct API'}{deployment.latencyMs ? ` · ${deployment.latencyMs}ms` : ''}</em>
+    </div>
+  );
 }
 
 function fmt(value?: number) {
@@ -161,6 +176,7 @@ export default function Evaluation() {
       </div>
 
       {error && <div className="error-card"><strong>评测失败</strong><p>{error}</p></div>}
+      {results.deployment && <RuntimeMini deployment={results.deployment} />}
 
       <div className="two-col wide-left">
         <section className="panel form-panel">

@@ -8,7 +8,8 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run start:dev --prefix backend",
     "build": "npm run build --prefix frontend && npm run build --prefix backend",
-    "lint": "npm run lint --prefix frontend && npm run lint --prefix backend"
+    "lint": "npm run lint --prefix frontend && npm run lint --prefix backend",
+    "build:edgeone": "VITE_EDGEONE_PROXY=true VITE_DEPLOY_TARGET=edgeone npm run build --prefix frontend"
   },
   "keywords": [
     "AI Agent",
