@@ -397,25 +397,48 @@ async function proxyToRender(request, env, rawBody) {
   }
 }
 
-export async function onRequest({ request, env }) {
-  if (request.method === 'OPTIONS') return json({ ok: true });
+async function handleRequest(context) {
+  try {
+    const request = context?.request;
+    const env = context?.env || {};
 
-  const url = new URL(request.url);
-  const pathname = url.pathname;
-  const method = request.method.toUpperCase();
-  const { body, raw } = await readJsonSafely(request.clone());
-
-  if (!pathname.startsWith('/api')) {
-    return fallbackFor('/api/health', method, body, 'not_api_route');
-  }
-
-  if (!shouldSkipLiveProxy(request, pathname)) {
-    try {
-      return await proxyToRender(request, env, raw);
-    } catch (error) {
-      return fallbackFor(pathname, method, body, error?.message || 'render_proxy_failed');
+    if (!request) {
+      return json({
+        ok: false,
+        message: 'Missing request in EdgeOne function context.',
+        deployment: deploymentInfo('demo_fallback', 'missing_request_context'),
+      }, 200);
     }
-  }
 
-  return fallbackFor(pathname, method, body, 'demo_token_or_no_auth');
+    if (request.method === 'OPTIONS') return json({ ok: true });
+
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+    const method = request.method.toUpperCase();
+    const { body, raw } = await readJsonSafely(request.clone());
+
+    if (!pathname.startsWith('/api')) {
+      return fallbackFor('/api/health', method, body, 'not_api_route');
+    }
+
+    if (!shouldSkipLiveProxy(request, pathname)) {
+      try {
+        return await proxyToRender(request, env, raw);
+      } catch (error) {
+        return fallbackFor(pathname, method, body, error?.message || 'render_proxy_failed');
+      }
+    }
+
+    return fallbackFor(pathname, method, body, 'demo_token_or_no_auth');
+  } catch (error) {
+    return json({
+      ok: false,
+      message: 'EdgeOne function crashed before fallback.',
+      error: error?.message || String(error),
+      deployment: deploymentInfo('demo_fallback', 'edge_function_runtime_error'),
+    }, 200);
+  }
 }
+
+export default handleRequest;
+export const onRequest = handleRequest;
