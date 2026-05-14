@@ -227,7 +227,7 @@ function makeLogs() {
       ragScores: [0.94, 0.87, 0.79],
       cacheHit: false,
       fallbackTriggered: true,
-      fallbackReason: 'render_unavailable',
+      fallbackReason: 'render_unavailable_or_forced_demo',
       toolNames: [],
       createdAt: nowIso(),
     },
@@ -245,7 +245,7 @@ function makeLogs() {
       ragScores: [0.92, 0.88, 0.83],
       cacheHit: true,
       fallbackTriggered: true,
-      fallbackReason: 'render_unavailable',
+      fallbackReason: 'render_unavailable_or_forced_demo',
       toolNames: ['RAG Evaluation'],
       createdAt: nowIso(),
     },
@@ -556,11 +556,13 @@ function makeTargetUrl(request, env) {
   return target;
 }
 
-function shouldSkipLiveProxy(request, pathname) {
-  const auth = request.headers.get('authorization') || '';
-  if (/edgeone-demo-token/i.test(auth)) return true;
-  if (pathname === '/api/auth/profile' && !auth) return true;
-  return false;
+function shouldSkipLiveProxy(request, pathname, env) {
+  // Only force Demo Fallback when explicitly configured.
+  // Do NOT skip live proxy just because the browser has an old edgeone-demo-token.
+  // Older deployments issued that token, and skipping here would lock the whole app
+  // into offline fallback even when Render is healthy. proxyToRender strips that demo
+  // token before forwarding, so the Render backend can use its public guest context.
+  return String(env?.EDGEONE_FORCE_DEMO || '').toLowerCase() === 'true';
 }
 
 async function proxyToRender(request, env, rawBody) {
@@ -627,7 +629,7 @@ async function handleRequest(context) {
       return fallbackFor('/api/health', method, body, 'not_api_route');
     }
 
-    if (!shouldSkipLiveProxy(request, pathname)) {
+    if (!shouldSkipLiveProxy(request, pathname, env)) {
       try {
         return await proxyToRender(request, env, raw);
       } catch (error) {
