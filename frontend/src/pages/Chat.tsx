@@ -243,7 +243,47 @@ function parseLooseJson(value: unknown): any {
   try { return JSON.parse(text); } catch { return value; }
 }
 
-function DisplayValue({ value }: { value: unknown }) {
+function normalizeReadableSourceText(value: unknown) {
+  return cleanText(value)
+    .replace(/\r\n/g, '\n')
+    .replace(/\s*#{1,6}\s*/g, '\n')
+    .replace(/\s+标签[:：]/g, '\n标签：')
+    .replace(/\s+适用对象\s*/g, '\n适用对象：')
+    .replace(/\s+英国计算机硕士通常关注什么\s*/g, '\n英国计算机硕士通常关注什么：')
+    .replace(/\s+三档定位逻辑\s*/g, '\n三档定位逻辑：')
+    .replace(/\s+(?=(学校|院校|专业|项目|档位|初筛成功率|成功率|适合背景|判断依据|主要风险|补强建议|下一步动作|推荐理由|风险边界)[:：])/g, '\n')
+    .replace(/\s+[–—-]\s+/g, '\n- ')
+    .replace(/([。；;])\s+(?=(\d+[.、]|[一二三四五六七八九十]+[.、]|[-–—]))/g, '$1\n')
+    .replace(/\s+(?=\d+[.、]\s*)/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function ReadableTextBlock({ value, source = false }: { value: unknown; source?: boolean }) {
+  const text = source ? normalizeReadableSourceText(value) : cleanText(value);
+  if (!text) return <p className="pre-line compact-text-block">暂无内容</p>;
+
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  if (source && lines.length > 1) {
+    return (
+      <div className="source-readable-block">
+        {lines.map((line, index) => {
+          const isList = /^[-•]/.test(line) || /^\d+[.、]/.test(line);
+          const isHeading = !isList && (/[:：]$/.test(line) || line.length <= 28 && /(标签|适用对象|定位逻辑|关注什么|材料|专业|院校|学校|项目|成功率|风险|建议|动作)/.test(line));
+          return (
+            <p key={`${index}-${line.slice(0, 12)}`} className={isList ? 'source-readable-line list-like' : isHeading ? 'source-readable-line heading-like' : 'source-readable-line'}>
+              {line.replace(/^[-•]\s*/, '')}
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return <p className="pre-line compact-text-block">{text}</p>;
+}
+
+function DisplayValue({ value, source = false }: { value: unknown; source?: boolean }) {
   const parsed = parseLooseJson(value);
   if (Array.isArray(parsed)) {
     return <ul className="clean-list compact-clean-list">{parsed.slice(0, 8).map((item, index) => <li key={index}>{toDisplayText(parseLooseJson(item))}</li>)}</ul>;
@@ -260,7 +300,7 @@ function DisplayValue({ value }: { value: unknown }) {
       </div>
     );
   }
-  return <p className="pre-line compact-text-block">{cleanText(parsed) || '暂无内容'}</p>;
+  return <ReadableTextBlock value={parsed} source={source} />;
 }
 
 function SourceCard({ source, index }: { source: any; index: number }) {
@@ -277,11 +317,17 @@ function SourceCard({ source, index }: { source: any; index: number }) {
   ].filter(([, value]) => value !== undefined && value !== null && value !== '');
 
   return (
-    <FoldSection title={cleanText(source.documentTitle || source.title || `来源 ${index + 1}`)} subtitle={`score ${cleanText(source.score) || '-'} · ${cleanText(source.retrievalMode || 'unknown')}`} defaultOpen={index < 2} className="inner-fold-card source-card-v13">
-      <div className="tag-row source-debug-row">
+    <FoldSection
+      title={cleanText(source.documentTitle || source.title || `来源 ${index + 1}`)}
+      subtitle={`score ${cleanText(source.score) || '-'} · ${cleanText(source.retrievalMode || 'unknown')}`}
+      defaultOpen={index === 0}
+      className="inner-fold-card source-card-v14"
+      bodyClassName="source-card-body-v14"
+    >
+      <div className="tag-row source-debug-row source-debug-row-v14">
         {metaItems.map(([key, value]) => <span key={String(key)}>{String(key)}: {cleanText(value)}</span>)}
       </div>
-      <DisplayValue value={source.content || source.chunk || source.text} />
+      <DisplayValue value={source.content || source.chunk || source.text} source />
     </FoldSection>
   );
 }

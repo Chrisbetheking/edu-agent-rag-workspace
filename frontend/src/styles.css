@@ -2747,3 +2747,116 @@ th { color: var(--muted); font-weight: 800; }
 #kb-chunks .tag-row span {
   line-height: 1.2;
 }
+
+/* V14: make RAG source citations easier to read during demos. */
+.chat-page-v2 .source-card-v14 {
+  border-radius: 24px;
+  border-color: #dfe9f8;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,251,255,.94));
+  box-shadow: 0 14px 36px rgba(15, 23, 42, .06);
+  margin-bottom: 16px;
+}
+
+.chat-page-v2 .source-card-v14 > summary {
+  padding: 20px 24px !important;
+  align-items: flex-start;
+}
+
+.chat-page-v2 .source-card-v14 > summary span {
+  gap: 8px;
+}
+
+.chat-page-v2 .source-card-v14 > summary strong {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.chat-page-v2 .source-card-body-v14 {
+  padding: 0 24px 24px !important;
+  display: grid;
+  gap: 16px;
+}
+
+.chat-page-v2 .source-debug-row-v14 {
+  gap: 10px 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+}
+
+.chat-page-v2 .source-debug-row-v14 span {
+  padding: 7px 11px;
+  line-height: 1.35;
+  max-width: 100%;
+  white-space: normal !important;
+}
+
+.chat-page-v2 .source-readable-block {
+  display: grid;
+  gap: 10px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 18px 20px;
+  border: 1px solid #edf2f7;
+  border-radius: 20px;
+  background: #ffffff;
+  color: #26364b;
+  font-size: 15px;
+  line-height: 1.95;
+}
+
+.chat-page-v2 .source-readable-line {
+  margin: 0;
+  white-space: normal !important;
+  overflow-wrap: break-word;
+}
+
+.chat-page-v2 .source-readable-line.heading-like {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5edf8;
+  color: #0f172a;
+  font-weight: 950;
+  line-height: 1.55;
+}
+
+.chat-page-v2 .source-readable-line.heading-like:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.chat-page-v2 .source-readable-line.list-like {
+  position: relative;
+  padding-left: 20px;
+}
+
+.chat-page-v2 .source-readable-line.list-like::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: .88em;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #3150c8;
+}
+
+.chat-page-v2 .source-card-v14 .compact-text-block,
+.chat-page-v2 .source-card-v14 p {
+  max-height: none;
+}
+
+@media (max-width: 720px) {
+  .chat-page-v2 .source-card-v14 > summary {
+    padding: 16px !important;
+  }
+  .chat-page-v2 .source-card-body-v14 {
+    padding: 0 16px 16px !important;
+  }
+  .chat-page-v2 .source-readable-block {
+    padding: 14px;
+    max-height: 460px;
+  }
+}
