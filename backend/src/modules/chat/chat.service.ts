@@ -1046,10 +1046,14 @@ ${chunk.content || ''}`);
 
   private detectAnswerMode(question: string): AnswerMode {
     const q = this.normalizeForRerank(question);
+
     const asksSchoolPlan = this.includesAny(q, [
       '选校',
       '学校推荐',
       '院校推荐',
+      '推荐学校',
+      '推荐院校',
+      '院校清单',
       '冲刺',
       '匹配',
       '保底',
@@ -1060,8 +1064,8 @@ ${chunk.content || ''}`);
       '档选校',
     ]);
 
-    const asksBackgroundPlan = this.includesAny(q, ['cgpa', 'gpa', '均分', '绩点', '预算'])
-      && this.includesAny(q, ['申请英国硕士', '申请澳洲硕士', '申请海外硕士', '怎么规划', '规划']);
+    const asksBackgroundPlan = this.includesAny(q, ['cgpa', 'gpa', '均分', '绩点', '预算', '背景'])
+      && this.includesAny(q, ['申请英国硕士', '申请澳洲硕士', '申请海外硕士', '硕士申请', '怎么规划', '规划']);
 
     const asksPureKnowledge = this.includesAny(q, [
       '申请材料',
@@ -1075,12 +1079,13 @@ ${chunk.content || ''}`);
       'ps怎么写',
       'personalstatement',
       'cv怎么写',
-      '时间线',
       '截止时间',
     ]);
 
-    if (asksPureKnowledge) return 'grounded_qa';
-    if (asksSchoolPlan || (asksBackgroundPlan && !asksPureKnowledge)) return 'school_plan';
+    // 明确出现选校 / 冲刺 / 匹配 / 保底等意图时，优先进入结构化选校方案。
+    // 避免用户同时提到 CV、PS、语言、材料补强时，被误判成普通知识库问答。
+    if (asksSchoolPlan) return 'school_plan';
+    if (asksBackgroundPlan && !asksPureKnowledge) return 'school_plan';
     return 'grounded_qa';
   }
 
