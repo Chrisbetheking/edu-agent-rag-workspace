@@ -138,7 +138,9 @@ function SchoolBands({ data, id = 'schools' }: { data: any; id?: string }) {
             <div className="school-card-list-v15">
               {asArray(items).length ? asArray(items).map((school: any, index) => (
                 <div className="school-row-v15" key={school.name || index}>
-                  <strong>{toDisplayText(school.name || school)}</strong>
+                  <strong>{`${school.rank ? `${school.rank}. ` : ''}${toDisplayText([school.nameZh, school.nameEn].filter(Boolean).join(' / ') || school.name || school)}`}</strong>
+                  {(school.major || school.majorZh || school.majorEn) && <small>推荐专业：{toDisplayText(school.major || [school.majorZh, school.majorEn].filter(Boolean).join(' / '))}</small>}
+                  {school.successRate && <small>初筛成功率：{toDisplayText(school.successRate)}</small>}
                   {(school.reason || school.fit) && <p>{toDisplayText(school.reason || school.fit)}</p>}
                   {school.risk && <small>风险：{toDisplayText(school.risk)}</small>}
                   {school.action && <small>下一步：{toDisplayText(school.action)}</small>}

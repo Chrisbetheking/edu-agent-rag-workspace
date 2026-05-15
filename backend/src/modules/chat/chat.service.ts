@@ -12,7 +12,14 @@ import { LlmService } from '../llm/llm.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 
 export interface SchoolAdvice {
+  rank?: number;
   name: string;
+  nameZh?: string;
+  nameEn?: string;
+  major?: string;
+  majorZh?: string;
+  majorEn?: string;
+  successRate?: string;
   reason: string;
   fit: string;
   risk: string;
@@ -928,11 +935,37 @@ ${chunk.content || ''}`);
       : '暂无工具调用。';
   }
 
+  private normalizeSchoolRanking(structured: StructuredAdvice | null): StructuredAdvice | null {
+    if (!structured) return structured;
+
+    const tierBase: Record<string, number> = { 冲刺: 42, 匹配: 68, 保底: 82 };
+    structured.schoolTiers = (structured.schoolTiers || []).map((tier) => {
+      const base = tierBase[tier.tier] ?? 60;
+      const schools = (tier.schools || [])
+        .map((school: SchoolAdvice, index: number) => ({
+          ...school,
+          rank: Number(school.rank || index + 1),
+          name: school.name || [school.nameZh, school.nameEn].filter(Boolean).join(' / '),
+          major: school.major || [school.majorZh, school.majorEn].filter(Boolean).join(' / '),
+          successRate: school.successRate || `${Math.max(25, base - index * 6)}%-${Math.min(90, base + 8 - index * 6)}%`,
+        }))
+        .sort((a: SchoolAdvice, b: SchoolAdvice) => {
+          const toScore = (rate?: string) => Number(String(rate || '').match(/\d+/)?.[0] || 0);
+          return toScore(b.successRate) - toScore(a.successRate);
+        })
+        .map((school: SchoolAdvice, index: number) => ({ ...school, rank: index + 1 }));
+
+      return { ...tier, schools };
+    });
+
+    return structured;
+  }
+
   private fallbackStructured(question: string, sources: any[], toolCalls: any[]): StructuredAdvice {
     const cgpaTool = toolCalls.find((t) => t.name.includes('CGPA'));
     const cgpaText = cgpaTool?.result?.cgpa ? `${cgpaTool.result.cgpa}/4.0` : '待补充';
 
-    return {
+    return this.normalizeSchoolRanking({
       summary: '建议先用 GPA、预算、目标专业和背景项目做初筛，再把院校分为冲刺、匹配、保底三档。',
       profile: {
         education: question.includes('APU') ? 'APU 计算机本科' : '本科背景待补充',
@@ -949,7 +982,14 @@ ${chunk.content || ''}`);
           strategy: '控制数量，优先选择专业匹配度高、不卡强背景的项目。',
           schools: [
             {
-              name: 'Queen Mary University of London',
+              rank: 1,
+              name: '伦敦玛丽女王大学 / Queen Mary University of London',
+              nameZh: '伦敦玛丽女王大学',
+              nameEn: 'Queen Mary University of London',
+              major: '计算机科学 MSc / Computer Science MSc',
+              majorZh: '计算机科学 MSc',
+              majorEn: 'Computer Science MSc',
+              successRate: '35%-45%',
               reason: '伦敦区位好，计算机相关项目选择较多，适合作为冲刺选择。',
               fit: '适合希望兼顾学校声誉和就业城市资源的申请人。',
               risk: '预算压力较高，且需要注意具体项目是否要求较强数学或编程背景。',
@@ -963,14 +1003,28 @@ ${chunk.content || ''}`);
           strategy: '重点投入文书、推荐信和项目经历包装。',
           schools: [
             {
-              name: 'Cardiff University',
+              rank: 1,
+              name: '卡迪夫大学 / Cardiff University',
+              nameZh: '卡迪夫大学',
+              nameEn: 'Cardiff University',
+              major: '数据科学与分析 MSc / Data Science and Analytics MSc',
+              majorZh: '数据科学与分析 MSc',
+              majorEn: 'Data Science and Analytics MSc',
+              successRate: '65%-75%',
               reason: '综合排名和申请难度相对平衡，适合作为核心目标。',
               fit: '适合计算机本科转向软件、数据或信息系统方向。',
               risk: '热门专业可能竞争较高，需要尽早递交。',
               action: '准备课程描述、成绩单、个人陈述和推荐信。',
             },
             {
-              name: 'University of Liverpool',
+              rank: 2,
+              name: '利物浦大学 / University of Liverpool',
+              nameZh: '利物浦大学',
+              nameEn: 'University of Liverpool',
+              major: '高级计算机科学 MSc / Advanced Computer Science MSc',
+              majorZh: '高级计算机科学 MSc',
+              majorEn: 'Advanced Computer Science MSc',
+              successRate: '58%-68%',
               reason: '计算机相关项目较完整，申请策略上适合作为匹配档。',
               fit: '适合想要稳定申请结果，同时保留学校认可度的学生。',
               risk: '不同项目对课程背景要求不同，要逐个核对。',
@@ -984,7 +1038,14 @@ ${chunk.content || ''}`);
           strategy: '选择专业匹配、预算压力低、录取门槛相对友好的学校。',
           schools: [
             {
-              name: 'University of Sussex',
+              rank: 1,
+              name: '萨塞克斯大学 / University of Sussex',
+              nameZh: '萨塞克斯大学',
+              nameEn: 'University of Sussex',
+              major: '数据科学 MSc / Data Science MSc',
+              majorZh: '数据科学 MSc',
+              majorEn: 'Data Science MSc',
+              successRate: '78%-88%',
               reason: '申请门槛相对友好，适合做安全选择。',
               fit: '适合希望稳妥拿 offer 的申请人。',
               risk: '需要评估专业课程是否足够贴近未来就业方向。',
@@ -1000,8 +1061,8 @@ ${chunk.content || ''}`);
       ],
       risks: ['30 万预算在伦敦可能偏紧。', '仅有 GPA 不足以判断全部录取概率。', '最终要求必须以学校官网当年页面为准。'],
       nextActions: ['补充雅思/托福情况。', '确认是否接受非伦敦城市。', '整理 1-2 个计算机相关项目经历。'],
-      disclaimer: '以上建议用于初筛和申请规划，真实申请请以学校官网和当年招生要求为准。',
-    };
+      disclaimer: '以上成功率为咨询初筛估计，不代表学校官方录取率；真实申请请以学校官网和当年招生要求为准。',
+    }) as StructuredAdvice;
   }
 
   private stripCodeFence(text: string) {
@@ -1031,7 +1092,12 @@ ${chunk.content || ''}`);
     const tierText = (structured.schoolTiers || [])
       .map((tier) => {
         const schools = (tier.schools || [])
-          .map((school) => `${school.name}：${school.reason}`)
+          .map((school) => {
+            const name = [school.nameZh, school.nameEn].filter(Boolean).join(' / ') || school.name;
+            const major = school.major || [school.majorZh, school.majorEn].filter(Boolean).join(' / ');
+            const rate = school.successRate ? `｜初筛成功率 ${school.successRate}` : '';
+            return `${school.rank ? `${school.rank}. ` : ''}${name}${major ? `｜${major}` : ''}${rate}：${school.reason}`;
+          })
           .join('\n');
         return `${tier.tier}：${tier.strategy}\n${schools}`;
       })
@@ -1046,7 +1112,6 @@ ${chunk.content || ''}`);
 
   private detectAnswerMode(question: string): AnswerMode {
     const q = this.normalizeForRerank(question);
-
     const asksSchoolPlan = this.includesAny(q, [
       '选校',
       '学校推荐',
@@ -1062,6 +1127,9 @@ ${chunk.content || ''}`);
       '申请哪些学校',
       '三档',
       '档选校',
+      '成功率排序',
+      '按成功率',
+      '录取概率',
     ]);
 
     const asksBackgroundPlan = this.includesAny(q, ['cgpa', 'gpa', '均分', '绩点', '预算', '背景'])
@@ -1082,8 +1150,7 @@ ${chunk.content || ''}`);
       '截止时间',
     ]);
 
-    // 明确出现选校 / 冲刺 / 匹配 / 保底等意图时，优先进入结构化选校方案。
-    // 避免用户同时提到 CV、PS、语言、材料补强时，被误判成普通知识库问答。
+    // 选校意图优先：用户只要明确要“冲刺/匹配/保底/三档/成功率排序”，就进入 school_plan。
     if (asksSchoolPlan) return 'school_plan';
     if (asksBackgroundPlan && !asksPureKnowledge) return 'school_plan';
     return 'grounded_qa';
@@ -1200,7 +1267,14 @@ JSON 格式必须严格如下：
       "strategy": "这一档的申请策略",
       "schools": [
         {
-          "name": "学校名称",
+          "rank": 1,
+          "name": "中文校名 / English university full name",
+          "nameZh": "中文校名",
+          "nameEn": "English university full name",
+          "major": "中文专业名 / English programme full name",
+          "majorZh": "中文专业名",
+          "majorEn": "English programme full name",
+          "successRate": "咨询初筛成功率区间，例如 55%-65%",
           "reason": "推荐原因，25到45字",
           "fit": "适配点，25到45字",
           "risk": "风险点，25到45字",
@@ -1230,12 +1304,14 @@ JSON 格式必须严格如下：
 }
 
 内容要求：
-1. 三档选校都必须给出，冲刺、匹配、保底每档各给 2 所学校。
-2. 每所学校的 reason、fit、risk、action 每项控制在 25 到 45 字，避免输出过长。
-3. 时间规划给 3 个阶段，每个阶段 2 个任务。
-4. 语气专业、具体、适合展示在研发项目 Demo 中。
-5. 不要编造精确录取率；不确定时用“需要核对官网要求”。
-6. 必须返回完整合法 JSON，不要输出 Markdown，不要输出解释。`,
+1. 三档选校都必须给出，冲刺、匹配、保底每档各给 2 到 3 所学校。
+2. 每所学校必须包含中英文院校全名、对应专业/项目中英文名称、successRate 咨询初筛成功率区间。
+3. 每一档内部必须按 successRate 从高到低排序，rank 从 1 开始。
+4. successRate 只能表达咨询初筛估计区间，不要声称是学校官方录取率；不确定时写“需要核对官网要求”。
+5. 每所学校的 reason、fit、risk、action 每项控制在 25 到 45 字，避免输出过长。
+6. 时间规划给 3 个阶段，每个阶段 2 个任务。
+7. 语气专业、具体、适合展示在研发项目 Demo 中。
+8. 必须返回完整合法 JSON，不要输出 Markdown，不要输出解释。`,
       },
       {
         role: 'user',
@@ -1252,7 +1328,7 @@ ${toolText}
       },
     ]);
 
-    const structured = this.parseStructuredAnswer(raw);
+    const structured = this.normalizeSchoolRanking(this.parseStructuredAnswer(raw));
     return {
       raw,
       structured,

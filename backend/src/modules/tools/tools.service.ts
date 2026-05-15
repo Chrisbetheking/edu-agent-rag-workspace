@@ -275,6 +275,50 @@ export class ToolsService {
         马来西亚: [["University of Malaya", "Universiti Putra Malaysia"], ["Taylor's University", "Monash Malaysia"], ["APU Malaysia", "INTI International University"]],
       };
       const pool = schoolPool[s.country] || schoolPool["英国"];
+      const nameZhMap: Record<string, string> = {
+        Manchester: "曼彻斯特大学",
+        Bristol: "布里斯托大学",
+        Glasgow: "格拉斯哥大学",
+        Sheffield: "谢菲尔德大学",
+        Nottingham: "诺丁汉大学",
+        "Queen Mary": "伦敦玛丽女王大学",
+        Cardiff: "卡迪夫大学",
+        Liverpool: "利物浦大学",
+        Sussex: "萨塞克斯大学",
+        "University of Sydney": "悉尼大学",
+        UNSW: "新南威尔士大学",
+        Monash: "莫纳什大学",
+      };
+      const nameEnMap: Record<string, string> = {
+        Manchester: "University of Manchester",
+        Bristol: "University of Bristol",
+        Glasgow: "University of Glasgow",
+        Sheffield: "University of Sheffield",
+        Nottingham: "University of Nottingham",
+        "Queen Mary": "Queen Mary University of London",
+        Cardiff: "Cardiff University",
+        Liverpool: "University of Liverpool",
+        Sussex: "University of Sussex",
+      };
+      const enrichSchool = (name: string, tier: "reach" | "match" | "safe", index: number) => {
+        const base = tier === "reach" ? 42 : tier === "match" ? 68 : 82;
+        const min = Math.max(25, base - index * 5);
+        const max = Math.min(90, base + 8 - index * 5);
+        const nameZh = nameZhMap[name] || name;
+        const nameEn = nameEnMap[name] || name;
+        const majorZh = s.major.includes("数据") ? "数据科学硕士" : "计算机科学硕士";
+        const majorEn = s.major.includes("数据") ? "Data Science MSc" : "Computer Science MSc";
+        return {
+          rank: index + 1,
+          name: `${nameZh} / ${nameEn}`,
+          nameZh,
+          nameEn,
+          major: `${majorZh} / ${majorEn}`,
+          majorZh,
+          majorEn,
+          successRate: `${min}%-${max}%`,
+        };
+      };
       const fallbackBands =
         gpa >= 3.4
           ? { reach: pool[0].slice(0, 2), match: pool[1].slice(0, 2), safe: pool[2].slice(0, 2) }
@@ -284,19 +328,25 @@ export class ToolsService {
 
       const fallback = {
         profile: s,
-        reach: fallbackBands.reach.map((name) => ({
-          name,
+        reach: fallbackBands.reach.map((name, index) => ({
+          ...enrichSchool(name, "reach", index),
           reason: "可作为冲刺选择，需要突出项目、实习和课程匹配度。",
+          fit: "适合保留少量高目标，展示申请上限。",
+          risk: "录取不确定性较高，需核对课程背景和语言要求。",
           action: "核对官网课程要求、语言要求和申请截止时间。",
         })),
-        match: fallbackBands.match.map((name) => ({
-          name,
+        match: fallbackBands.match.map((name, index) => ({
+          ...enrichSchool(name, "match", index),
           reason: "与当前背景相对匹配，建议重点准备申请材料。",
+          fit: "适合作为主申请区间，投入文书和项目包装。",
+          risk: "热门方向仍有竞争，需要尽早递交。",
           action: "围绕项目经历和专业匹配度准备 PS/CV。",
         })),
-        safe: fallbackBands.safe.map((name) => ({
-          name,
+        safe: fallbackBands.safe.map((name, index) => ({
+          ...enrichSchool(name, "safe", index),
           reason: "作为保底选择，适合提升申请成功率。",
+          fit: "用于控制整体风险，保证申请组合完整。",
+          risk: "需确认课程内容是否符合长期就业方向。",
           action: "控制申请风险，避免只投高风险学校。",
         })),
         risk: [
@@ -308,21 +358,16 @@ export class ToolsService {
       return this.aiJson({
         fallback,
         system:
-          "你是留学选校规划 Agent，擅长把学生背景拆成冲刺、匹配、保底三档。",
-        user: `请基于以下学生背景生成三档院校推荐 JSON。字段：profile, reach, match, safe, risk。每档 2-3 所学校，每所包含 name, reason, fit, risk, action。\n${JSON.stringify(s, null, 2)}`,
+          "你是留学选校规划 Agent，擅长把学生背景拆成冲刺、匹配、保底三档，并给出院校+专业的可执行候选清单。",
+        user: `请基于以下学生背景生成三档院校推荐 JSON。字段：profile, reach, match, safe, risk。每档 2-3 所学校，每所必须包含 rank, name, nameZh, nameEn, major, majorZh, majorEn, successRate, reason, fit, risk, action。name 要用“中文校名 / English full name”，major 要用“中文专业 / English programme full name”。每档内部按 successRate 从高到低排序。successRate 是咨询初筛估计区间，不是学校官方录取率。
+${JSON.stringify(s, null, 2)}`,
         normalize: (value) => ({
           ...fallback,
           ...value,
           profile: value.profile || fallback.profile,
-          reach: this.asArray(value.reach).length
-            ? this.asArray(value.reach)
-            : fallback.reach,
-          match: this.asArray(value.match).length
-            ? this.asArray(value.match)
-            : fallback.match,
-          safe: this.asArray(value.safe).length
-            ? this.asArray(value.safe)
-            : fallback.safe,
+          reach: this.sortSchoolCandidates(this.asArray(value.reach).length ? this.asArray(value.reach) : fallback.reach),
+          match: this.sortSchoolCandidates(this.asArray(value.match).length ? this.asArray(value.match) : fallback.match),
+          safe: this.sortSchoolCandidates(this.asArray(value.safe).length ? this.asArray(value.safe) : fallback.safe),
           risk: this.asArray(value.risk).length
             ? this.asArray(value.risk)
             : fallback.risk,
@@ -330,6 +375,13 @@ export class ToolsService {
         }),
       });
     });
+  }
+
+  private sortSchoolCandidates(items: any[]) {
+    const toScore = (rate?: string) => Number(String(rate || '').match(/\d+/)?.[0] || 0);
+    return this.asArray(items)
+      .sort((a, b) => toScore(b?.successRate) - toScore(a?.successRate))
+      .map((school, index) => ({ ...school, rank: Number(school?.rank || index + 1) }));
   }
 
   async generateCopywriting(input: StudentInput) {
@@ -826,13 +878,29 @@ export class ToolsService {
         马来西亚: [["University of Malaya", "Universiti Putra Malaysia"], ["Taylor's University", "Monash Malaysia"], ["APU Malaysia", "INTI International University"]],
       };
       const pool = schoolPool[s.country] || schoolPool["英国"];
-      const mapSchools = (names: string[], tier: string) => names.map((name) => ({
-        name,
-        reason: `${tier}档候选，需结合${s.major}课程设置、语言要求和预算进一步筛选。`,
-        fit: tier === "冲刺" ? "适合保留少量高目标" : tier === "匹配" ? "适合作为主申请区间" : "用于控制整体录取风险",
-        risk: tier === "冲刺" ? "对成绩、课程匹配和文书要求更高" : "需逐校核对官网要求",
-        action: "核对官网要求后再进入最终名单。",
-      }));
+      const mapSchools = (names: string[], tier: string) => names.map((name, index) => {
+        const base = tier === "冲刺" ? 42 : tier === "匹配" ? 68 : 82;
+        const nameZhMap: Record<string, string> = { Manchester: "曼彻斯特大学", Bristol: "布里斯托大学", Glasgow: "格拉斯哥大学", Cardiff: "卡迪夫大学", Liverpool: "利物浦大学", Sheffield: "谢菲尔德大学", Sussex: "萨塞克斯大学", Swansea: "斯旺西大学", Portsmouth: "朴茨茅斯大学" };
+        const nameEnMap: Record<string, string> = { Manchester: "University of Manchester", Bristol: "University of Bristol", Glasgow: "University of Glasgow", Cardiff: "Cardiff University", Liverpool: "University of Liverpool", Sheffield: "University of Sheffield", Sussex: "University of Sussex", Swansea: "Swansea University", Portsmouth: "University of Portsmouth" };
+        const nameZh = nameZhMap[name] || name;
+        const nameEn = nameEnMap[name] || name;
+        const majorZh = s.major.includes("数据") ? "数据科学硕士" : "计算机科学硕士";
+        const majorEn = s.major.includes("数据") ? "Data Science MSc" : "Computer Science MSc";
+        return {
+          rank: index + 1,
+          name: `${nameZh} / ${nameEn}`,
+          nameZh,
+          nameEn,
+          major: `${majorZh} / ${majorEn}`,
+          majorZh,
+          majorEn,
+          successRate: `${Math.max(25, base - index * 5)}%-${Math.min(90, base + 8 - index * 5)}%`,
+          reason: `${tier}档候选，需结合${s.major}课程设置、语言要求和预算进一步筛选。`,
+          fit: tier === "冲刺" ? "适合保留少量高目标" : tier === "匹配" ? "适合作为主申请区间" : "用于控制整体录取风险",
+          risk: tier === "冲刺" ? "对成绩、课程匹配和文书要求更高" : "需逐校核对官网要求",
+          action: "核对官网要求后再进入最终名单。",
+        };
+      });
       const schools = {
         profile: s,
         reach: mapSchools(pool[0].slice(0, fit.tierAdvice.reach || 1), "冲刺"),

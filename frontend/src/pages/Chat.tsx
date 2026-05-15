@@ -7,7 +7,14 @@ import { readSessionState, writeSessionState } from '../utils/sessionState';
 import { mergeToolsDraft, runAdvisorInBackground } from '../utils/workspaceBridge';
 
 interface SchoolAdvice {
+  rank?: number;
   name: string;
+  nameZh?: string;
+  nameEn?: string;
+  major?: string;
+  majorZh?: string;
+  majorEn?: string;
+  successRate?: string;
   reason: string;
   fit: string;
   risk: string;
@@ -181,6 +188,14 @@ function cleanText(text?: unknown) {
     .replace(/```json/g, '')
     .replace(/```/g, '')
     .trim();
+}
+
+function schoolDisplayName(school: SchoolAdvice) {
+  return [school.nameZh, school.nameEn].filter(Boolean).join(' / ') || school.name;
+}
+
+function schoolDisplayMajor(school: SchoolAdvice) {
+  return school.major || [school.majorZh, school.majorEn].filter(Boolean).join(' / ');
 }
 
 function formatMs(value?: number) {
@@ -397,7 +412,14 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
               <p className="tier-strategy">{cleanText(tier.strategy)}</p>
               <div className="school-list">
                 {(tier.schools || []).map((school, index) => (
-                  <FoldSection title={cleanText(school.name)} subtitle={cleanText(tier.tier)} key={`${tier.tier}-${school.name}-${index}`} defaultOpen className="inner-fold-card">
+                  <FoldSection
+                    title={`${school.rank ? `${school.rank}. ` : ''}${cleanText(schoolDisplayName(school))}`}
+                    subtitle={[cleanText(tier.tier), school.successRate ? `初筛成功率 ${cleanText(school.successRate)}` : ''].filter(Boolean).join(' · ')}
+                    key={`${tier.tier}-${school.name}-${index}`}
+                    defaultOpen
+                    className="inner-fold-card"
+                  >
+                    <div className="school-detail"><span>推荐专业</span><p>{cleanText(schoolDisplayMajor(school) || '待结合官网项目列表确认')}</p></div>
                     <div className="school-detail"><span>推荐原因</span><p>{cleanText(school.reason)}</p></div>
                     <div className="school-detail"><span>适配点</span><p>{cleanText(school.fit)}</p></div>
                     <div className="school-detail warn"><span>风险点</span><p>{cleanText(school.risk)}</p></div>
