@@ -135,8 +135,51 @@ export function SectionNav({ items }: { items: Array<{ id: string; label: string
   );
 }
 
+function readableSegments(value: unknown) {
+  let text = toDisplayText(value)
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim();
+
+  if (!text) return [];
+
+  text = text
+    .replace(/\s*(#{1,6}\s*)/g, '\n\n$1')
+    .replace(/\s+(标签[:：])/g, '\n$1')
+    .replace(/([。！？；;])\s*(?=(适用对象|核心材料|核心要求|三档定位|专业方向|项目示例|代表院校|推荐专业|申请材料|材料补强|时间线|风险提示|下一步|适合背景|课程匹配|判断依据|申请建议|补强重点|注意事项)[:：]?)/g, '$1\n\n')
+    .replace(/\s+(?=([-•·]|[0-9]+[.、．]|[一二三四五六七八九十]+[、.．])\s*)/g, '\n')
+    .replace(/\s+(?=(适用对象|核心材料|核心要求|三档定位|专业方向|项目示例|代表院校|推荐专业|申请材料|材料补强|时间线|风险提示|下一步|适合背景|课程匹配|判断依据|申请建议|补强重点|注意事项)[:：])/g, '\n\n');
+
+  return text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const heading = line.match(/^(#{1,6})\s*(.+)$/);
+      if (heading) return { type: 'heading', text: heading[2].trim() };
+      const list = line.match(/^([-•·]|[0-9]+[.、．]|[一二三四五六七八九十]+[、.．])\s*(.+)$/);
+      if (list) return { type: 'list', text: list[2].trim() };
+      if (/^(标签|适用对象|核心材料|核心要求|三档定位|专业方向|项目示例|代表院校|推荐专业|申请材料|材料补强|时间线|风险提示|下一步|适合背景|课程匹配|判断依据|申请建议|补强重点|注意事项)[:：]/.test(line)) {
+        return { type: 'label', text: line };
+      }
+      return { type: 'paragraph', text: line };
+    });
+}
+
 export function TextBlock({ value, className = 'pre-line' }: { value: unknown; className?: string }) {
-  return <p className={className}>{toDisplayText(value) || '暂无内容'}</p>;
+  const segments = readableSegments(value);
+  if (!segments.length) return <p className={className}>暂无内容</p>;
+
+  return (
+    <div className={`readable-text ${className}`.trim()}>
+      {segments.map((segment, index) => (
+        <p className={`readable-line readable-${segment.type}`} key={`${segment.type}-${index}`}>
+          {segment.type === 'list' && <span className="readable-bullet">•</span>}
+          <span>{segment.text}</span>
+        </p>
+      ))}
+    </div>
+  );
 }
 
 export function ListBlock({ items }: { items: unknown }) {

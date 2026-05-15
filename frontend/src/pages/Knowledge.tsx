@@ -258,8 +258,8 @@ export default function Knowledge() {
           ) : (
             <div className="chunk-grid">
               {切片.map((chunk) => (
-                <FoldSection title={`切片 #${chunk.chunkIndex + 1}`} key={chunk.id} defaultOpen={chunk.chunkIndex === 0}>
-                  <TextBlock value={chunk.content} />
+                <FoldSection title={`切片 #${chunk.chunkIndex + 1}`} key={chunk.id} defaultOpen={chunk.chunkIndex === 0} className="chunk-preview-card" bodyClassName="chunk-preview-body">
+                  <TextBlock value={chunk.content} className="knowledge-chunk-text" />
                   {!!chunk.keywords?.length && <div className="tag-row">{chunk.keywords.slice(0, 6).map((keyword) => <span key={keyword}>{keyword}</span>)}</div>}
                 </FoldSection>
               ))}

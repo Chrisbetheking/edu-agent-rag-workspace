@@ -302,7 +302,11 @@ export class ChatService {
     if (this.includesAny(q, ['预算', '费用', '学费', '生活费', '30万', '城市', '伦敦'])) return 'budget';
     if (this.includesAny(q, ['rag项目', 'embedding', 'pgvector', '向量检索'])) return 'rag-project';
     if (this.includesAny(q, ['前端ai', 'ai工作台', 'react项目', 'sse', '前端项目'])) return 'frontend-project';
-    if (this.includesAny(q, ['选校', '定位', '冲刺', '匹配', '保底', '学校推荐', '院校推荐'])) return 'school-fit';
+    if (this.includesAny(q, [
+      '选校', '定位', '冲刺', '匹配', '保底', '学校推荐', '院校推荐',
+      '推荐专业', '专业推荐', '具体专业', '项目名称', '院校专业', '哪个专业', '成功率排序',
+      'computer science', 'data science', 'artificial intelligence', 'software engineering', 'cyber security',
+    ])) return 'school-fit';
     return 'general';
   }
 
@@ -318,7 +322,7 @@ export class ChatService {
       budget: ['%11_英国预算%', '%预算%', '%城市选择%'],
       'rag-project': ['%22_RAG%', '%RAG项目%', '%17_AI%', '%12_计算机项目%'],
       'frontend-project': ['%21_前端AI%', '%前端AI工作台%', '%18_软件工程%', '%12_计算机项目%'],
-      'school-fit': ['%05_英国计算机硕士选校%', '%选校分层%', '%01_%', '%申请总览%', '%16_马来西亚%'],
+      'school-fit': ['%05_英国计算机硕士选校%', '%选校分层%', '%26_%', '%27_%', '%28_%', '%专业方向%', '%院校专业%', '%数据科学硕士院校%', '%成功率初筛%', '%01_%', '%申请总览%', '%16_马来西亚%'],
       general: [],
     };
     return patternMap[intent] || [];
@@ -341,7 +345,7 @@ export class ChatService {
     if (intent === 'budget') return this.includesAny(t, ['预算', '城市选择']) ? 0.98 : 0.74;
     if (intent === 'rag-project') return this.includesAny(t, ['rag项目申请素材']) ? 0.98 : 0.74;
     if (intent === 'frontend-project') return this.includesAny(t, ['前端ai工作台']) ? 0.98 : 0.74;
-    if (intent === 'school-fit') return this.includesAny(t, ['选校分层', '申请总览']) ? 0.96 : 0.72;
+    if (intent === 'school-fit') return this.includesAny(t, ['选校分层', '申请总览', '专业方向', '院校专业', '数据科学硕士院校', '成功率初筛']) ? 0.98 : 0.72;
     return 0;
   }
 
@@ -1130,6 +1134,12 @@ ${chunk.content || ''}`);
       '成功率排序',
       '按成功率',
       '录取概率',
+      '推荐专业',
+      '专业推荐',
+      '具体专业',
+      '项目名称',
+      '院校专业',
+      '哪个专业',
     ]);
 
     const asksBackgroundPlan = this.includesAny(q, ['cgpa', 'gpa', '均分', '绩点', '预算', '背景'])

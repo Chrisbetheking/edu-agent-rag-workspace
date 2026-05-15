@@ -47,6 +47,12 @@ export class DocumentsService {
     return user.role === 'admin' || visibility === 'public' || ownerId === user.id;
   }
 
+  private isProfessionalSeedDoc(doc: any) {
+    const fileName = String(doc.fileName || doc.file_name || '');
+    const title = String(doc.title || '');
+    return fileName.startsWith('seed-major-') || /^2[6-8]_/.test(title);
+  }
+
   private withPermissions(doc: any, user: RequestUser) {
     const visibility = doc.visibility || 'public';
     const ownerId = doc.ownerId || 'u_chris';
@@ -327,9 +333,29 @@ export class DocumentsService {
       const result = await this.db.query('select count(*)::int as count from documents');
       const count = Number(result.rows?.[0]?.count || 0);
 
-      if (count > 0) return;
+      if (count === 0) {
+        for (const doc of this.store.documents) {
+          await this.persistDocument(doc);
+          await this.persistChunks(doc.id);
+        }
+        return;
+      }
 
-      for (const doc of this.store.documents) {
+      // 线上库已经有旧资料时，也补齐新增的“专业细分/院校专业/成功率排序”系统资料。
+      // 这样部署新版本后，不需要手动上传，知识库会自动变得更细到具体专业。
+      const professionalSeeds = this.store.documents.filter((doc) => this.isProfessionalSeedDoc(doc));
+      if (!professionalSeeds.length) return;
+
+      const seedFileNames = professionalSeeds.map((doc) => doc.fileName || `${doc.title}.txt`);
+      const existing = await this.db.query(
+        'select file_name from documents where file_name = any($1::text[])',
+        [seedFileNames],
+      );
+      const existingNames = new Set((existing.rows || []).map((row: any) => row.file_name));
+
+      for (const doc of professionalSeeds) {
+        const fileName = doc.fileName || `${doc.title}.txt`;
+        if (existingNames.has(fileName)) continue;
         await this.persistDocument(doc);
         await this.persistChunks(doc.id);
       }

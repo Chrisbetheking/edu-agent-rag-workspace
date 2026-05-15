@@ -5,16 +5,29 @@ export function normalizeText(text: string): string {
 }
 
 export function splitIntoChunks(text: string, chunkSize = 420, overlap = 60) {
-  const normalized = normalizeText(text);
+  const normalized = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
   const chunks: string[] = [];
   let start = 0;
   while (start < normalized.length) {
-    const end = Math.min(start + chunkSize, normalized.length);
-    chunks.push(normalized.slice(start, end));
-    if (end === normalized.length) break;
+    let end = Math.min(start + chunkSize, normalized.length);
+
+    if (end < normalized.length) {
+      const window = normalized.slice(start, end);
+      const paragraphBreak = Math.max(window.lastIndexOf('\n\n'), window.lastIndexOf('。'), window.lastIndexOf('；'));
+      if (paragraphBreak > chunkSize * 0.48) end = start + paragraphBreak + 1;
+    }
+
+    chunks.push(normalized.slice(start, end).trim());
+    if (end >= normalized.length) break;
     start = Math.max(0, end - overlap);
   }
-  return chunks;
+  return chunks.filter(Boolean);
 }
 
 const countryTerms = ['英国', '澳洲', '澳大利亚', '新加坡', '香港', '美国', '加拿大', '马来西亚'];
@@ -25,6 +38,8 @@ const domainTerms = [
   '申请材料', '材料', '成绩单', '在读证明', '毕业证', '课程描述', '推荐信', '个人陈述', '简历',
   '语言成绩', '雅思', '托福', 'pte', 'gpa', 'cgpa', '均分', '预算', '项目经历', '实习经历',
   'apu', '冲刺', '匹配', '保底', '选校', '留学', '申请', '文书', '录取',
+  '专业方向', '推荐专业', '项目名称', '院校专业', '数据科学', '人工智能', '网络安全', '软件工程',
+  'computer science', 'data science', 'artificial intelligence', 'cyber security', 'software engineering',
 ];
 
 const stopWords = new Set([
