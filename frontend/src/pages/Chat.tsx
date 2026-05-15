@@ -15,6 +15,9 @@ interface SchoolAdvice {
   majorZh?: string;
   majorEn?: string;
   successRate?: string;
+  city?: string;
+  direction?: string;
+  decisionBasis?: string[];
   reason: string;
   fit: string;
   risk: string;
@@ -48,6 +51,7 @@ interface StructuredAdvice {
   timeline: 时间线Item[];
   risks: string[];
   nextActions: string[];
+  decisionBasis?: string[];
   disclaimer: string;
 }
 
@@ -452,6 +456,12 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
       </SectionGroup>
 
       <SectionGroup id="chat-schools" title="三档选校方案" subtitle="冲刺 / 匹配 / 保底" defaultOpen>
+        <div className="success-note-v15">初筛成功率是系统根据成绩、专业匹配、项目经历、语言和预算估算的咨询区间，不代表学校官方录取率。</div>
+        {Array.isArray(data.decisionBasis) && data.decisionBasis.length > 0 && (
+          <div className="decision-basis-v15">
+            {data.decisionBasis.slice(0, 4).map((item, index) => <span key={index}>{cleanText(item)}</span>)}
+          </div>
+        )}
         <div className="tier-grid">
           {(data.schoolTiers || []).map((tier) => (
             <FoldSection title={cleanText(tier.tier)} subtitle={cleanText(tier.level)} key={tier.tier} defaultOpen>
@@ -466,8 +476,12 @@ function StructuredResult({ data }: { data: StructuredAdvice }) {
                     className="inner-fold-card"
                   >
                     <div className="school-detail"><span>推荐专业</span><p>{cleanText(schoolDisplayMajor(school) || '待结合官网项目列表确认')}</p></div>
+                    {(school.city || school.direction) && <div className="school-detail"><span>城市 / 方向</span><p>{[school.city, school.direction].filter(Boolean).map(cleanText).join(' · ')}</p></div>}
                     <div className="school-detail"><span>推荐原因</span><p>{cleanText(school.reason)}</p></div>
                     <div className="school-detail"><span>适配点</span><p>{cleanText(school.fit)}</p></div>
+                    {Array.isArray(school.decisionBasis) && school.decisionBasis.length > 0 && (
+                      <div className="school-detail decision"><span>推荐依据</span><ListBlock items={school.decisionBasis.slice(0, 4)} /></div>
+                    )}
                     <div className="school-detail warn"><span>风险点</span><p>{cleanText(school.risk)}</p></div>
                     <div className="school-action">下一步：{cleanText(school.action)}</div>
                   </FoldSection>

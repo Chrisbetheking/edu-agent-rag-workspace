@@ -2860,3 +2860,41 @@ th { color: var(--muted); font-weight: 800; }
     max-height: 460px;
   }
 }
+
+/* v15: explain school recommendation confidence and per-school decision basis. */
+.chat-page-v2 .success-note-v15 {
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  border-radius: 16px;
+  padding: 11px 13px;
+  line-height: 1.65;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.chat-page-v2 .decision-basis-v15 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chat-page-v2 .decision-basis-v15 span {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.chat-page-v2 .school-detail.decision {
+  background: #f8fafc;
+}
+
+.chat-page-v2 .school-detail.decision .clean-list {
+  margin: 0;
+}

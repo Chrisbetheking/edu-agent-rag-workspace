@@ -5,6 +5,29 @@ import { LlmService } from "../llm/llm.service";
 
 type ToolStatus = "success" | "failed";
 
+type ProgrammeCandidate = {
+  country: string;
+  universityZh: string;
+  universityEn: string;
+  programmeZh: string;
+  programmeEn: string;
+  direction: string[];
+  minPercent: number;
+  ambition: "high" | "medium" | "accessible";
+  budgetBand: "high" | "medium" | "low";
+  city: string;
+  backgroundNeeds: string[];
+  riskTags: string[];
+};
+
+type RankedProgramme = ProgrammeCandidate & {
+  fitScore: number;
+  rateMin: number;
+  rateMax: number;
+  tier: "reach" | "match" | "safe";
+  decisionBasis: string[];
+};
+
 type StudentInput = {
   name?: string;
   studentName?: string;
@@ -47,15 +70,17 @@ export class ToolsService {
   }
 
   private normalizeStudent(input: StudentInput = {}) {
-    const name = input.name || input.studentName || "Chris";
-    const country = input.country || input.targetCountry || "英国";
+    const country = this.normalizeCountry(input.country || input.targetCountry || "英国");
     const major = input.major || "计算机科学";
+    const cgpaRaw = String(input.cgpa || input.gpa || "3.2");
+    const numericCgpa = Number(cgpaRaw.match(/\d+(?:\.\d+)?/)?.[0] || 0);
+    const inferredScale = numericCgpa > 10 ? 100 : 4;
+    const name = input.name || input.studentName || "Chris";
     const degree = input.degree || "硕士";
-    const cgpa = String(input.cgpa || input.gpa || "3.2");
-    const scale = Number(input.scale || 4);
+    const scale = Number(input.scale || inferredScale);
     const budget = input.budget || "30万人民币";
-    const languageType = input.languageType || "IELTS";
-    const languageScore = input.languageScore || "6.5";
+    const languageType = input.languageType || this.inferLanguageType(input.language || input.englishScore || "") || "IELTS";
+    const languageScore = input.languageScore || String(input.language || input.englishScore || "").match(/\d+(?:\.\d+)?/)?.[0] || "6.5";
     const language =
       input.language ||
       input.englishScore ||
@@ -79,7 +104,7 @@ export class ToolsService {
       country,
       major,
       degree,
-      cgpa,
+      cgpa: cgpaRaw,
       scale,
       budget,
       language,
@@ -92,6 +117,26 @@ export class ToolsService {
       platform,
       targetSchools,
     };
+  }
+
+  private normalizeCountry(country: string) {
+    const text = String(country || "");
+    if (/澳洲|澳大利亚|australia/i.test(text)) return "澳洲";
+    if (/新加坡|singapore/i.test(text)) return "新加坡";
+    if (/香港|hong\s*kong/i.test(text)) return "香港";
+    if (/加拿大|canada/i.test(text)) return "加拿大";
+    if (/美国|usa|united\s*states/i.test(text)) return "美国";
+    if (/英国|uk|united\s*kingdom|england/i.test(text)) return "英国";
+    return text.trim() || "英国";
+  }
+
+  private inferLanguageType(text: string) {
+    const value = String(text || "").toLowerCase();
+    if (/雅思|ielts/.test(value)) return "IELTS";
+    if (/托福|toefl/.test(value)) return "TOEFL";
+    if (/pte/.test(value)) return "PTE";
+    if (/duolingo|多邻国/.test(value)) return "Duolingo";
+    return "";
   }
 
   private track<T>(toolName: string, input: any, fn: () => T) {
@@ -254,104 +299,382 @@ export class ToolsService {
     });
   }
 
+  private programmeDatabase(): ProgrammeCandidate[] {
+    return [
+      {
+        country: "英国",
+        universityZh: "帝国理工学院",
+        universityEn: "Imperial College London",
+        programmeZh: "计算机科学硕士（人工智能与机器学习方向）",
+        programmeEn: "MSc Computing (Artificial Intelligence and Machine Learning)",
+        direction: ["计算机", "人工智能", "AI", "机器学习"],
+        minPercent: 88,
+        ambition: "high",
+        budgetBand: "high",
+        city: "London",
+        backgroundNeeds: ["算法", "数学", "机器学习", "科研", "竞赛"],
+        riskTags: ["竞争极高", "课程匹配要求高", "伦敦预算压力"],
+      },
+      {
+        country: "英国",
+        universityZh: "伦敦大学学院",
+        universityEn: "University College London",
+        programmeZh: "计算机科学硕士",
+        programmeEn: "MSc Computer Science",
+        direction: ["计算机", "软件", "人工智能", "AI"],
+        minPercent: 86,
+        ambition: "high",
+        budgetBand: "high",
+        city: "London",
+        backgroundNeeds: ["编程", "数学", "项目", "算法"],
+        riskTags: ["热门项目", "伦敦预算压力", "需强项目支撑"],
+      },
+      {
+        country: "英国",
+        universityZh: "爱丁堡大学",
+        universityEn: "University of Edinburgh",
+        programmeZh: "人工智能硕士",
+        programmeEn: "MSc Artificial Intelligence",
+        direction: ["人工智能", "AI", "机器学习", "数据"],
+        minPercent: 84,
+        ambition: "high",
+        budgetBand: "high",
+        city: "Edinburgh",
+        backgroundNeeds: ["数学", "算法", "机器学习", "科研"],
+        riskTags: ["AI方向竞争强", "数学背景需核对"],
+      },
+      {
+        country: "英国",
+        universityZh: "曼彻斯特大学",
+        universityEn: "University of Manchester",
+        programmeZh: "高级计算机科学硕士",
+        programmeEn: "MSc Advanced Computer Science",
+        direction: ["计算机", "软件", "人工智能", "数据"],
+        minPercent: 82,
+        ambition: "high",
+        budgetBand: "medium",
+        city: "Manchester",
+        backgroundNeeds: ["编程", "算法", "项目"],
+        riskTags: ["热门院校", "项目经历要写实"],
+      },
+      {
+        country: "英国",
+        universityZh: "布里斯托大学",
+        universityEn: "University of Bristol",
+        programmeZh: "数据科学硕士",
+        programmeEn: "MSc Data Science",
+        direction: ["数据科学", "数据", "人工智能", "AI"],
+        minPercent: 80,
+        ambition: "high",
+        budgetBand: "medium",
+        city: "Bristol",
+        backgroundNeeds: ["统计", "数学", "编程", "数据项目"],
+        riskTags: ["数据方向热门", "统计基础需说明"],
+      },
+      {
+        country: "英国",
+        universityZh: "格拉斯哥大学",
+        universityEn: "University of Glasgow",
+        programmeZh: "数据科学硕士",
+        programmeEn: "MSc Data Science",
+        direction: ["数据科学", "数据", "计算机"],
+        minPercent: 78,
+        ambition: "medium",
+        budgetBand: "medium",
+        city: "Glasgow",
+        backgroundNeeds: ["编程", "数学", "数据项目"],
+        riskTags: ["需证明定量能力", "热门方向尽早递交"],
+      },
+      {
+        country: "英国",
+        universityZh: "伦敦玛丽女王大学",
+        universityEn: "Queen Mary University of London",
+        programmeZh: "计算机科学硕士",
+        programmeEn: "MSc Computer Science",
+        direction: ["计算机", "软件", "人工智能", "AI"],
+        minPercent: 76,
+        ambition: "medium",
+        budgetBand: "high",
+        city: "London",
+        backgroundNeeds: ["编程", "项目", "数据结构"],
+        riskTags: ["伦敦成本较高", "需核对课程背景"],
+      },
+      {
+        country: "英国",
+        universityZh: "谢菲尔德大学",
+        universityEn: "University of Sheffield",
+        programmeZh: "数据科学硕士",
+        programmeEn: "MSc Data Science",
+        direction: ["数据科学", "数据", "人工智能"],
+        minPercent: 74,
+        ambition: "medium",
+        budgetBand: "medium",
+        city: "Sheffield",
+        backgroundNeeds: ["统计", "编程", "项目"],
+        riskTags: ["课程匹配需逐项核对", "热门方向建议早递交"],
+      },
+      {
+        country: "英国",
+        universityZh: "诺丁汉大学",
+        universityEn: "University of Nottingham",
+        programmeZh: "计算机科学硕士",
+        programmeEn: "MSc Computer Science",
+        direction: ["计算机", "软件", "数据"],
+        minPercent: 74,
+        ambition: "medium",
+        budgetBand: "medium",
+        city: "Nottingham",
+        backgroundNeeds: ["编程", "算法", "项目"],
+        riskTags: ["需突出本科课程匹配", "避免文书泛泛而谈"],
+      },
+      {
+        country: "英国",
+        universityZh: "卡迪夫大学",
+        universityEn: "Cardiff University",
+        programmeZh: "数据科学与分析硕士",
+        programmeEn: "MSc Data Science and Analytics",
+        direction: ["数据科学", "数据", "商业分析", "计算机"],
+        minPercent: 70,
+        ambition: "accessible",
+        budgetBand: "low",
+        city: "Cardiff",
+        backgroundNeeds: ["数据", "编程", "项目"],
+        riskTags: ["要确认分析/计算机课程占比", "非伦敦就业需提前规划"],
+      },
+      {
+        country: "英国",
+        universityZh: "利物浦大学",
+        universityEn: "University of Liverpool",
+        programmeZh: "高级计算机科学硕士",
+        programmeEn: "MSc Advanced Computer Science",
+        direction: ["计算机", "软件", "数据"],
+        minPercent: 70,
+        ambition: "accessible",
+        budgetBand: "low",
+        city: "Liverpool",
+        backgroundNeeds: ["编程", "项目", "软件工程"],
+        riskTags: ["需筛选最贴合项目", "不要只按综合排名选择"],
+      },
+      {
+        country: "英国",
+        universityZh: "萨塞克斯大学",
+        universityEn: "University of Sussex",
+        programmeZh: "数据科学硕士",
+        programmeEn: "MSc Data Science",
+        direction: ["数据科学", "数据", "计算机"],
+        minPercent: 68,
+        ambition: "accessible",
+        budgetBand: "low",
+        city: "Brighton",
+        backgroundNeeds: ["编程", "数据", "项目"],
+        riskTags: ["保底安全性较好", "需确认课程是否贴合职业目标"],
+      },
+      {
+        country: "澳洲",
+        universityZh: "悉尼大学",
+        universityEn: "University of Sydney",
+        programmeZh: "数据科学硕士",
+        programmeEn: "Master of Data Science",
+        direction: ["数据科学", "数据", "人工智能"],
+        minPercent: 82,
+        ambition: "high",
+        budgetBand: "high",
+        city: "Sydney",
+        backgroundNeeds: ["数学", "统计", "编程"],
+        riskTags: ["预算较高", "需核对数学/统计背景"],
+      },
+      {
+        country: "澳洲",
+        universityZh: "新南威尔士大学",
+        universityEn: "UNSW Sydney",
+        programmeZh: "信息技术硕士",
+        programmeEn: "Master of Information Technology",
+        direction: ["计算机", "软件", "数据"],
+        minPercent: 80,
+        ambition: "high",
+        budgetBand: "high",
+        city: "Sydney",
+        backgroundNeeds: ["编程", "项目", "数学"],
+        riskTags: ["预算较高", "课程方向需提前选好"],
+      },
+      {
+        country: "澳洲",
+        universityZh: "莫纳什大学",
+        universityEn: "Monash University",
+        programmeZh: "数据科学硕士",
+        programmeEn: "Master of Data Science",
+        direction: ["数据科学", "数据", "计算机"],
+        minPercent: 76,
+        ambition: "medium",
+        budgetBand: "medium",
+        city: "Melbourne",
+        backgroundNeeds: ["编程", "数据", "项目"],
+        riskTags: ["热门方向", "需准备课程描述"],
+      },
+      {
+        country: "澳洲",
+        universityZh: "悉尼科技大学",
+        universityEn: "University of Technology Sydney",
+        programmeZh: "信息技术硕士",
+        programmeEn: "Master of Information Technology",
+        direction: ["计算机", "软件", "数据"],
+        minPercent: 70,
+        ambition: "accessible",
+        budgetBand: "medium",
+        city: "Sydney",
+        backgroundNeeds: ["编程", "项目"],
+        riskTags: ["城市成本较高", "需明确就业方向"],
+      },
+      {
+        country: "澳洲",
+        universityZh: "迪肯大学",
+        universityEn: "Deakin University",
+        programmeZh: "数据科学硕士",
+        programmeEn: "Master of Data Science",
+        direction: ["数据科学", "数据", "计算机"],
+        minPercent: 65,
+        ambition: "accessible",
+        budgetBand: "low",
+        city: "Melbourne / Geelong",
+        backgroundNeeds: ["数据", "编程"],
+        riskTags: ["作为保底控制风险", "需评估课程认可度"],
+      },
+    ];
+  }
+
+  private percentFromStudent(student: ReturnType<ToolsService["normalizeStudent"]>) {
+    const raw = Number(String(student.cgpa || "").match(/\d+(?:\.\d+)?/)?.[0] || 0);
+    const scale = Number(student.scale || (raw > 10 ? 100 : 4));
+    if (!raw) return 80;
+    if (scale === 100 || raw > 10) return Math.max(0, Math.min(100, raw));
+    return Math.max(0, Math.min(100, (raw / scale) * 100));
+  }
+
+  private budgetAmount(student: ReturnType<ToolsService["normalizeStudent"]>) {
+    const text = String(student.budget || "").toLowerCase();
+    const value = Number(text.match(/\d+(?:\.\d+)?/)?.[0] || 0);
+    if (!value) return 30;
+    return value;
+  }
+
+  private scoreProgramme(programme: ProgrammeCandidate, student: ReturnType<ToolsService["normalizeStudent"]>): RankedProgramme {
+    const percent = this.percentFromStudent(student);
+    const text = `${student.major} ${student.experience} ${student.concern}`.toLowerCase();
+    const directionMatch = programme.direction.some((term) => text.includes(term.toLowerCase()));
+    const backgroundHits = programme.backgroundNeeds.filter((term) => text.includes(term.toLowerCase())).length;
+    const hasProject = /项目|project|github|作品集|系统|web|开发|ai|rag|数据|实习|intern|科研|竞赛|论文/i.test(text);
+    const languageScore = Number(String(student.languageScore || student.language || "").match(/\d+(?:\.\d+)?/)?.[0] || 0);
+    const languageType = String(student.languageType || student.language || "").toUpperCase();
+    const languageReady = languageType.includes("IELTS") ? languageScore >= 6.5 : languageType.includes("TOEFL") ? languageScore >= 90 : languageScore > 0;
+    const budget = this.budgetAmount(student);
+    const budgetFit = programme.budgetBand === "high" ? budget >= 40 : programme.budgetBand === "medium" ? budget >= 32 : budget >= 25;
+    const ambitionPenalty = programme.ambition === "high" ? 10 : programme.ambition === "medium" ? 3 : 0;
+
+    const fitScore = Math.round(
+      60 +
+        (percent - programme.minPercent) * 1.18 +
+        (directionMatch ? 7 : -6) +
+        Math.min(8, backgroundHits * 3) +
+        (hasProject ? 5 : -5) +
+        (languageReady ? 3 : -3) +
+        (budgetFit ? 3 : -6) -
+        ambitionPenalty,
+    );
+    const midpoint = Math.max(28, Math.min(88, fitScore));
+    const rateMin = Math.max(25, midpoint - 6);
+    const rateMax = Math.min(92, midpoint + 8);
+
+    let tier: RankedProgramme["tier"] = "match";
+    if (programme.ambition === "high") tier = rateMax < 72 ? "reach" : "match";
+    else if (programme.ambition === "medium") tier = midpoint < 62 ? "reach" : midpoint < 78 ? "match" : "safe";
+    else tier = midpoint < 68 ? "match" : "safe";
+
+    const decisionBasis = [
+      `成绩折算约 ${percent.toFixed(1)}%，项目初筛线约 ${programme.minPercent}%`,
+      directionMatch ? "目标方向与项目方向匹配" : "目标方向需要用课程/项目进一步解释",
+      hasProject ? "有项目/实习素材，可用于 PS 和 CV 支撑" : "项目素材不足，需补充可验证经历",
+      budgetFit ? `预算与 ${programme.city} 成本基本匹配` : `预算对 ${programme.city} 成本存在压力`,
+    ];
+
+    return { ...programme, fitScore: midpoint, rateMin, rateMax, tier, decisionBasis };
+  }
+
+  private pickTier(scored: RankedProgramme[], tier: RankedProgramme["tier"], used: Set<string>, limit = 3) {
+    const exact = scored.filter((item) => item.tier === tier && !used.has(item.universityEn));
+    const fallbackOrder: RankedProgramme["ambition"][] = tier === "reach" ? ["high", "medium", "accessible"] : tier === "match" ? ["medium", "high", "accessible"] : ["accessible", "medium", "high"];
+    const fallback = scored.filter((item) => fallbackOrder.includes(item.ambition) && !used.has(item.universityEn));
+    const selected: RankedProgramme[] = [];
+    for (const item of [...exact, ...fallback]) {
+      if (used.has(item.universityEn)) continue;
+      used.add(item.universityEn);
+      selected.push(item);
+      if (selected.length >= limit) break;
+    }
+    return selected.sort((a, b) => b.rateMin - a.rateMin);
+  }
+
+  private formatProgramme(item: RankedProgramme, index: number) {
+    const risk = item.riskTags.join("；");
+    return {
+      rank: index + 1,
+      name: `${item.universityZh} / ${item.universityEn}`,
+      nameZh: item.universityZh,
+      nameEn: item.universityEn,
+      major: `${item.programmeZh} / ${item.programmeEn}`,
+      majorZh: item.programmeZh,
+      majorEn: item.programmeEn,
+      successRate: `${item.rateMin}%-${item.rateMax}%`,
+      city: item.city,
+      direction: item.direction.slice(0, 3).join(" / "),
+      decisionBasis: item.decisionBasis,
+      reason: `${item.city} 项目与目标方向相关，按当前成绩和经历适合作为${item.tier === "reach" ? "冲刺" : item.tier === "match" ? "匹配" : "保底"}候选。`,
+      fit: item.decisionBasis.slice(0, 2).join("；"),
+      risk: risk || "需逐校核对官网课程、语言和截止日期。",
+      action: "核对官网要求，准备成绩单、课程描述、PS/CV 和项目证据。",
+    };
+  }
+
   async recommendSchools(input: StudentInput) {
     return this.trackAsync("院校推荐工具", input, async () => {
       const s = this.normalizeStudent(input);
-      const gpa = Number(s.cgpa) || 3.2;
-      const schoolPool: Record<string, string[][]> = {
-        英国: [["Manchester", "Bristol", "Glasgow"], ["Sheffield", "Nottingham", "Queen Mary"], ["Cardiff", "Liverpool", "Sussex"]],
-        澳洲: [["University of Sydney", "UNSW", "Monash"], ["University of Adelaide", "UTS", "RMIT"], ["Deakin", "Swinburne", "Macquarie"]],
-        新加坡: [["NUS", "NTU"], ["SMU", "SUTD"], ["SIM / Kaplan 合作项目", "PSB Academy"]],
-        香港: [["HKU", "CUHK", "HKUST"], ["CityU", "PolyU", "HKBU"], ["Lingnan", "HSUHK"]],
-        加拿大: [["UBC", "Toronto", "Waterloo"], ["McMaster", "Ottawa", "Simon Fraser"], ["York", "Concordia", "Windsor"]],
-        美国: [["Northeastern", "USC", "NYU Tandon"], ["Stevens", "Syracuse", "George Washington"], ["Pace", "Illinois Tech", "University of Dayton"]],
-        新西兰: [["University of Auckland", "University of Otago"], ["Victoria University of Wellington", "University of Canterbury"], ["Massey University", "AUT"]],
-        爱尔兰: [["Trinity College Dublin", "University College Dublin"], ["University of Galway", "University College Cork"], ["Dublin City University", "Maynooth University"]],
-        荷兰: [["TU Delft", "University of Amsterdam"], ["Eindhoven University of Technology", "Utrecht University"], ["Tilburg University", "Vrije Universiteit Amsterdam"]],
-        德国: [["Technical University of Munich", "RWTH Aachen"], ["University of Stuttgart", "TU Darmstadt"], ["Saarland University", "University of Passau"]],
-        法国: [["École Polytechnique", "Université PSL"], ["Télécom Paris", "Université Paris-Saclay"], ["Grenoble INP", "Université Côte d'Azur"]],
-        日本: [["University of Tokyo", "Kyoto University"], ["Osaka University", "Tohoku University"], ["Waseda University", "Keio University"]],
-        韩国: [["Seoul National University", "KAIST"], ["POSTECH", "Yonsei University"], ["Korea University", "Hanyang University"]],
-        马来西亚: [["University of Malaya", "Universiti Putra Malaysia"], ["Taylor's University", "Monash Malaysia"], ["APU Malaysia", "INTI International University"]],
-      };
-      const pool = schoolPool[s.country] || schoolPool["英国"];
-      const nameZhMap: Record<string, string> = {
-        Manchester: "曼彻斯特大学",
-        Bristol: "布里斯托大学",
-        Glasgow: "格拉斯哥大学",
-        Sheffield: "谢菲尔德大学",
-        Nottingham: "诺丁汉大学",
-        "Queen Mary": "伦敦玛丽女王大学",
-        Cardiff: "卡迪夫大学",
-        Liverpool: "利物浦大学",
-        Sussex: "萨塞克斯大学",
-        "University of Sydney": "悉尼大学",
-        UNSW: "新南威尔士大学",
-        Monash: "莫纳什大学",
-      };
-      const nameEnMap: Record<string, string> = {
-        Manchester: "University of Manchester",
-        Bristol: "University of Bristol",
-        Glasgow: "University of Glasgow",
-        Sheffield: "University of Sheffield",
-        Nottingham: "University of Nottingham",
-        "Queen Mary": "Queen Mary University of London",
-        Cardiff: "Cardiff University",
-        Liverpool: "University of Liverpool",
-        Sussex: "University of Sussex",
-      };
-      const enrichSchool = (name: string, tier: "reach" | "match" | "safe", index: number) => {
-        const base = tier === "reach" ? 42 : tier === "match" ? 68 : 82;
-        const min = Math.max(25, base - index * 5);
-        const max = Math.min(90, base + 8 - index * 5);
-        const nameZh = nameZhMap[name] || name;
-        const nameEn = nameEnMap[name] || name;
-        const majorZh = s.major.includes("数据") ? "数据科学硕士" : "计算机科学硕士";
-        const majorEn = s.major.includes("数据") ? "Data Science MSc" : "Computer Science MSc";
-        return {
-          rank: index + 1,
-          name: `${nameZh} / ${nameEn}`,
-          nameZh,
-          nameEn,
-          major: `${majorZh} / ${majorEn}`,
-          majorZh,
-          majorEn,
-          successRate: `${min}%-${max}%`,
-        };
-      };
-      const fallbackBands =
-        gpa >= 3.4
-          ? { reach: pool[0].slice(0, 2), match: pool[1].slice(0, 2), safe: pool[2].slice(0, 2) }
-          : gpa >= 3.0
-            ? { reach: pool[1].slice(0, 2), match: pool[2].slice(0, 2), safe: [pool[2][2] || pool[2][0], "合作项目/预科/桥梁课程"] }
-            : { reach: pool[2].slice(0, 1), match: [pool[2][1] || pool[2][0], "合作项目"], safe: ["预科/桥梁课程", "语言班后补方案"] };
+      const targetCountry = this.normalizeCountry(s.country);
+      const programmePool = this.programmeDatabase();
+      let candidates = programmePool.filter((item) => item.country === targetCountry);
+      if (!candidates.length) candidates = programmePool.filter((item) => item.country === "英国");
+
+      const majorText = `${s.major} ${s.experience} ${s.concern}`.toLowerCase();
+      const directionFiltered = candidates.filter((item) => item.direction.some((term) => majorText.includes(term.toLowerCase())));
+      const scored = (directionFiltered.length >= 6 ? directionFiltered : candidates)
+        .map((programme) => this.scoreProgramme(programme, s))
+        .sort((a, b) => b.fitScore - a.fitScore);
+
+      const used = new Set<string>();
+      const reach = this.pickTier(scored, "reach", used, 3).map((item, index) => this.formatProgramme(item, index));
+      const match = this.pickTier(scored, "match", used, 3).map((item, index) => this.formatProgramme(item, index));
+      const safe = this.pickTier(scored, "safe", used, 3).map((item, index) => this.formatProgramme(item, index));
+      const percent = this.percentFromStudent(s);
+      const budget = this.budgetAmount(s);
 
       const fallback = {
-        profile: s,
-        reach: fallbackBands.reach.map((name, index) => ({
-          ...enrichSchool(name, "reach", index),
-          reason: "可作为冲刺选择，需要突出项目、实习和课程匹配度。",
-          fit: "适合保留少量高目标，展示申请上限。",
-          risk: "录取不确定性较高，需核对课程背景和语言要求。",
-          action: "核对官网课程要求、语言要求和申请截止时间。",
-        })),
-        match: fallbackBands.match.map((name, index) => ({
-          ...enrichSchool(name, "match", index),
-          reason: "与当前背景相对匹配，建议重点准备申请材料。",
-          fit: "适合作为主申请区间，投入文书和项目包装。",
-          risk: "热门方向仍有竞争，需要尽早递交。",
-          action: "围绕项目经历和专业匹配度准备 PS/CV。",
-        })),
-        safe: fallbackBands.safe.map((name, index) => ({
-          ...enrichSchool(name, "safe", index),
-          reason: "作为保底选择，适合提升申请成功率。",
-          fit: "用于控制整体风险，保证申请组合完整。",
-          risk: "需确认课程内容是否符合长期就业方向。",
-          action: "控制申请风险，避免只投高风险学校。",
-        })),
+        profile: {
+          ...s,
+          targetCountry,
+          convertedPercent: Number(percent.toFixed(1)),
+        },
+        algorithm: "programme-fit-v3",
+        decisionBasis: [
+          `成绩按 ${s.cgpa}/${s.scale} 折算约 ${percent.toFixed(1)}%`,
+          `目标国家：${targetCountry}；目标方向：${s.major}`,
+          `预算约 ${budget} 万人民币，系统会降低伦敦/悉尼等高成本城市权重`,
+          "成功率为咨询初筛区间，不代表学校官方录取率",
+        ],
+        reach: this.sortSchoolCandidates(reach),
+        match: this.sortSchoolCandidates(match),
+        safe: this.sortSchoolCandidates(safe),
         risk: [
-          "GPA、语言成绩、课程匹配度和申请时间都会影响结果。",
-          "推荐结果为初筛，真实申请需核对学校官网。",
+          "成功率是基于 GPA、方向匹配、项目经历、语言和预算的咨询初筛估计，不是官方录取率。",
+          "热门项目需要逐校核对课程背景、语言要求、截止日期和申请轮次。",
+          budget < 35 ? "预算偏紧时建议降低伦敦/悉尼等高成本城市占比。" : "预算基本可覆盖多数候选，但仍需逐校核对学费和生活费。",
         ],
       };
 
@@ -359,12 +682,14 @@ export class ToolsService {
         fallback,
         system:
           "你是留学选校规划 Agent，擅长把学生背景拆成冲刺、匹配、保底三档，并给出院校+专业的可执行候选清单。",
-        user: `请基于以下学生背景生成三档院校推荐 JSON。字段：profile, reach, match, safe, risk。每档 2-3 所学校，每所必须包含 rank, name, nameZh, nameEn, major, majorZh, majorEn, successRate, reason, fit, risk, action。name 要用“中文校名 / English full name”，major 要用“中文专业 / English programme full name”。每档内部按 successRate 从高到低排序。successRate 是咨询初筛估计区间，不是学校官方录取率。
-${JSON.stringify(s, null, 2)}`,
+        user: `请基于以下学生背景和系统初筛候选生成三档院校推荐 JSON。字段：profile, algorithm, decisionBasis, reach, match, safe, risk。每档 2-3 所学校，每所必须包含 rank, name, nameZh, nameEn, major, majorZh, majorEn, successRate, city, direction, decisionBasis, reason, fit, risk, action。name 要用“中文校名 / English full name”，major 要用“中文专业 / English programme full name”。每档内部按 successRate 从高到低排序。successRate 是咨询初筛估计区间，不是学校官方录取率。
+${JSON.stringify(fallback, null, 2)}`,
         normalize: (value) => ({
           ...fallback,
           ...value,
           profile: value.profile || fallback.profile,
+          algorithm: value.algorithm || fallback.algorithm,
+          decisionBasis: this.asArray(value.decisionBasis).length ? this.asArray(value.decisionBasis) : fallback.decisionBasis,
           reach: this.sortSchoolCandidates(this.asArray(value.reach).length ? this.asArray(value.reach) : fallback.reach),
           match: this.sortSchoolCandidates(this.asArray(value.match).length ? this.asArray(value.match) : fallback.match),
           safe: this.sortSchoolCandidates(this.asArray(value.safe).length ? this.asArray(value.safe) : fallback.safe),

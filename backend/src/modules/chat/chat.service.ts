@@ -20,6 +20,9 @@ export interface SchoolAdvice {
   majorZh?: string;
   majorEn?: string;
   successRate?: string;
+  city?: string;
+  direction?: string;
+  decisionBasis?: string[];
   reason: string;
   fit: string;
   risk: string;
@@ -53,6 +56,7 @@ export interface StructuredAdvice {
   timeline: TimelineItem[];
   risks: string[];
   nextActions: string[];
+  decisionBasis?: string[];
   disclaimer: string;
 }
 
@@ -875,20 +879,77 @@ ${chunk.content || ''}`);
     return !this.llmService.isConfigured() || String(process.env.FORCE_MOCK_CHAT || '').toLowerCase() === 'true';
   }
 
+  private extractStudentProfileFromQuestion(query: string) {
+    const text = String(query || '');
+    const compact = this.normalizeForRerank(text);
+    const countryTerms = ['英国', '澳洲', '澳大利亚', '新加坡', '香港', '加拿大', '美国', '新西兰', '爱尔兰', '荷兰', '德国', '法国', '日本', '韩国', '马来西亚'];
+    const country = countryTerms.find((item) => text.includes(item)) || '英国';
+
+    const majorMap: Array<[RegExp, string]> = [
+      [/数据科学|data\s*science|数据分析|analytics/i, '数据科学'],
+      [/人工智能|机器学习|\bai\b|artificial\s*intelligence|machine\s*learning/i, '人工智能'],
+      [/软件工程|software\s*engineering|全栈|full\s*stack/i, '软件工程'],
+      [/网络安全|cyber\s*security|安全/i, '网络安全'],
+      [/金融科技|fintech/i, '金融科技'],
+      [/计算机科学|计算机|computer\s*science|\bcs\b/i, '计算机科学'],
+    ];
+    const major = majorMap.find(([pattern]) => pattern.test(text))?.[1] || '计算机科学';
+
+    const explicitScale = text.match(/(?:满分制|满分|\/|／)\s*(4(?:\.0)?|5(?:\.0)?|100)/i)?.[1];
+    const gpaMatch =
+      text.match(/(?:cgpa|gpa|绩点|成绩|均分)\s*[:：]?\s*([0-9]+(?:\.[0-9]+)?)(?:\s*[\/／]\s*(4(?:\.0)?|5(?:\.0)?|100))?/i) ||
+      text.match(/([0-9]+(?:\.[0-9]+)?)\s*[\/／]\s*(4(?:\.0)?|5(?:\.0)?|100)/i) ||
+      text.match(/均分\s*([0-9]+(?:\.[0-9]+)?)/i);
+    const gpaRaw = gpaMatch?.[1] || '';
+    const numericGpa = Number(gpaRaw || 0);
+    const scale = Number(gpaMatch?.[2] || explicitScale || (numericGpa > 10 ? 100 : 4));
+
+    const budgetMatch = text.match(/预算\s*(?:约|大概|大约)?\s*([0-9]+(?:\.[0-9]+)?\s*(?:万|w|W)(?:人民币|rmb|元)?)/i) || text.match(/([0-9]+(?:\.[0-9]+)?\s*(?:万|w|W)(?:人民币|rmb|元)?)\s*预算/i);
+    const budget = budgetMatch?.[1]?.replace(/[wW]/, '万') || '30万人民币';
+
+    const languageMatch =
+      text.match(/(?:IELTS|雅思)\s*([0-9]+(?:\.[0-9]+)?)/i) ||
+      text.match(/(?:TOEFL|托福)\s*([0-9]+(?:\.[0-9]+)?)/i) ||
+      text.match(/(?:PTE)\s*([0-9]+(?:\.[0-9]+)?)/i) ||
+      text.match(/(?:Duolingo|多邻国)\s*([0-9]+(?:\.[0-9]+)?)/i);
+    const languageType = /toefl|托福/i.test(text) ? 'TOEFL' : /pte/i.test(text) ? 'PTE' : /duolingo|多邻国/i.test(text) ? 'Duolingo' : /ielts|雅思/i.test(text) ? 'IELTS' : 'IELTS';
+    const languageScore = languageMatch?.[1] || '';
+
+    const degree = compact.includes('本科申请') && !compact.includes('硕士申请') ? '本科' : '硕士';
+    const education = text.includes('APU') ? '马来西亚 APU 计算机本科' : text.match(/背景[:：]([^。\n]+)/)?.[1]?.trim() || text.slice(0, 180);
+    const concern = text.match(/(?:顾虑|担心|希望)[:：]?([^。\n]+)/)?.[1]?.trim() || '';
+
+    return {
+      country,
+      targetCountry: country,
+      major,
+      degree,
+      cgpa: gpaRaw || undefined,
+      gpa: gpaRaw || undefined,
+      scale,
+      budget,
+      languageType,
+      languageScore,
+      language: languageScore ? `${languageType} ${languageScore}` : '暂未明确',
+      background: education,
+      experience: education,
+      concern,
+    };
+  }
+
   private async detectTools(query: string) {
     const calls: any[] = [];
     const lower = query.toLowerCase();
     const answerMode = this.detectAnswerMode(query);
+    const profile = this.extractStudentProfileFromQuestion(query);
 
-    if (/cgpa|gpa|绩点|均分/.test(lower)) {
-      const num = Number((query.match(/\d+(\.\d+)?/) || ['3.2'])[0]);
-
+    if (/cgpa|gpa|绩点|均分|成绩/.test(lower) && profile.cgpa) {
       calls.push({
         name: 'CGPA 换算工具',
         result: this.tools.convertCgpa({
-          cgpa: num,
-          scale: 4,
-          targetCountry: '英国/澳洲',
+          cgpa: Number(profile.cgpa),
+          scale: Number(profile.scale || 4),
+          targetCountry: profile.targetCountry || profile.country || '英国',
         }),
       });
     }
@@ -896,12 +957,7 @@ ${chunk.content || ''}`);
     if (answerMode === 'school_plan') {
       calls.push({
         name: '院校推荐工具',
-        result: await this.tools.recommendSchools({
-          gpa: 3.2,
-          country: '英国/澳洲',
-          major: '计算机',
-          budget: '30万人民币',
-        }),
+        result: await this.tools.recommendSchools(profile),
       });
     }
 
@@ -910,8 +966,9 @@ ${chunk.content || ''}`);
         name: '销售话术生成工具',
         result: await this.tools.generateCopywriting({
           name: '同学',
-          country: '英国',
-          concern: '选校和成功率',
+          country: profile.country || '英国',
+          major: profile.major || '计算机科学',
+          concern: profile.concern || '选校和成功率',
         }),
       });
     }
@@ -967,19 +1024,73 @@ ${chunk.content || ''}`);
 
   private fallbackStructured(question: string, sources: any[], toolCalls: any[]): StructuredAdvice {
     const cgpaTool = toolCalls.find((t) => t.name.includes('CGPA'));
-    const cgpaText = cgpaTool?.result?.cgpa ? `${cgpaTool.result.cgpa}/4.0` : '待补充';
+    const schoolTool = toolCalls.find((t) => t.name.includes('院校推荐'));
+    const schoolResult = schoolTool?.result || {};
+    const extractedProfile = this.extractStudentProfileFromQuestion(question);
+    const profile = schoolResult.profile || extractedProfile;
+    const cgpaText = cgpaTool?.result?.cgpa
+      ? `${cgpaTool.result.cgpa}/${cgpaTool.result.scale || profile.scale || 4}`
+      : profile.cgpa
+        ? `${profile.cgpa}/${profile.scale || 4}`
+        : '待补充';
+
+    const toSchools = (items: any[] = []) => (Array.isArray(items) ? items : [])
+      .map((school, index) => ({
+        rank: Number(school.rank || index + 1),
+        name: school.name || [school.nameZh, school.nameEn].filter(Boolean).join(' / '),
+        nameZh: school.nameZh,
+        nameEn: school.nameEn,
+        major: school.major || [school.majorZh, school.majorEn].filter(Boolean).join(' / '),
+        majorZh: school.majorZh,
+        majorEn: school.majorEn,
+        successRate: school.successRate,
+        city: school.city,
+        direction: school.direction,
+        decisionBasis: Array.isArray(school.decisionBasis) ? school.decisionBasis : [],
+        reason: school.reason || '该项目与学生目标方向相关，可作为当前申请组合候选。',
+        fit: school.fit || (Array.isArray(school.decisionBasis) ? school.decisionBasis.slice(0, 2).join('；') : '需结合 GPA、课程和项目经历判断。'),
+        risk: school.risk || '需逐校核对官网课程、语言和截止日期。',
+        action: school.action || '核对官网要求并准备成绩单、课程描述、PS/CV。',
+      }));
+
+    const toolTiers = [
+      {
+        tier: '冲刺',
+        level: '录取有挑战，需要强项目和文书支撑',
+        strategy: '控制数量，选择与背景最贴合的高目标项目，不建议盲投。',
+        schools: toSchools(schoolResult.reach),
+      },
+      {
+        tier: '匹配',
+        level: '录取概率相对均衡，是主申请区间',
+        strategy: '重点投入文书、推荐信、课程匹配说明和项目经历包装。',
+        schools: toSchools(schoolResult.match),
+      },
+      {
+        tier: '保底',
+        level: '录取安全性更高，用于控制整体风险',
+        strategy: '选择专业匹配、预算压力低、录取门槛相对友好的学校。',
+        schools: toSchools(schoolResult.safe),
+      },
+    ];
+
+    const hasToolSchools = toolTiers.some((tier) => tier.schools.length > 0);
 
     return this.normalizeSchoolRanking({
-      summary: '建议先用 GPA、预算、目标专业和背景项目做初筛，再把院校分为冲刺、匹配、保底三档。',
+      summary: '系统已根据用户问题中的成绩、目标国家、专业方向、预算、语言和背景项目做初筛，并按冲刺、匹配、保底三档输出院校与具体项目。',
       profile: {
-        education: question.includes('APU') ? 'APU 计算机本科' : '本科背景待补充',
+        education: profile.experience || profile.background || (question.includes('APU') ? 'APU 计算机本科' : '本科背景待补充'),
         gpa: cgpaText,
-        targetCountry: question.includes('英国') ? '英国' : '目标国家待确认',
-        targetMajor: question.includes('计算机') ? '计算机 / 软件工程 / 数据方向' : '目标专业待确认',
-        budget: question.includes('30') ? '约 30 万人民币' : '预算待确认',
-        competitiveness: '具备申请基础，但需要结合语言成绩、项目经历、实习和课程匹配度进一步判断。',
+        targetCountry: profile.targetCountry || profile.country || (question.includes('英国') ? '英国' : '目标国家待确认'),
+        targetMajor: profile.major || (question.includes('数据') ? '数据科学' : '计算机 / 软件工程 / 数据方向'),
+        budget: profile.budget || (question.includes('30') ? '约 30 万人民币' : '预算待确认'),
+        competitiveness: `当前结果来自 ${schoolResult.algorithm || 'programme-fit'} 初筛；还需要结合课程描述、语言成绩、项目证据和官网要求复核。`,
       },
-      schoolTiers: [
+      decisionBasis: Array.isArray(schoolResult.decisionBasis) ? schoolResult.decisionBasis : [
+        '成绩、专业方向、项目经历、语言和预算共同影响三档定位。',
+        '同一档内部按咨询初筛成功率区间排序。',
+      ],
+      schoolTiers: hasToolSchools ? toolTiers : [
         {
           tier: '冲刺',
           level: '录取有挑战，需要强项目和文书支撑',
@@ -1020,20 +1131,6 @@ ${chunk.content || ''}`);
               risk: '热门专业可能竞争较高，需要尽早递交。',
               action: '准备课程描述、成绩单、个人陈述和推荐信。',
             },
-            {
-              rank: 2,
-              name: '利物浦大学 / University of Liverpool',
-              nameZh: '利物浦大学',
-              nameEn: 'University of Liverpool',
-              major: '高级计算机科学 MSc / Advanced Computer Science MSc',
-              majorZh: '高级计算机科学 MSc',
-              majorEn: 'Advanced Computer Science MSc',
-              successRate: '58%-68%',
-              reason: '计算机相关项目较完整，申请策略上适合作为匹配档。',
-              fit: '适合想要稳定申请结果，同时保留学校认可度的学生。',
-              risk: '不同项目对课程背景要求不同，要逐个核对。',
-              action: '筛选 1 到 2 个最匹配项目，不要盲投。',
-            },
           ],
         },
         {
@@ -1063,8 +1160,8 @@ ${chunk.content || ''}`);
         { phase: '申请阶段', time: '开放申请后 1-2 个月内', tasks: ['优先提交匹配院校', '同步准备冲刺和保底', '检查语言成绩要求'] },
         { phase: '补强阶段', time: '等待 offer 期间', tasks: ['补充作品集或 GitHub 项目', '继续刷语言成绩', '准备面试和奖学金材料'] },
       ],
-      risks: ['30 万预算在伦敦可能偏紧。', '仅有 GPA 不足以判断全部录取概率。', '最终要求必须以学校官网当年页面为准。'],
-      nextActions: ['补充雅思/托福情况。', '确认是否接受非伦敦城市。', '整理 1-2 个计算机相关项目经历。'],
+      risks: Array.isArray(schoolResult.risk) && schoolResult.risk.length ? schoolResult.risk : ['预算、课程匹配和语言成绩会影响真实结果。', '仅有 GPA 不足以判断全部录取概率。', '最终要求必须以学校官网当年页面为准。'],
+      nextActions: ['补充或确认雅思/托福情况。', '整理课程描述、项目说明、实习证明和 GitHub/Demo。', '逐校核对官网项目名称、学费、语言和截止日期。'],
       disclaimer: '以上成功率为咨询初筛估计，不代表学校官方录取率；真实申请请以学校官网和当年招生要求为准。',
     }) as StructuredAdvice;
   }
@@ -1285,6 +1382,9 @@ JSON 格式必须严格如下：
           "majorZh": "中文专业名",
           "majorEn": "English programme full name",
           "successRate": "咨询初筛成功率区间，例如 55%-65%",
+          "city": "城市",
+          "direction": "项目方向",
+          "decisionBasis": ["推荐依据1", "推荐依据2"],
           "reason": "推荐原因，25到45字",
           "fit": "适配点，25到45字",
           "risk": "风险点，25到45字",
@@ -1310,12 +1410,13 @@ JSON 格式必须严格如下：
   ],
   "risks": ["风险1", "风险2", "风险3"],
   "nextActions": ["下一步1", "下一步2", "下一步3"],
+  "decisionBasis": ["整体推荐依据1", "整体推荐依据2"],
   "disclaimer": "真实申请请以学校官网和当年招生要求为准。"
 }
 
 内容要求：
 1. 三档选校都必须给出，冲刺、匹配、保底每档各给 2 到 3 所学校。
-2. 每所学校必须包含中英文院校全名、对应专业/项目中英文名称、successRate 咨询初筛成功率区间。
+2. 每所学校必须包含中英文院校全名、对应专业/项目中英文名称、successRate 咨询初筛成功率区间、city、direction、decisionBasis。
 3. 每一档内部必须按 successRate 从高到低排序，rank 从 1 开始。
 4. successRate 只能表达咨询初筛估计区间，不要声称是学校官方录取率；不确定时写“需要核对官网要求”。
 5. 每所学校的 reason、fit、risk、action 每项控制在 25 到 45 字，避免输出过长。
@@ -1338,11 +1439,12 @@ ${toolText}
       },
     ]);
 
-    const structured = this.normalizeSchoolRanking(this.parseStructuredAnswer(raw));
+    const parsed = this.normalizeSchoolRanking(this.parseStructuredAnswer(raw));
+    const structured = parsed || this.fallbackStructured(question, sources, toolCalls);
     return {
       raw,
       structured,
-      answer: structured ? this.structuredToPlainText(structured) : raw,
+      answer: this.structuredToPlainText(structured),
     };
   }
 
@@ -1450,8 +1552,14 @@ ${toolText}
         fallbackReason = 'llm_call_failed';
         errorType = error?.name || 'LLMError';
         errorMessage = error?.message || String(error);
-        answer = `真实大模型调用失败。错误信息：${errorMessage}`;
-        rawAnswer = answer;
+        if (answerMode === 'school_plan') {
+          structured = this.fallbackStructured(question, sources, toolCalls);
+          answer = this.structuredToPlainText(structured);
+          rawAnswer = JSON.stringify(structured, null, 2);
+        } else {
+          answer = `真实大模型调用失败。错误信息：${errorMessage}`;
+          rawAnswer = answer;
+        }
       }
     }
 
