@@ -1,0 +1,10 @@
+# Netlify configuration for EduAgent frontend deployment.
+# Build settings are still recommended to fill in the Netlify UI:
+# Base directory: frontend
+# Build command: npm run build
+# Publish directory: dist
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
